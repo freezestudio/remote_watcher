@@ -13,13 +13,6 @@ include_directories(
 
 # file(GLOB gtest_src CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/*.cc)
 add_executable(service_utils_test
-    # ${gtest_src}
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest.cc
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-filepath.cc
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-port.cc
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-printers.cc
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-death-test.cc
-    # ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-test-part.cc
     ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest-all.cc
     ${PROJECT_SOURCE_DIR}/3rdpart/googletest/googletest/src/gtest_main.cc
     ./service-utils.test.cc

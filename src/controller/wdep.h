@@ -5,7 +5,7 @@
 #include <atlbase.h>
 #include <atlapp.h>
 
-extern CAppModule _AppModule;
+extern WTL::CAppModule _AppModule;
 
 #include <atlwin.h>
 #include "atlframe.h"

@@ -18,6 +18,7 @@ target_link_options(monitor
     PRIVATE /SUBSYSTEM:WINDOWS
     PUBLIC /MANIFESTUAC:"level='requireAdministrator' uiAccess='false'"
 )
+target_sources(monitor PUBLIC ./assets/controller.rc ./assets/controller.ico ./assets/blob.zip)
 
 add_subdirectory(src/service)
 

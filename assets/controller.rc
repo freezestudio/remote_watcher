@@ -1,0 +1,39 @@
+//
+// rc.exe /I ../3rdpart/wtl/include /D _DEBUG /D _UNICODE /D UNICODE /L 0x804 /nologo /fo ../build/Debug/monitor.res
+//
+#include "../include/assets.h"
+#include "atlres.h"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+
+IDR_MAINFRAME ICON "controller.ico"
+IDR_MAINFRAME IDR_BLOB "blob.zip"
+
+IDD_MAINDLG DIALOGEX 0,0,200,100
+STYLE DS_SETFONT|WS_MINIMIZEBOX|WS_CAPTION|WS_SYSMENU
+CAPTION "Service Controller"
+FONT 9,"Segoe UI",0,0,0x00
+BEGIN
+
+END
+
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION 1,0,0,1
+    PRODUCTVERSION 1,0,0,1
+    FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+    FILEFLAGS 0x1L
+#else
+    FILEFLAGS 0x0L
+#endif
+    FILEOS 0x4L
+    FILETYPE 0x2L
+    FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        VALUE "FileDescription", "Install and Uninstall Service"
+        VALUE "FileVersion",     "1,0,0,1"  
+    END
+END
