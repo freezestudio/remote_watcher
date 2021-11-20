@@ -1,9 +1,9 @@
-[submodule ".\\3rdpart\\wtl"]
-	path = .\\3rdpart\\wtl
+[submodule "3rdpart/wtl"]
+	path = 3rdpart/wtl
 	url = https://git.code.sf.net/p/wtl/git
-[submodule ".\\3rdpart\\nats"]
-	path = .\\3rdpart\\nats
+[submodule "3rdpartnats"]
+	path = 3rdpart/nats
 	url = https://github.com/nats-io/nats.c.git
-[submodule ".\\3rdpart\\googletest"]
-	path = .\\3rdpart\\googletest
+[submodule "3rdpart/googletest"]
+	path = 3rdpart/googletest
 	url = https://github.com/google/googletest.git
