@@ -17,7 +17,7 @@ DWORD __stdcall handler_proc(
 void register_handler();
 void init_threadpool();
 
-void __stdcall entry(DWORD argc LPWSTR * argv)
+void __stdcall entry(DWORD argc, LPWSTR * argv)
 {
     register_handler();
 }

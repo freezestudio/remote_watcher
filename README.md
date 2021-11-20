@@ -1,3 +1,8 @@
 # remote_watcher
 
-Windows Service routines for remote file monitoring applied to local area network
+1. 实现服务的安装与卸载
+2. 服务自动运行
+3. 线程池
+4. nats 通信
+5. 监控指定文件夹
+
