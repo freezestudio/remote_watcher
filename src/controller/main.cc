@@ -1,3 +1,4 @@
+#include "dep.h"
 #include "wdep.h"
 
 CAppModule _AppModule;

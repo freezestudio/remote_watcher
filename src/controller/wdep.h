@@ -2,12 +2,12 @@
 // Window Dependence Files
 //
 
-#include "atlbase.h"
-#include "atlapp.h"
+#include <atlbase.h>
+#include <atlapp.h>
 
 extern CAppModule _AppModule;
 
-#include "atlwin.h"
+#include <atlwin.h>
 #include "atlframe.h"
 #include "atlctrls.h"
 #include "atlctrlx.h"
