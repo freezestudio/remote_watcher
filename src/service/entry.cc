@@ -26,3 +26,8 @@ void register_handler()
 {
     ss_handle = ::RegisterServiceCtrlHandlerExW(SERVICE_NAME, handler_proc, nullptr);
 }
+
+void init_threadpool()
+{
+    SERVICE_WIN32;
+}

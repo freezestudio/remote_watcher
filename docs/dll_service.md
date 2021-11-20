@@ -4,4 +4,36 @@
 
 ## 注册表项
 
+服务
+
+```shell
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME:
+#   DependOnService REG_MULTI_SZ  xxx yyy ...
+  Description        REG_SZ        服务说明
+  DisplayName        REG_SZ        SERVICE_NAME
+#   ErrorControl       REG_DWORD     0x00000001
+#   FailureActions     REG_BINARY    80 51 01 00 ...
+  ImagePath          REG_EXPAND_SZ %SystemRoot%\system32\svchost.exe -k LocalService -p
+  ObjectName         REG_SZ        LocalSystem
+#   RequiredPrivileges REG_MULTI_SZ  SelmpersonatePrivilege SeCreateGlobalPrivilege
+  Start              REG_DWORD     0x00000002 # 1:延迟 2:自动 3:手动 4:禁用
+  Type               REG_WORD      0x00000010
+
+  \Parameters:
+    ServiceDll             REG_SZ        d:\Program Files\xxx\yyy.dll
+    ServiceDllUnloadOnStop REG_DWORD     0x00000001
+    ServiceMain            REG_SZ        ServiceMain
+```
+
+SvcHost 组
+
+```
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost:
+  LocalService             REG_MULTI_SZ      nsi WdiServiceHost ... SERVICE_NAME
+```
+
+
 ## dll 及相关文件的释放位置
+
+1. 所有文件使用 zip 打包
+2. 制作资源 dll
