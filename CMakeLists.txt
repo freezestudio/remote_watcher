@@ -8,5 +8,9 @@ list(APPEND CMAKE_MODULE_PATH
 include(common)
 
 include_directories(include)
+
 add_executable(monitor src/controller/main.cc)
+target_include_directories(monitor PUBLIC 3rdpart/wtl/include)
+
 add_library(mnsvc SHARED src/service/entry.cc)
+target_include_directories(mnsvc PUBLIC 3rdpart/nats/src)
