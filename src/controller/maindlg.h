@@ -11,6 +11,14 @@ public:
     // use in: CDialogImpl::Create(...)
     static constexpr auto IDD = IDD_MAINDLG;
 
+    // Controls
+public:
+    CImageList mInstallButtonImage;
+	CImageList mUninstallButtonImage;
+    CBitmapButton mInstallButton;
+    CBitmapButton mUninstallButton;
+    CIPAddressCtrl mIP;
+
 public:
     virtual BOOL PreTranslateMessage(LPMSG pMsg) /* override */
     {
@@ -32,6 +40,9 @@ public:
         MSG_WM_DESTROY(OnDestroy)
         //SYS_CLOSE_BUTTON
         COMMAND_ID_HANDLER_EX(2, OnClose)
+        // PushButton
+        COMMAND_ID_HANDLER_EX(IDC_BTN_INSTALL, OnInstall)
+        COMMAND_ID_HANDLER_EX(IDC_BTN_UNINSTALL, OnUninstall)
     END_MSG_MAP()
 
 public:
@@ -41,7 +52,7 @@ public:
 
         _SetIcon();
         _SetIcon(true);
-
+        _Subclass();
         _AddMessage();
 
         UIAddChildWindowContainer(m_hWnd);
@@ -51,15 +62,49 @@ public:
 
     void OnDestroy()
     {
+        _UnSubclass();
         _RemoveMessage();
     }
 
-    void OnClose(UINT uNotifyCode, int nID, CWindow wndCtl)
+    void OnClose(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
     {
         _Close();
     }
 
+    void OnInstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
+    {
+
+    }
+
+    void OnUninstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
+    {
+
+    }
+
 private:
+    void _Subclass()
+    {
+        mIP.Attach(GetDlgItem(IDC_REMOTEIP));
+
+        mInstallButtonImage.CreateFromImage(IDR_BMP_INSTALL, 88, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);		
+		mInstallButton.SetImageList(mInstallButtonImage);
+		mInstallButton.SetImages(0, 1, 2, 3);
+		mInstallButton.SubclassWindow(GetDlgItem(IDC_BTN_INSTALL));
+
+		mUninstallButtonImage.CreateFromImage(IDR_BMP_UNINSTALL, 88, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);
+		mUninstallButton.SetImageList(mUninstallButtonImage);
+		mUninstallButton.SetImages(0, 1, 2, 3);
+		mUninstallButton.SubclassWindow(GetDlgItem(IDC_BTN_UNINSTALL));
+		mUninstallButton.EnableWindow(FALSE);
+    }
+
+    void _UnSubclass()
+    {
+        mIP.Detach();
+        mInstallButton.UnsubclassWindow();
+		mUninstallButton.UnsubclassWindow();
+    }
+
     void _SetIcon(bool _small = false)
     {
         auto cx = !_small ? SM_CXICON : SM_CXSMICON;

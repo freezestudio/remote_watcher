@@ -37,3 +37,18 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost:
 
 1. 所有文件使用 zip 打包
 2. 制作资源 dll
+
+## 概念
+
+* 服务应用程序: 符合(SCM)接口规则
+* 驱动程序服务: 不与(SCM)交互
+* 服务控制管理器
+* 服务数据库 `HKEY_LOCAL_MACHINE_SYSTEM\CurrentControlSet\Services`
+* 服务
+* 服务计划
+* 服务配置
+* 服务控制
+
+## 其它
+
+* 线程池与 APC

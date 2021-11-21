@@ -5,6 +5,7 @@
 #include "assets.h"
 #include "wdep.h"
 
+#include "setup.h"
 #include "maindlg.h"
 
 WTL::CAppModule _AppModule;
