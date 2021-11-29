@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20.0)
 
 project(remote_win32)
 
@@ -7,16 +7,19 @@ list(APPEND CMAKE_MODULE_PATH
 )
 include(common)
 
+#
+# rgmsvc.dll service
+#
 add_subdirectory(src/service)
 
 #
-# the Manager of Service (mnsvc)
+# the Manager of Service (rgmsvc)
 #
 
 file(GLOB MONITOR_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/*.cc)
 add_executable(monitor ${MONITOR_SRC})
 target_include_directories(monitor 
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/wtl/include ./include
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/wtl/include ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/zlib ./include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/controller 
 )
 target_link_options(monitor
@@ -29,7 +32,7 @@ target_sources(monitor PUBLIC
     ./assets/blob.zip
 )
 add_custom_command(TARGET monitor PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "will build monitor project ..."
+    COMMAND ${CMAKE_COMMAND} -E echo "will build project: monitor ..."
 )
 
 #
@@ -42,7 +45,7 @@ add_custom_target(debug-only
 )
 
 #
-# Some Test
+# Some GoogleTest
 #
 
 add_subdirectory(test)

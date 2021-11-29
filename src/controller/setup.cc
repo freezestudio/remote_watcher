@@ -1,9 +1,9 @@
 #include "dep.h"
+#include "wdep.h"
 #include "setup.h"
 #include "assets.h"
-#include "atluser.h"
 
-#define SERVICE_NAME L"mnsvc"
+#define SERVICE_NAME L"rgmsvc"
 #define SERVICE_PATH L"xMonit"
 
 namespace fs = std::filesystem;
@@ -96,9 +96,9 @@ void install_service()
         return;
     }
 
-    // mnsvc append to:
+    // rgmsvc append to:
     // HKLM_Software\Microsoft\Windows NT\CurrentVersion\Svchost\LocalService
-    // Type: REG_MULTI_SZ Value: "mnsvc"
+    // Type: REG_MULTI_SZ Value: SERVICE_NAME
     // ...
 
     CloseServiceHandle(_service);

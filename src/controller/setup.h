@@ -7,8 +7,11 @@
 #ifndef SETUP_H
 #define SETUP_H
 
-#include <compressapi.h>
-#pragma comment(lib, "Cabinet.lib")
+// Need >= Windows 8
+// #include <compressapi.h>
+// #pragma comment(lib, "Cabinet.lib")
+
+#include "zlib.h"
 
 void install_service();
 void uninstall_service();
