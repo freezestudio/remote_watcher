@@ -36,3 +36,5 @@ mobj/
 *.exe
 *.out
 *.app
+
+tools/*.exe

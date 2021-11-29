@@ -11,8 +11,6 @@
 // #include <compressapi.h>
 // #pragma comment(lib, "Cabinet.lib")
 
-#include "zlib.h"
-
 void install_service();
 void uninstall_service();
 void start_service();

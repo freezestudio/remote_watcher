@@ -24,7 +24,12 @@ set(AMD64 OFF)
 add_subdirectory(3rdpart/zlib ${PROJECT_BINARY_DIR}/zlib)
 
 #
-# compile googletest
+# minizip (miniunz)
+#
+add_subdirectory(tools)
+
+#
+# compile googletest (debug only)
 #
 set(BUILD_GMOCK OFF)
 set(INSTALL_GTEST OFF)
@@ -74,7 +79,10 @@ add_custom_target(debug-only
 )
 
 #
-# Some GoogleTest
+# Some GoogleTest (debug only)
 #
 
-add_subdirectory(test)
+# ? can not test condition
+if($<CONFIG:Debug>)
+    add_subdirectory(test)
+endif()

@@ -25,11 +25,12 @@ include_directories(
 # ${CMAKE_<CONFIG>_POSTFIX}: $<$<CONFIG:Debug>:d>
 # $<CONFIG:cfg-list>: include=1, else 0
 #
+# link_libraries(
+#     ${PROJECT_BINARY_DIR}/lib/$<CONFIG>/gtest$<$<CONFIG:Debug>:d>.lib
+#     ${PROJECT_BINARY_DIR}/lib/$<CONFIG>/gtest_main$<$<CONFIG:Debug>:d>.lib
+# )
 
-link_libraries(
-    ${PROJECT_BINARY_DIR}/lib/$<CONFIG>/gtest$<$<CONFIG:Debug>:d>.lib
-    ${PROJECT_BINARY_DIR}/lib/$<CONFIG>/gtest_main$<$<CONFIG:Debug>:d>.lib
-)
+link_libraries(gtest gtest_main)
 
 #
 # executor
