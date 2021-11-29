@@ -1,12 +1,16 @@
 
-add_library(mnsvc SHARED
+add_library(rgmsvc SHARED
     ./utils.cc
     ./entry.cc
 )
-target_include_directories(mnsvc
+target_include_directories(rgmsvc
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
     PRIVATE ./
 )
-add_custom_command(TARGET mnsvc POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "mnsvc project build done."
+
+#
+# compress rgmsvc.dll and dependencies
+#
+add_custom_command(TARGET rgmsvc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "rgmsvc project build done."
 )

@@ -8,6 +8,73 @@
 
 namespace fs = std::filesystem;
 
+// Need >= Windows 8
+// static void compress_blob()
+// {
+//
+//     DECOMPRESSOR_HANDLE hdecomp;
+//     auto _created = CreateDecompressor(COMPRESS_ALGORITHM_LZMS, nullptr, &hdecomp);
+//     if(!_created)
+//     {
+//         auto _msg = std::format(L"Failed to create decompressor: {}", GetLastError());
+//         OutputDebugString(_msg.data());
+//         return;
+//     }
+//
+//     PBYTE _buffer = nullptr;
+//     size_t _buffer_size = 0;
+//     auto _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
+//     if (!_decompressed)
+//     {
+//         auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
+//         OutputDebugString(_msg.data());
+//         auto _err = GetLastError();
+//         if(_err != ERROR_INSUFFICIENT_BUFFER)
+//         {
+//             return;
+//         }
+//         _buffer = new BYTE[_buffer_size];
+//         if(!_buffer)
+//         {
+//             return;
+//         }
+//     }
+//     _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
+//     if(!_decompressed)
+//     {
+//         auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
+//         OutputDebugString(_msg.data());
+//         return;
+//     } 
+//     // copy all decompressed files to install path
+//     // ...
+//
+//     delete [] _buffer;
+//     CloseDecompressor(hdecomp);   
+// }
+
+static bool read_resource(void** data, int* len)
+{
+    
+    auto _resource = WTL::CResource();
+    auto _loaded = _resource.Load(MAKEINTRESOURCE(IDR_BLOB), MAKEINTRESOURCE(IDR_MAINFRAME));
+    if(!_loaded)
+    {
+        auto _msg = std::format(L"Failed to load resource: {}", GetLastError());
+        OutputDebugString(_msg.data());
+        return false;
+    }
+    *len = _resource.GetSize();
+    *data = _resource.Lock();
+
+    return true;
+}
+
+static void compress_blobs()
+{
+    
+}
+
 void install_service()
 {
     auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
@@ -15,56 +82,13 @@ void install_service()
     ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
     auto _install_path = fs::path(_path_buf);
 
+    // decompress blob
     auto _resource = WTL::CResource();
-    auto _loaded = _resource.Load(MAKEINTRESOURCE(IDR_BLOB), MAKEINTRESOURCE(IDR_MAINFRAME));
-    if(!_loaded)
-    {
-        auto _msg = std::format(L"Failed to load resource: {}", GetLastError());
-        OutputDebugString(_msg.data());
-        return;
-    }
-    auto _data_size = _resource.GetSize();
-    auto _data = _resource.Lock();
-    DECOMPRESSOR_HANDLE hdecomp;
-    auto _created = CreateDecompressor(COMPRESS_ALGORITHM_LZMS, nullptr, &hdecomp);
-    if(!_created)
-    {
-        auto _msg = std::format(L"Failed to create decompressor: {}", GetLastError());
-        OutputDebugString(_msg.data());
-        return;
-    }
-
-    PBYTE _buffer = nullptr;
-    size_t _buffer_size = 0;
-    auto _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
-    if (!_decompressed)
-    {
-        auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
-        OutputDebugString(_msg.data());
-        auto _err = GetLastError();
-        if(_err != ERROR_INSUFFICIENT_BUFFER)
-        {
-            return;
-        }
-        _buffer = new BYTE[_buffer_size];
-        if(!_buffer)
-        {
-            return;
-        }
-    }
-    _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
-    if(!_decompressed)
-    {
-        auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
-        OutputDebugString(_msg.data());
-        return;
-    }
-    
-    // copy all decompressed files to install path
+    void* _data = nullptr;
+    int _len = 0;
+    read_resource(&_data, &_len);
     // ...
-
-    delete [] _buffer;
-    CloseDecompressor(hdecomp);
+    _resource.Release();
 
     auto _scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
     if (_scm == nullptr)
@@ -74,7 +98,7 @@ void install_service()
         return;
     }
 
-    auto _service_path = _install_path/SERVICE_PATH/L"mnsvc.dll";
+    auto _service_path = _install_path/SERVICE_PATH/L"rgmsvc.dll";
     auto _service = CreateService(
         _scm,
         SERVICE_NAME,
