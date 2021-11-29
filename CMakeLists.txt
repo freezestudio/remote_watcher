@@ -72,8 +72,8 @@ add_custom_command(TARGET monitor PRE_BUILD
 #
 # about CMAKE_BUILD_TYPE
 #
-message(STATUS "Has [CMAKE_BUILD_TYPE]? ", ${CMAKE_BUILD_TYPE})
-message(STATUS "Has [CMAKE_CONFIG_TYPE]? ", ${CMAKE_CONFIG_TYPE})
+message(STATUS "Has [CMAKE_BUILD_TYPE]? " ${CMAKE_BUILD_TYPE})
+message(STATUS "Has [CMAKE_CONFIG_TYPE]? " ${CMAKE_CONFIG_TYPE})
 add_custom_target(debug-only
     COMMAND ${CMAKE_COMMAND} -E echo "Is Debug Config? $<CONFIG:Debug>"
 )
@@ -82,7 +82,9 @@ add_custom_target(debug-only
 # Some GoogleTest (debug only)
 #
 
-# ? can not test condition
-if($<CONFIG:Debug>)
+option(THIS_DISABLE_DEBUG_TEST "if config is not `Debug`, then disable build tests." ON)
+# ? can not test condition $<CONFIG:Debug>
+message(STATUS "THIS_DISABLE_DEBUG_TEST? " ${THIS_DISABLE_DEBUG_TEST})
+if((CMAKE_BUILD_TYPE EQUAL "Debug") OR (NOT THIS_DISABLE_DEBUG_TEST))
     add_subdirectory(test)
 endif()

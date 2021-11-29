@@ -33,10 +33,8 @@ include_directories(
 link_libraries(gtest gtest_main)
 
 #
-# executor
+# executors
 #
-add_executable(service_utils_test
-    service-utils.test.cc
-)
 
+add_executable(service_utils_test service-utils.test.cc)
 add_executable(service_zlib_test service-zlib.test.cc)
