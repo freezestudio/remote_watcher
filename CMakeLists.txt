@@ -65,8 +65,12 @@ target_sources(monitor PUBLIC
     ./assets/controller.ico
     ./assets/blob.zip
 )
+
+#
+# custom command: check blob
+#
 add_custom_command(TARGET monitor PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "will build project: monitor ..."
+    COMMAND ${CMAKE_COMMAND} -E echo "before build monitor: check blob ..."
 )
 
 #
@@ -74,6 +78,10 @@ add_custom_command(TARGET monitor PRE_BUILD
 #
 message(STATUS "Has [CMAKE_BUILD_TYPE]? " ${CMAKE_BUILD_TYPE})
 message(STATUS "Has [CMAKE_CONFIG_TYPE]? " ${CMAKE_CONFIG_TYPE})
+
+#
+# mock-target: ...
+#
 add_custom_target(debug-only
     COMMAND ${CMAKE_COMMAND} -E echo "Is Debug Config? $<CONFIG:Debug>"
 )

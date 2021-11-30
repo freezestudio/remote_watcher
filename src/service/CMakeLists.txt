@@ -1,9 +1,13 @@
+#
+#
+#
 
-add_library(rgmsvc SHARED
+set(SERVICE_NAME rgmsvc)
+add_library(${SERVICE_NAME} SHARED
     ./utils.cc
     ./entry.cc
 )
-target_include_directories(rgmsvc
+target_include_directories(${SERVICE_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
     PRIVATE ./
 )
@@ -11,6 +15,16 @@ target_include_directories(rgmsvc
 #
 # compress rgmsvc.dll and dependencies
 #
-add_custom_command(TARGET rgmsvc POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "rgmsvc project build done."
+set(SERVICE_FILE_NAME "${SERVICE_NAME}.dll")
+set(DEP_CORE_FILE_NAME "api-ms-win-core-file-l1-2-0.dll")
+set(SERVICE_FILE "${PROJECT_BINARY_DIR}/service/$<CONFIG>/${SERVICE_FILE_NAME}")
+set(DEP_CORE_FILE "D:/Windows Kits/10/bin/x64/${DEP_CORE_FILE_NAME}")
+add_custom_command(TARGET ${SERVICE_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Make ${SERVICE_NAME} blob bundle ..."
+    COMMAND ${CMAKE_COMMAND} -E copy ${SERVICE_FILE} ${PROJECT_SOURCE_DIR}/tools/${SERVICE_FILE_NAME}
+    COMMAND ${CMAKE_COMMAND} -E copy ${DEP_CORE_FILE} ${PROJECT_SOURCE_DIR}/tools/${DEP_CORE_FILE_NAME}
+    # TODO: using cmake-tar
+    COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_SOURCE_DIR}/tools minizip.exe -o -0 "${PROJECT_SOURCE_DIR}/assets/blob.zip" "${SERVICE_FILE_NAME}" "${DEP_CORE_FILE_NAME}"
+    COMMAND ${CMAKE_COMMAND} -E rm -f "${PROJECT_SOURCE_DIR}/tools/${SERVICE_FILE_NAME}" "${PROJECT_SOURCE_DIR}/tools/${DEP_CORE_FILE_NAME}"
+    COMMAND ${CMAKE_COMMAND} -E echo "Make ${SERVICE_NAME} blob bundle done."
 )
