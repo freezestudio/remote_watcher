@@ -25,8 +25,9 @@ add_subdirectory(3rdpart/zlib ${PROJECT_BINARY_DIR}/zlib)
 
 #
 # minizip (miniunz)
+# deprecated. ignore now.
 #
-add_subdirectory(tools)
+# add_subdirectory(tools)
 
 #
 # compile googletest (debug only)
@@ -53,8 +54,9 @@ add_subdirectory(src/service ${PROJECT_BINARY_DIR}/service)
 file(GLOB MONITOR_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/*.cc)
 add_executable(monitor ${MONITOR_SRC})
 target_include_directories(monitor 
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/wtl/include ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/zlib ./include
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/controller 
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/wtl/include ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/zlib
+    PUBLIC ${PROJECT_BINARY_DIR}/zlib
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/controller  ./include
 )
 target_link_options(monitor
     PRIVATE /SUBSYSTEM:WINDOWS
@@ -63,8 +65,11 @@ target_link_options(monitor
 target_sources(monitor PUBLIC
     ./assets/controller.rc
     ./assets/controller.ico
-    ./assets/blob.zip
+    # ./assets/blob.zip
+    # TODO: test if exists
+    ./assets/blob.tgz
 )
+target_link_libraries(monitor zlibstatic)
 
 #
 # custom command: check blob

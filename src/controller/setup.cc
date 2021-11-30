@@ -70,8 +70,13 @@ static bool read_resource(void** data, int* len)
     return true;
 }
 
-static void compress_blobs()
+static void decompress_blobs(void* blob, const char* out_path)
 {
+    // save tgz = path/to/temp/blob.tgz
+    // tar(tgz, out_path);
+
+    auto _temp_path = fs::temp_directory_path();
+    _temp_path /=SERVICE_PATH;
     
 }
 

@@ -16,5 +16,6 @@ void uninstall_service();
 void start_service();
 void stop_service();
 void default_configure_service();
+void tar(const char*, const char*);
 
 #endif
