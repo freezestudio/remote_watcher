@@ -85,13 +85,16 @@ private:
     void _Subclass()
     {
         mIP.Attach(GetDlgItem(IDC_REMOTEIP));
-
-        mInstallButtonImage.CreateFromImage(IDR_BMP_INSTALL, 88, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);		
+        mIP.SetAddress(MAKEIPADDRESS(192,168,0,1));
+        
+        mInstallButton.SetBitmapButtonExtendedStyle(BMPBTN_HOVER, BMPBTN_HOVER);
+        mInstallButtonImage.CreateFromImage(IDR_BMP_INSTALL, 90, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);		
 		mInstallButton.SetImageList(mInstallButtonImage);
 		mInstallButton.SetImages(0, 1, 2, 3);
 		mInstallButton.SubclassWindow(GetDlgItem(IDC_BTN_INSTALL));
 
-		mUninstallButtonImage.CreateFromImage(IDR_BMP_UNINSTALL, 88, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);
+        mUninstallButton.SetBitmapButtonExtendedStyle(BMPBTN_HOVER, BMPBTN_HOVER);
+		mUninstallButtonImage.CreateFromImage(IDR_BMP_UNINSTALL, 90, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);
 		mUninstallButton.SetImageList(mUninstallButtonImage);
 		mUninstallButton.SetImages(0, 1, 2, 3);
 		mUninstallButton.SubclassWindow(GetDlgItem(IDC_BTN_UNINSTALL));
