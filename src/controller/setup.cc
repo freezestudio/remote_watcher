@@ -70,14 +70,25 @@ static bool read_resource(void** data, int* len)
     return true;
 }
 
-static void decompress_blobs(void* blob, const char* out_path)
+static void decompress_blobs(void* blob, int len, const char* out_path)
 {
     // save tgz = path/to/temp/blob.tgz
     // tar(tgz, out_path);
 
     auto _temp_path = fs::temp_directory_path();
     _temp_path /=SERVICE_PATH;
+    if(!fs::exists(_temp_path))
+    {
+        std::error_code ec;
+        auto created = fs::create_directory(_temp_path, ec);
+        if(!created || ec)
+        {
+            // error
+        }
+    }
     
+    // remove temp file
+    // 
 }
 
 void install_service()
