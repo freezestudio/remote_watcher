@@ -73,7 +73,14 @@ public:
 
     void OnInstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
     {
+        if (install_service())
+        {
 
+        }
+        else
+        {
+
+        }
     }
 
     void OnUninstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)

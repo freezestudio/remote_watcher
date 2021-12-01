@@ -11,11 +11,11 @@
 // #include <compressapi.h>
 // #pragma comment(lib, "Cabinet.lib")
 
-void install_service();
-void uninstall_service();
-void start_service();
-void stop_service();
+bool install_service();
+bool uninstall_service();
+bool start_service();
+bool stop_service();
 void default_configure_service();
-void tar(const char*, const char*);
+int tar(const char*, const char*);
 
 #endif

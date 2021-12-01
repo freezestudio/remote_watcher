@@ -84,14 +84,58 @@ static void decompress_blobs(void* blob, int len, const char* out_path)
         if(!created || ec)
         {
             // error
+            auto _msg = ec.message();
+            OutputDebugStringA(_msg.c_str());
+            return;
         }
     }
+
+    auto _temp_tgz = _temp_path / L"blob.tgz";
+    auto _htmp = ::CreateFile(
+        _temp_tgz.c_str(),
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (_htmp == INVALID_HANDLE_VALUE)
+    {
+        OutputDebugString(L"before pick tgz, create temp file failure.\n");
+        return;
+    }
+
+    DWORD written;
+    auto writted = ::WriteFile(_htmp, blob, len, &written, nullptr);
+    if (!writted)
+    {
+        OutputDebugString(L"write tgz to temp file failured.\n");
+        CloseHandle(_htmp);
+        return;
+    }
+
+    auto _tgz = _temp_tgz.string().data();
+    auto ok = tar(_tgz, out_path)==0;
+    if (!ok)
+    {
+        OutputDebugString(L"decompress tgz failure.\n");
+    }
+
+    CloseHandle(_htmp);
     
     // remove temp file
-    // 
+    std::error_code ec;
+    auto removed = fs::remove(_temp_tgz, ec);
+    if (!removed || ec)
+    {
+        auto _msg = ec.message();
+        OutputDebugString(L"remove temp tgz file failure.\n");
+        OutputDebugStringA(_msg.data());
+    }
 }
 
-void install_service()
+bool install_service()
 {
     auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
     wchar_t _path_buf[MAX_PATH]{};
@@ -103,7 +147,9 @@ void install_service()
     void* _data = nullptr;
     int _len = 0;
     read_resource(&_data, &_len);
-    // ...
+    
+    decompress_blobs(_data, _len, _install_path.string().data());
+
     _resource.Release();
 
     auto _scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
@@ -111,10 +157,16 @@ void install_service()
     {
         auto _msg = std::format(L"OpenSCManager failed {}\n", GetLastError());
         OutputDebugString(_msg.data());
-        return;
+        return false;
     }
 
     auto _service_path = _install_path/SERVICE_PATH/L"rgmsvc.dll";
+    if (!fs::exists(_service_path))
+    {
+        OutputDebugString(L"error, service dll file not exists.\n");
+        return false;
+    }
+
     auto _service = CreateService(
         _scm,
         SERVICE_NAME,
@@ -133,7 +185,7 @@ void install_service()
     {
         printf("CreateService failed (%d)\n", GetLastError());
         CloseServiceHandle(_scm);
-        return;
+        return false;
     }
 
     // rgmsvc append to:
@@ -143,21 +195,23 @@ void install_service()
 
     CloseServiceHandle(_service);
     CloseServiceHandle(_scm);
+
+    return true;
 }
 
-void uninstall_service()
+bool uninstall_service()
 {
-
+    return false;
 }
 
-void start_service()
+bool start_service()
 {
-
+    return false;
 }
 
-void stop_service()
+bool stop_service()
 {
-
+    return false;
 }
 
 void default_configure_service()
