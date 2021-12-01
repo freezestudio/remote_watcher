@@ -73,9 +73,28 @@ public:
 
     void OnInstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
     {
+        DWORD addr;
+        auto _ipfields = mIP.GetAddress(&addr);
+        int ip0,ip1,ip2,ip3;
+        if(_ipfields == 4)
+        {
+            ip0=FIRST_IPADDRESS(addr);
+            ip1=SECOND_IPADDRESS(addr);
+            ip2=THIRD_IPADDRESS(addr);
+            ip3=FOURTH_IPADDRESS(addr);
+        }
+        else
+        {
+            //error
+            return;
+        }
+
+        wchar_t ip[16]{};
+        auto str_ip = std::format(L"{}.{}.{}.{}", ip0, ip1, ip2, ip3);
+        wcscpy_s(ip, str_ip.c_str());
         if (install_service())
         {
-
+            start_service(ip);
         }
         else
         {

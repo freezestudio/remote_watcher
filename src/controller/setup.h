@@ -13,8 +13,8 @@
 
 bool install_service();
 bool uninstall_service();
-bool start_service();
-bool stop_service();
+bool start_service(LPCWSTR ip);
+bool stop_service(SC_HANDLE=nullptr);
 void default_configure_service();
 int tar(const char*, const char*);
 

@@ -12,3 +12,5 @@
 #include <string>
 #include <format>
 #include <filesystem>
+
+#define SERVICE_NAME L"rgmsvc"
