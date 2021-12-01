@@ -5,7 +5,7 @@
 #include "dep.h"
 #include "sdep.h"
 
-#define SERVICE_NAME L"mnsvc"
+#define SERVICE_NAME L"rgmsvc"
 
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 
