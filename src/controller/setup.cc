@@ -80,15 +80,99 @@ static bool read_resource(void** data, int* len)
 	return true;
 }
 
-// ÊÖ¶¯¸½¼Ó rgmsvc µ½:
+// ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½ rgmsvc ï¿½ï¿½:
 // HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
 //   LocalService    REG_MULTI_SZ     nsi WdiServiceHost ... SERVICE_NAME
 // ...
-void append_hkey()
+// void append_hkey()
+// {
+// 	WTL::CRegKeyEx regKey;
+// }
+void append_hkey(
+	LPCWSTR key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
+	LPCWSTR subkey = L"LocalService",
+	LPCWSTR value=L"rgmsvc")
 {
-	WTL::CRegKeyEx regKey;
+	// è®¡ç®—æœº\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
+	// LocalServer REG_MULTI_SIZE
 
+	HKEY hHKLM = HKEY_LOCAL_MACHINE;
+	ATL::CRegKey svcHost;
+	auto status = svcHost.Open(hHKLM, key);
+	if (ERROR_SUCCESS != status)
+	{
+		LPWSTR pBuffer = nullptr;
+		FormatMessage(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+			nullptr,
+			status,
+			0,
+			(LPWSTR)&pBuffer,
+			0,
+			nullptr);
+
+		auto msg = std::format(L"Open RegKey Error: {}\n"sv, pBuffer);
+		OutputDebugString(msg.data());
+
+		LocalFree(pBuffer);
+		return;
+	}
+
+	wchar_t exist_value[384]{};
+	ULONG len = 384;
+	status = svcHost.QueryMultiStringValue(subkey, exist_value, &len);
+	if (ERROR_SUCCESS != status)
+	{
+		LPWSTR pBuffer = nullptr;
+		FormatMessage(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+			nullptr,
+			status,
+			0,
+			(LPWSTR)&pBuffer,
+			0,
+			nullptr);
+
+		auto msg = std::format(L"Query MultiString RegKey Error: {}\n"sv, pBuffer);
+		OutputDebugString(msg.data());
+
+		LocalFree(pBuffer);
+		return;
+	}
+
+	auto wcs_value = std::wstring(exist_value, len);
+	auto pos = wcs_value.find(value);
+	if (pos == std::wstring::npos)
+	{
+		auto _name_len = wcslen(value) + 1;
+		WTL::SecureHelper::strcpy_x(exist_value + len - 1, _name_len, value);		
+		status = svcHost.SetMultiStringValue(subkey, exist_value);
+		if (ERROR_SUCCESS != status)
+		{
+			LPWSTR pBuffer = nullptr;
+			FormatMessage(
+				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+				nullptr,
+				status,
+				0,
+				(LPWSTR)&pBuffer,
+				0,
+				nullptr);
+
+			auto msg = std::format(L"Query MultiString RegKey Error: {}\n"sv, pBuffer);
+			OutputDebugString(msg.data());
+
+			LocalFree(pBuffer);
+			return;
+		}
+	}
+	else
+	{
+		OutputDebugString(L"Key-Value exists.\n");
+	}
+	OutputDebugString(L"Done.\n");
 }
+
 
 static bool decompress_blobs(void* blob, int len, const char* out_path)
 {
@@ -212,8 +296,8 @@ bool install_service()
 		return false;
 	}
 
-	// ´´½¨·þÎñ
-	// Ô¤ÆÚ×Ô¶¯Ìí¼Ó×¢²á±í:
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// Ô¤ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½:
 	// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME
 	// \Parameters:
 	//    ServiceDll  REG_MULTI_SZ  %ProgramData%\xMonit\rgmsvc.dll
@@ -238,7 +322,7 @@ bool install_service()
 		return false;
 	}
 
-	// ÊÖ¶¯¸½¼Ó rgmsvc µ½:
+	// ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½ rgmsvc ï¿½ï¿½:
 	// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
 	//   LocalService    REG_MULTI_SZ     nsi WdiServiceHost ... SERVICE_NAME
 	// ...
@@ -284,7 +368,7 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// ´ò¿ª·þÎñ¾ä±ú
+	// ï¿½ò¿ª·ï¿½ï¿½ï¿½ï¿½ï¿½
 	auto hsc = ::OpenService(g_scmhandle, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
@@ -294,11 +378,11 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// ¼ì²é·þÎñ×´Ì¬
-	// 1. Èç¹û·þÎñµÄ×´Ì¬ÊÇ SERVICE_RUNNING¡¢SERVICE_PAUSE_PENDING¡¢SERVICE_PAUSED »ò SERVICE_CONTINUE_PENDING Ö®Ò»,
-	//    ÔòSERVICE_STATUS_PROCESS½á¹¹ÖÐ·µ»ØµÄ½ø³Ì±êÊ¶·ûÊÇÓÐÐ§µÄ
-	// 2. Èç¹û·þÎñ×´Ì¬ÊÇ SERVICE_START_PENDING »ò SERVICE_STOP_PENDING, Ôò½ø³Ì±êÊ¶·û¿ÉÄÜÎÞÐ§
-	// 3. Èç¹û·þÎñ×´Ì¬ÊÇ SERVICE_STOPPED, Ôò½ø³Ì±êÊ¶·ûÎÞÐ§
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
+	// 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ SERVICE_RUNNINGï¿½ï¿½SERVICE_PAUSE_PENDINGï¿½ï¿½SERVICE_PAUSED ï¿½ï¿½ SERVICE_CONTINUE_PENDING Ö®Ò»,
+	//    ï¿½ï¿½SERVICE_STATUS_PROCESSï¿½á¹¹ï¿½Ð·ï¿½ï¿½ØµÄ½ï¿½ï¿½Ì±ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
+	// 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ SERVICE_START_PENDING ï¿½ï¿½ SERVICE_STOP_PENDING, ï¿½ï¿½ï¿½ï¿½Ì±ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§
+	// 3. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ SERVICE_STOPPED, ï¿½ï¿½ï¿½ï¿½Ì±ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½Ð§
 	//
 	auto info = SC_STATUS_PROCESS_INFO;
 	SERVICE_STATUS_PROCESS sstatus;
@@ -319,10 +403,10 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// µ±Ç°·þÎñ×´Ì¬
+	// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½×´Ì¬
 	auto current_state = sstatus.dwCurrentState;
 
-	// ·þÎñÎ´Í£Ö¹Ê±, ÏÈÍ£Ö¹·þÎñ
+	// ï¿½ï¿½ï¿½ï¿½Î´Í£Ö¹Ê±, ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½
 	if (current_state != SERVICE_STOPPED && current_state != SERVICE_STOP_PENDING)
 	{
 		auto stopped = stop_service(hsc);
@@ -338,12 +422,12 @@ bool start_service(LPCWSTR ip)
 	auto check_point = sstatus.dwCheckPoint;
 	auto wait_tick = GetTickCount();
 
-	// µ±·þÎñ×´Ì¬Îª SERVICE_STOP_PENDING Ê±, µÈ´ý·þÎñÍ£Ö¹
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬Îª SERVICE_STOP_PENDING Ê±, ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹
 
 	do
 	{
-		// µÈ´ýÊ±³¤²»Òª³¬¹ý dwWaitHint, µ«²»ÒªÐ¡ÓÚ 1s.
-		// ×î¼ÑÊ±³¤Îª 1s < x < 10s
+		// ï¿½È´ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ dwWaitHint, ï¿½ï¿½ï¿½ï¿½ÒªÐ¡ï¿½ï¿½ 1s.
+		// ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Îª 1s < x < 10s
 		auto wait = static_cast<DWORD>(sstatus.dwWaitHint * 0.1);
 		if (wait < 1000)
 		{
@@ -368,9 +452,9 @@ bool start_service(LPCWSTR ip)
 		}
 		current_state = sstatus.dwCurrentState;
 
-		// ³¬Ê±´¦Àí
+		// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
 
-		// ·þÎñ×´Ì¬¸Ä±äÊ±, ÖØÐÂ¼ÆÊ±
+		// ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½Ä±ï¿½Ê±, ï¿½ï¿½ï¿½Â¼ï¿½Ê±
 		if (sstatus.dwCheckPoint > check_point)
 		{
 			check_point = sstatus.dwCheckPoint;
@@ -391,15 +475,15 @@ bool start_service(LPCWSTR ip)
 
 	} while (current_state == SERVICE_STOP_PENDING);
 
-	// Æô¶¯·þÎñ
-	// 1. ´Ëº¯Êý·µ»ØÖ®Ç°, ÓÉ·þÎñ¹ÜÀíÆ÷ÉèÖÃ:
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// 1. ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö®Ç°, ï¿½É·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:
 	//    a. dwCurrentState = SERVICE_START_PENDING
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
 	//    d. dwWaitHint = 2s;
 	if (!::StartService(hsc, 1, &ip))
 	{
-		// ERROR_SERVICE_REQUEST_TIMEOUT (30s ³¬Ê±)
+		// ERROR_SERVICE_REQUEST_TIMEOUT (30s ï¿½ï¿½Ê±)
 
 		auto _msg = std::format(L"when start service: service start failed {}\n", GetLastError());
 		OutputDebugString(_msg.data());
@@ -408,7 +492,7 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// (ÔÙ´Î)¼ì²é·þÎñ×´Ì¬
+	// (ï¿½Ù´ï¿½)ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
 	memset(&sstatus, 0, buf_size);
 	needbytes = 0;
 	if (!::QueryServiceStatusEx(hsc, info, (LPBYTE)&sstatus, buf_size, &needbytes))
@@ -420,16 +504,16 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// µ±Ç°·þÎñ×´Ì¬
+	// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½×´Ì¬
 	current_state = sstatus.dwCurrentState;
 	check_point = sstatus.dwCheckPoint;
 	wait_tick = GetTickCount();
 
-	// µ±·þÎñ×´Ì¬Îª SERVICE_START_PENDING Ê±, µÈ´ý·þÎñÆô¶¯
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬Îª SERVICE_START_PENDING Ê±, ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	do
 	{
-		// µÈ´ýÊ±³¤²»Òª³¬¹ý dwWaitHint, µ«²»ÒªÐ¡ÓÚ 1s.
-		// ×î¼ÑÊ±³¤Îª 1s < x < 10s
+		// ï¿½È´ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ dwWaitHint, ï¿½ï¿½ï¿½ï¿½ÒªÐ¡ï¿½ï¿½ 1s.
+		// ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Îª 1s < x < 10s
 		auto wait = static_cast<DWORD>(sstatus.dwWaitHint * 0.1);
 		if (wait < 1000)
 		{
@@ -454,9 +538,9 @@ bool start_service(LPCWSTR ip)
 		}
 		current_state = sstatus.dwCurrentState;
 
-		// ³¬Ê±´¦Àí
+		// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
 
-		// ·þÎñ×´Ì¬¸Ä±äÊ±, ÖØÐÂ¼ÆÊ±
+		// ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½Ä±ï¿½Ê±, ï¿½ï¿½ï¿½Â¼ï¿½Ê±
 		if (sstatus.dwCheckPoint > check_point)
 		{
 			check_point = sstatus.dwCheckPoint;
@@ -473,7 +557,7 @@ bool start_service(LPCWSTR ip)
 		}
 	} while (current_state == SERVICE_START);
 
-	// ÑéÖ¤·þÎñÒÑ¾­Æô¶¯
+	// ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (current_state == SERVICE_START)
 	{
 		OutputDebugString(L"start service:rgmsvc successfully.\n");
@@ -516,7 +600,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		return false;
 	}
 
-	// ·þÎñ×´Ì¬²éÑ¯
+	// ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½Ñ¯
 
 	SERVICE_STATUS_PROCESS sstatus;
 	auto buf_size = sizeof(SERVICE_STATUS_PROCESS);
@@ -542,7 +626,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 	auto current_state = sstatus.dwCurrentState;
 	auto wait_tick = GetTickCount();
 
-	// µ±·þÎñ×´Ì¬Îª SERVICE_STOP_PENDING Ê±, µÈ´ýÍ£Ö¹
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬Îª SERVICE_STOP_PENDING Ê±, ï¿½È´ï¿½Í£Ö¹
 	do
 	{
 		auto wait = sstatus.dwWaitHint / 10;
@@ -581,13 +665,13 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		auto duration = GetTickCount() - wait_tick;
 		if (duration > 30000)
 		{
-			// ³¬Ê±ÍË³ö ...
+			// ï¿½ï¿½Ê±ï¿½Ë³ï¿½ ...
 			return false;
 		}
 	} while (current_state == SERVICE_STOP_PENDING);
 
-	// ·¢ËÍÍ£Ö¹¿ØÖÆÂë
-	//SERVICE_STATUS stop_status; // Ç°¼¸ÏîÓë SERVICE_STATUS_PROCESS ½á¹¹ÏàÍ¬
+	// ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	//SERVICE_STATUS stop_status; // Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ SERVICE_STATUS_PROCESS ï¿½á¹¹ï¿½ï¿½Í¬
 	if (!::ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&sstatus))
 	{
 		::CloseServiceHandle(service);
@@ -595,10 +679,10 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 	}
 
 	current_state = sstatus.dwCurrentState;
-	// µÈ´ý·þÎñÍ£Ö¹
+	// ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹
 	do
 	{
-		// µÈ´ý
+		// ï¿½È´ï¿½
 		Sleep(sstatus.dwWaitHint);
 
 		memset(&sstatus, 0, buf_size);
@@ -625,7 +709,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		auto duration = GetTickCount() - wait_tick;
 		if (duration > 30000)
 		{
-			// ³¬Ê± ...
+			// ï¿½ï¿½Ê± ...
 			break;
 		}
 
