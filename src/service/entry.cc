@@ -7,6 +7,8 @@
 
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable = nullptr;
+HANDLE hh_mockthread = nullptr;
+bool bb_mockthread_exit = false;
 
 DWORD __stdcall handler_proc(
 	DWORD dwControl,
@@ -34,8 +36,17 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		OutputDebugString(_msg.data());
 	}
 
-
 	register_handler();
+}
+
+DWORD __stdcall _MockThread(LPVOID)
+{
+	while (!bb_mockthread_exit)
+	{
+		Sleep(5000);
+		OutputDebugString(L"Service Work Thread running ...");
+	}
+	return 0;
 }
 
 void register_handler()
@@ -70,14 +81,22 @@ void register_handler()
 
 		return;
 	}
+	bb_mockthread_exit = false;
 
 	// start multi threads
 	// ...
 
+	hh_mockthread = ::CreateThread(nullptr, 0, _MockThread, nullptr, 0, nullptr);
+	if (!hh_mockthread)
+	{
+		OutputDebugStringA("Mock Thread failure.\n");
+		goto theend;
+	}
+
 	// 运行服务
 	check_point++;
-	status.dwCurrentState = SERVICE_START; // 启动
-	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; // 接受这些控制
+	status.dwCurrentState = SERVICE_START; // started
+	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; // accept[stop, shutdown]
 	status.dwCheckPoint = check_point;
 	status.dwWin32ExitCode = 0;
 	status.dwServiceSpecificExitCode = 0;
@@ -99,7 +118,6 @@ void register_handler()
 		auto res = ::WaitForSingleObject(hh_waitable, INFINITE);
 
 		// ignore WAIT_TIMEOUT
-
 		if (res == WAIT_OBJECT_0)
 		{
 			OutputDebugStringA("waitable handle signed: WAIT_OBJECT_0\n");
@@ -127,6 +145,9 @@ void register_handler()
 		}
 	}
 
+theend:
+	bb_mockthread_exit = true;
+
 	status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
 	status.dwWaitHint = 30000; // 等待 30s
 	status.dwCheckPoint = 0;
@@ -147,6 +168,8 @@ DWORD __stdcall handler_proc(
 	default:
 		break;
 	case SERVICE_STOP:
+		bb_mockthread_exit = true;
+		SetEvent(hh_waitable);
 		break;
 	}
 	return NO_ERROR;

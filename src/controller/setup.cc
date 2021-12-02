@@ -8,6 +8,7 @@
 #define SERVICE_PATH L"xMonit"
 
 namespace fs = std::filesystem;
+using namespace std::literals;
 
 SC_HANDLE g_scmhandle = nullptr;
 
@@ -80,7 +81,66 @@ static bool read_resource(void** data, int* len)
 	return true;
 }
 
-// �ֶ����� rgmsvc ��:
+// add to:
+// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME
+// DisplayName    REG_SZ
+// Description    REG_SZ
+// ImagePath      REG_EXPAND_SZ %SystemRoot%\system32\svchost.exe -k LocalService -p
+// ObjectName     REG_SZ        NT Authority\LocalService
+// Start          REG_DWORD     2
+// \Parameters:
+//    ServiceDll  REG_MULTI_SZ  %ProgramData%\xMonit\rgmsvc.dll
+//    ServiceMain REG_SZ        ServiceMain
+bool add_svckey()
+{
+	ATL::CRegKey svc;
+	//auto status = svc.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services");
+	//if (ERROR_SUCCESS != status)
+	//{
+	//	LPWSTR pBuffer = nullptr;
+	//	FormatMessage(
+	//		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+	//		nullptr,
+	//		status,
+	//		0,
+	//		(LPWSTR)&pBuffer,
+	//		0,
+	//		nullptr);
+
+	//	auto msg = std::format(L"service RegKey Open Error: {}\n"sv, pBuffer);
+	//	OutputDebugString(msg.data());
+
+	//	LocalFree(pBuffer);
+	//	return false;
+	//}
+
+	auto _svckey = L"SYSTEM\\CurrentControlSet\\Services\\"s + SERVICE_NAME;
+	auto status = svc.Create(HKEY_LOCAL_MACHINE, _svckey.data());
+	if (ERROR_SUCCESS != status)
+	{
+		LPWSTR pBuffer = nullptr;
+		FormatMessage(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+			nullptr,
+			status,
+			0,
+			(LPWSTR)&pBuffer,
+			0,
+			nullptr);
+
+		auto msg = std::format(L"create service RegKey Error: {}\n"sv, pBuffer);
+		OutputDebugString(msg.data());
+
+		LocalFree(pBuffer);
+		return false;
+	}
+
+	svc.SetStringValue(_svckey.data(), L"");
+
+	return true;
+}
+
+// append rgmsvc:
 // HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
 //   LocalService    REG_MULTI_SZ     nsi WdiServiceHost ... SERVICE_NAME
 // ...
@@ -88,12 +148,12 @@ static bool read_resource(void** data, int* len)
 // {
 // 	WTL::CRegKeyEx regKey;
 // }
-void append_hkey(
+bool append_hostkey(
 	LPCWSTR key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
 	LPCWSTR subkey = L"LocalService",
 	LPCWSTR value=L"rgmsvc")
 {
-	// 计算机\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
+	// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
 	// LocalServer REG_MULTI_SIZE
 
 	HKEY hHKLM = HKEY_LOCAL_MACHINE;
@@ -111,11 +171,11 @@ void append_hkey(
 			0,
 			nullptr);
 
-		auto msg = std::format(L"Open RegKey Error: {}\n"sv, pBuffer);
+		auto msg = std::format(L"Open host RegKey Error: {}\n"sv, pBuffer);
 		OutputDebugString(msg.data());
 
 		LocalFree(pBuffer);
-		return;
+		return false;
 	}
 
 	wchar_t exist_value[384]{};
@@ -137,7 +197,7 @@ void append_hkey(
 		OutputDebugString(msg.data());
 
 		LocalFree(pBuffer);
-		return;
+		return false;
 	}
 
 	auto wcs_value = std::wstring(exist_value, len);
@@ -163,7 +223,7 @@ void append_hkey(
 			OutputDebugString(msg.data());
 
 			LocalFree(pBuffer);
-			return;
+			return false;
 		}
 	}
 	else
@@ -171,6 +231,7 @@ void append_hkey(
 		OutputDebugString(L"Key-Value exists.\n");
 	}
 	OutputDebugString(L"Done.\n");
+	return true;
 }
 
 
@@ -273,7 +334,12 @@ bool install_service()
 	int _len = 0;
 	read_resource(&_data, &_len);
 
-	decompress_blobs(_data, _len, _install_path.string().data());
+	if (!decompress_blobs(_data, _len, _install_path.string().data()))
+	{
+		_resource.Release();
+		OutputDebugString(L"decompress blob failure.\n");
+		return false;
+	}
 
 	_resource.Release();
 
@@ -296,8 +362,7 @@ bool install_service()
 		return false;
 	}
 
-	// ��������
-	// Ԥ���Զ�����ע���:
+	// ? insert to:
 	// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME
 	// \Parameters:
 	//    ServiceDll  REG_MULTI_SZ  %ProgramData%\xMonit\rgmsvc.dll
@@ -322,11 +387,8 @@ bool install_service()
 		return false;
 	}
 
-	// �ֶ����� rgmsvc ��:
-	// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
-	//   LocalService    REG_MULTI_SZ     nsi WdiServiceHost ... SERVICE_NAME
-	// ...
-	append_hkey();
+	// append reg key to svchost
+	append_hostkey();
 
 	CloseServiceHandle(_service);
 
@@ -368,7 +430,7 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// �򿪷�����
+	// open service
 	auto hsc = ::OpenService(g_scmhandle, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
@@ -378,9 +440,9 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// ������״̬
-	// 1. ��������״̬�� SERVICE_RUNNING��SERVICE_PAUSE_PENDING��SERVICE_PAUSED �� SERVICE_CONTINUE_PENDING ֮һ,
-	//    ��SERVICE_STATUS_PROCESS�ṹ�з��صĽ��̱�ʶ������Ч��
+	// service state:
+	// 1. state: SERVICE_RUNNING, SERVICE_PAUSE_PENDING, SERVICE_PAUSED,SERVICE_CONTINUE_PENDING,
+	//    the SERVICE_STATUS_PROCESS�ṹ�з��صĽ��̱�ʶ������Ч��
 	// 2. �������״̬�� SERVICE_START_PENDING �� SERVICE_STOP_PENDING, ����̱�ʶ��������Ч
 	// 3. �������״̬�� SERVICE_STOPPED, ����̱�ʶ����Ч
 	//
