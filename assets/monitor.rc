@@ -7,15 +7,17 @@
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 #pragma code_page(936)
 
-IDR_MAINFRAME ICON "controller.ico"
 //IDR_MAINFRAME IDR_BLOB "blob.zip"
 IDR_MAINFRAME IDR_BLOB "blob.tgz"
+
+IDR_MAINFRAME ICON "monitor.ico"
+
 IDR_BMP_INSTALL BITMAP "btn_install.bmp"
 IDR_BMP_UNINSTALL BITMAP "Btn_uninstall.bmp"
 
 IDD_MAINDLG DIALOGEX 0,0,200,100
 STYLE DS_SETFONT|WS_MINIMIZEBOX|WS_CAPTION|WS_SYSMENU
-CAPTION "Service Controller"
+CAPTION "Monitor Service"
 FONT 9,"Segoe UI",0,0,0x00
 BEGIN
     LTEXT           "Remote:",IDC_STATIC,10,10,26,8
@@ -44,4 +46,15 @@ BEGIN
         VALUE "FileDescription", "Install and Uninstall Service"
         VALUE "FileVersion",     "1,0,0,1"  
     END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String table
+//
+
+STRINGTABLE
+BEGIN
+   IDS_DISPLAY   "FolderMointService"
+   IDS_DESC      "Watch a Folder, Send event to remote."
 END

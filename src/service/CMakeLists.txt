@@ -11,6 +11,9 @@ target_include_directories(${SERVICE_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
     PRIVATE ./
 )
+target_sources(${SERVICE_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/assets/${SERVICE_NAME}.rc
+)
 
 #
 # compress rgmsvc.dll and dependencies

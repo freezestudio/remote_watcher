@@ -6,6 +6,7 @@
 #include <cassert>
 
 #define SERVICE_PATH L"xMonit"
+#define BLOB_NAME L"blob.tgz"
 
 namespace fs = std::filesystem;
 using namespace std::literals;
@@ -81,122 +82,55 @@ static bool read_resource(void** data, int* len)
 	return true;
 }
 
-// add to:
-// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME
-// DisplayName    REG_SZ
-// Description    REG_SZ
-// ImagePath      REG_EXPAND_SZ %SystemRoot%\system32\svchost.exe -k LocalService -p
-// ObjectName     REG_SZ        NT Authority\LocalService
-// Start          REG_DWORD     2
-// \Parameters:
-//    ServiceDll  REG_MULTI_SZ  %ProgramData%\xMonit\rgmsvc.dll
-//    ServiceMain REG_SZ        ServiceMain
-bool add_svckey()
+
+static bool _verify_status(LPCWSTR op, DWORD status)
 {
-	ATL::CRegKey svc;
-	//auto status = svc.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services");
-	//if (ERROR_SUCCESS != status)
-	//{
-	//	LPWSTR pBuffer = nullptr;
-	//	FormatMessage(
-	//		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-	//		nullptr,
-	//		status,
-	//		0,
-	//		(LPWSTR)&pBuffer,
-	//		0,
-	//		nullptr);
-
-	//	auto msg = std::format(L"service RegKey Open Error: {}\n"sv, pBuffer);
-	//	OutputDebugString(msg.data());
-
-	//	LocalFree(pBuffer);
-	//	return false;
-	//}
-
-	auto _svckey = L"SYSTEM\\CurrentControlSet\\Services\\"s + SERVICE_NAME;
-	auto status = svc.Create(HKEY_LOCAL_MACHINE, _svckey.data());
-	if (ERROR_SUCCESS != status)
+	if (ERROR_SUCCESS == status)
 	{
-		LPWSTR pBuffer = nullptr;
-		FormatMessage(
-			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-			nullptr,
-			status,
-			0,
-			(LPWSTR)&pBuffer,
-			0,
-			nullptr);
-
-		auto msg = std::format(L"create service RegKey Error: {}\n"sv, pBuffer);
-		OutputDebugString(msg.data());
-
-		LocalFree(pBuffer);
-		return false;
+		return true;
 	}
 
-	svc.SetStringValue(_svckey.data(), L"");
+	if (LPWSTR pBuffer = nullptr;
+		FormatMessage(
+			FORMAT_MESSAGE_FROM_SYSTEM |    //
+			FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
+			FORMAT_MESSAGE_ALLOCATE_BUFFER, //
+			nullptr,                        // lpSource
+			status,                         // dwMessageId
+			0,                              // dwLanguageId
+			(LPWSTR)&pBuffer,               // lpBuffer
+			0,                              // nSize
+			nullptr                         // Arguments
+		) > 0)
+	{
+		auto msg = std::format(L"{} Error: {}\n"sv, op, pBuffer);
+		OutputDebugString(msg.data());
+		LocalFree(pBuffer);
+	}
 
-	return true;
+	return false;
 }
 
-// append rgmsvc:
-// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
-//   LocalService    REG_MULTI_SZ     nsi WdiServiceHost ... SERVICE_NAME
-// ...
-// void append_hkey()
-// {
-// 	WTL::CRegKeyEx regKey;
-// }
-bool append_hostkey(
+static bool append_host_value(
 	LPCWSTR key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
 	LPCWSTR subkey = L"LocalService",
-	LPCWSTR value=L"rgmsvc")
+	LPCWSTR value = SERVICE_NAME)
 {
 	// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
-	// LocalServer REG_MULTI_SIZE
+	//   LocalServer REG_MULTI_SZ  ...
 
-	HKEY hHKLM = HKEY_LOCAL_MACHINE;
 	ATL::CRegKey svcHost;
-	auto status = svcHost.Open(hHKLM, key);
-	if (ERROR_SUCCESS != status)
+	auto status = svcHost.Open(HKEY_LOCAL_MACHINE, key);
+	if (!_verify_status(L"Open Key", status))
 	{
-		LPWSTR pBuffer = nullptr;
-		FormatMessage(
-			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-			nullptr,
-			status,
-			0,
-			(LPWSTR)&pBuffer,
-			0,
-			nullptr);
-
-		auto msg = std::format(L"Open host RegKey Error: {}\n"sv, pBuffer);
-		OutputDebugString(msg.data());
-
-		LocalFree(pBuffer);
 		return false;
 	}
 
-	wchar_t exist_value[384]{};
-	ULONG len = 384;
+	wchar_t exist_value[MAX_REGVALUE]{};
+	ULONG len = MAX_REGVALUE;
 	status = svcHost.QueryMultiStringValue(subkey, exist_value, &len);
-	if (ERROR_SUCCESS != status)
+	if (!_verify_status(L"Query Key", status))
 	{
-		LPWSTR pBuffer = nullptr;
-		FormatMessage(
-			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-			nullptr,
-			status,
-			0,
-			(LPWSTR)&pBuffer,
-			0,
-			nullptr);
-
-		auto msg = std::format(L"Query MultiString RegKey Error: {}\n"sv, pBuffer);
-		OutputDebugString(msg.data());
-
-		LocalFree(pBuffer);
 		return false;
 	}
 
@@ -205,24 +139,10 @@ bool append_hostkey(
 	if (pos == std::wstring::npos)
 	{
 		auto _name_len = wcslen(value) + 1;
-		WTL::SecureHelper::strcpy_x(exist_value + len - 1, _name_len, value);		
+		WTL::SecureHelper::strcpy_x(exist_value + len - 1, _name_len, value);
 		status = svcHost.SetMultiStringValue(subkey, exist_value);
-		if (ERROR_SUCCESS != status)
+		if (!_verify_status(L"Set RegValue", status))
 		{
-			LPWSTR pBuffer = nullptr;
-			FormatMessage(
-				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-				nullptr,
-				status,
-				0,
-				(LPWSTR)&pBuffer,
-				0,
-				nullptr);
-
-			auto msg = std::format(L"Query MultiString RegKey Error: {}\n"sv, pBuffer);
-			OutputDebugString(msg.data());
-
-			LocalFree(pBuffer);
 			return false;
 		}
 	}
@@ -230,10 +150,163 @@ bool append_hostkey(
 	{
 		OutputDebugString(L"Key-Value exists.\n");
 	}
-	OutputDebugString(L"Done.\n");
+	OutputDebugString(L"Append to Host Done.\n");
 	return true;
 }
 
+static bool remove_host_value(
+	LPCWSTR key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
+	LPCWSTR subkey = L"LocalService",
+	LPCWSTR value = SERVICE_NAME)
+{
+	// HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost
+	//   LocalServer REG_MULTI_SZ  ...
+
+	ATL::CRegKey host;
+	auto status = host.Open(HKEY_LOCAL_MACHINE, key);
+	if (!_verify_status(L"Open Key for Remove", status))
+	{
+		return false;
+	}
+
+	wchar_t exist_value[MAX_REGVALUE]{};
+	ULONG len = MAX_REGVALUE;
+	status = host.QueryMultiStringValue(subkey, exist_value, &len);
+	if (!_verify_status(L"Query Key for Remove", status))
+	{
+		return false;
+	}
+
+	auto wcs_value = std::wstring(exist_value, len);
+	auto pos = wcs_value.find(value);
+	if (pos == std::wstring::npos)
+	{
+		return true;
+	}
+
+	wcs_value.erase(pos);
+	auto _new_str = wcs_value.data();
+	auto _new_size = wcs_value.size();
+	wmemset(exist_value, 0, MAX_REGVALUE);
+	wmemcpy_s(exist_value, len, wcs_value.data(), wcs_value.size());
+	status = host.SetMultiStringValue(subkey, exist_value);
+	if (!_verify_status(L"Remove Host Value", status))
+	{
+		return false;
+	}
+
+	OutputDebugString(L"Remove from Host Done.\n");
+	return true;
+}
+
+static bool add_svc_keyvalue(
+	LPCWSTR key = L"SYSTEM\\CurrentControlSet\\Services",
+	LPCWSTR name = SERVICE_NAME
+)
+{
+	// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services
+	//   \rgmsvc                ...
+	//   \rgmsvc\Parameters     ...
+
+	ATL::CRegKey svc;
+	auto maybe_create_svc = std::wstring(key) + L"\\" + name;
+	auto status = svc.Create(HKEY_LOCAL_MACHINE, maybe_create_svc.c_str());
+	if (!_verify_status(L"Create or Open Svc Key", status))
+	{
+		return false;
+	}
+
+	// Start: SERVICE_START_PENDING; // 2
+	// Type:  SERVICE_WIN32;         // 30
+	// 
+	// DisplayName REG_SZ        @%ProgramFile%\\xMonit\\rgmsvc.dll,-101
+	// Description REG_SZ        @%ProgramFile%\\xMonit\\rgmsvc.dll,-102
+	// ImagePath   REG_EXPAND_SZ %SystemRoot%\\system32\\svchost.exe -k LocalService
+	// ObjectName  REG_SZ        NT Authority\\LocalService
+	// Start       REG_DWORD     2
+	// Type        REG_DWORD     30
+
+	auto display_name = std::format(L"@%ProgramFile%\\{}\\{}.dll,-101"sv, SERVICE_PATH, SERVICE_NAME);
+	status = svc.SetStringValue(L"DisplayName", display_name.data());
+	if (!_verify_status(L"Set Svc Value: DisplayName", status))
+	{
+		return false;
+	}
+	auto description = std::format(L"@%ProgramFile%\\{}\\{}.dll,-102"sv, SERVICE_PATH, SERVICE_NAME);
+	status = svc.SetStringValue(L"Description", description.data());
+	if (!_verify_status(L"Set Svc Value: Description", status))
+	{
+		return false;
+	}
+	status = svc.SetStringValue(L"ImagePath", L"%SystemRoot%\\system32\\svchost.exe -k LocalService", REG_EXPAND_SZ);
+	if (!_verify_status(L"Set Svc Value: ImagePath", status))
+	{
+		return false;
+	}
+	status = svc.SetStringValue(L"ObjectName", L"NT Authority\\LocalService");
+	if (!_verify_status(L"Set Svc Value: ObjectName", status))
+	{
+		return false;
+	}
+	status = svc.SetDWORDValue(L"Start", SERVICE_START_PENDING);
+	if (!_verify_status(L"Set Svc Value: Start", status))
+	{
+		return false;
+	}
+	status = svc.SetDWORDValue(L"Type", SERVICE_WIN32);
+	if (!_verify_status(L"Set Svc Value: Start", status))
+	{
+		return false;
+	}
+
+	svc.Close();
+
+	auto maybe_create_svc_params = maybe_create_svc + L"\\Parameters";
+	status = svc.Create(HKEY_LOCAL_MACHINE, maybe_create_svc_params.c_str());
+	if (!_verify_status(L"Create or Open Svc\\param Key", status))
+	{
+		return false;
+	}
+
+	// ServiceDll             REG_EXPAND_SZ %ProgramFiles%\\xMonit\\rgmsvc.dll
+	// ServiceDllUnloadOnStop REG_DWORD     1 // * here ignore it
+	// ServiceMain            REG_SZ        ServiceMain
+
+	auto service_dll = std::format(L"@%ProgramFile%\\{}\\{}.dll"sv, SERVICE_PATH, SERVICE_NAME);
+	status = svc.SetStringValue(L"ServiceDll", service_dll.data(), REG_EXPAND_SZ);
+	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceDll", status))
+	{
+		return false;
+	}
+	status = svc.SetStringValue(L"ServiceMain", L"ServiceMain");
+	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceMain", status))
+	{
+		return false;
+	}
+
+	OutputDebugString(L"Add Svc Key-Values Done.\n");
+	return true;
+}
+
+static bool remove_svc_keyvalue(
+	LPCWSTR key = L"SYSTEM\\CurrentControlSet\\Services",
+	LPCWSTR name = SERVICE_NAME
+)
+{
+	ATL::CRegKey svc{HKEY_LOCAL_MACHINE};
+	auto maybe_delete = std::wstring(key) + L"\\" + name;
+	auto status = svc.RecurseDeleteKey(maybe_delete.c_str());
+	auto ok = _verify_status(L"Delete Svc Keys", status);
+	if (ok)
+	{
+		OutputDebugString(L"Remove Svc Key Done.\n");
+	}
+	else
+	{
+		OutputDebugString(L"Remove Svc Key Error.\n");
+	}
+	return ok;
+}
 
 static bool decompress_blobs(void* blob, int len, const char* out_path)
 {
@@ -255,7 +328,7 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 		}
 	}
 
-	auto _temp_tgz = _temp_path / L"blob.tgz";
+	auto _temp_tgz = _temp_path / BLOB_NAME;
 	auto _htmp = ::CreateFile(
 		_temp_tgz.c_str(),
 		GENERIC_READ | GENERIC_WRITE,
@@ -355,7 +428,7 @@ bool install_service()
 		return false;
 	}
 
-	auto _service_path = _install_path / L"rgmsvc.dll";
+	auto _service_path = _install_path / std::format(L"{}.dll"sv, SERVICE_NAME).data();
 	if (!fs::exists(_service_path))
 	{
 		OutputDebugString(L"error, service rgmsvc.dll file not exists.\n");
@@ -366,10 +439,12 @@ bool install_service()
 	// HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME
 	// \Parameters:
 	//    ServiceDll  REG_MULTI_SZ  %ProgramData%\xMonit\rgmsvc.dll
+	wchar_t _display_name[256]{};
+	LoadString(nullptr, IDS_DISPLAY, _display_name,  256);
 	auto _service = CreateService(
 		g_scmhandle,
 		SERVICE_NAME,
-		SERVICE_NAME,
+		_display_name,
 		SERVICE_ALL_ACCESS,
 		SERVICE_WIN32_OWN_PROCESS,
 		SERVICE_AUTO_START,
@@ -387,8 +462,18 @@ bool install_service()
 		return false;
 	}
 
-	// append reg key to svchost
-	append_hostkey();
+	// add service key
+	if(!add_svc_keyvalue())
+	{
+		CloseServiceHandle(_service);
+		return false;
+	}
+	// append value to svchost
+	if(!append_host_value())
+	{
+		CloseServiceHandle(_service);
+		return false;
+	}
 
 	CloseServiceHandle(_service);
 
@@ -441,16 +526,15 @@ bool start_service(LPCWSTR ip)
 	}
 
 	// service state:
-	// 1. state: SERVICE_RUNNING, SERVICE_PAUSE_PENDING, SERVICE_PAUSED,SERVICE_CONTINUE_PENDING,
-	//    the SERVICE_STATUS_PROCESS�ṹ�з��صĽ��̱�ʶ������Ч��
-	// 2. �������״̬�� SERVICE_START_PENDING �� SERVICE_STOP_PENDING, ����̱�ʶ��������Ч
-	// 3. �������״̬�� SERVICE_STOPPED, ����̱�ʶ����Ч
+	// 1. state: SERVICE_RUNNING, SERVICE_PAUSE_PENDING, SERVICE_PAUSED, SERVICE_CONTINUE_PENDING,
+	//    the SERVICE_STATUS_PROCES.ProcessId valid.
+	// 2. state: SERVICE_START_PENDING, SERVICE_STOP_PENDING, ProcessId maybe invalid.
+	// 3. state: SERVICE_STOPPED, ProcessId invalid.
 	//
-	auto info = SC_STATUS_PROCESS_INFO;
 	SERVICE_STATUS_PROCESS sstatus;
 	auto buf_size = sizeof(SERVICE_STATUS_PROCESS);
 	DWORD needbytes = 0;
-	if (!::QueryServiceStatusEx(hsc, info, (LPBYTE)&sstatus, buf_size, &needbytes))
+	if (!::QueryServiceStatusEx(hsc, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 	{
 		// ERROR_INVALID_HANDLE
 		// ERROR_ACCESS_DENIED
@@ -465,10 +549,10 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// ��ǰ����״̬
+	// service current state
 	auto current_state = sstatus.dwCurrentState;
 
-	// ����δֹͣʱ, ��ֹͣ����
+	// service state: not stop
 	if (current_state != SERVICE_STOPPED && current_state != SERVICE_STOP_PENDING)
 	{
 		auto stopped = stop_service(hsc);
@@ -484,12 +568,11 @@ bool start_service(LPCWSTR ip)
 	auto check_point = sstatus.dwCheckPoint;
 	auto wait_tick = GetTickCount();
 
-	// ������״̬Ϊ SERVICE_STOP_PENDING ʱ, �ȴ�����ֹͣ
-
+	// try stop service
 	do
 	{
-		// �ȴ�ʱ����Ҫ���� dwWaitHint, ����ҪС�� 1s.
-		// ���ʱ��Ϊ 1s < x < 10s
+		// get dwWaitHint, 1s.
+		// wait should: 1s < x < 10s
 		auto wait = static_cast<DWORD>(sstatus.dwWaitHint * 0.1);
 		if (wait < 1000)
 		{
@@ -504,7 +587,7 @@ bool start_service(LPCWSTR ip)
 
 		memset(&sstatus, 0, buf_size);
 		needbytes = 0;
-		if (!::QueryServiceStatusEx(hsc, info, (LPBYTE)&sstatus, buf_size, &needbytes))
+		if (!::QueryServiceStatusEx(hsc, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 		{
 			auto _msg = std::format(L"when start service: QueryServiceStatusEx failed {}\n", GetLastError());
 			OutputDebugString(_msg.data());
@@ -514,9 +597,7 @@ bool start_service(LPCWSTR ip)
 		}
 		current_state = sstatus.dwCurrentState;
 
-		// ��ʱ����
-
-		// ����״̬�ı�ʱ, ���¼�ʱ
+		// service state maybe changed.
 		if (sstatus.dwCheckPoint > check_point)
 		{
 			check_point = sstatus.dwCheckPoint;
@@ -537,15 +618,15 @@ bool start_service(LPCWSTR ip)
 
 	} while (current_state == SERVICE_STOP_PENDING);
 
-	// ��������
-	// 1. �˺�������֮ǰ, �ɷ������������:
+	// service control manager set:
+	// 1. default paramters:
 	//    a. dwCurrentState = SERVICE_START_PENDING
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
 	//    d. dwWaitHint = 2s;
 	if (!::StartService(hsc, 1, &ip))
 	{
-		// ERROR_SERVICE_REQUEST_TIMEOUT (30s ��ʱ)
+		// ERROR_SERVICE_REQUEST_TIMEOUT (<=30s)
 
 		auto _msg = std::format(L"when start service: service start failed {}\n", GetLastError());
 		OutputDebugString(_msg.data());
@@ -554,10 +635,10 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// (�ٴ�)������״̬
+	// re-query status
 	memset(&sstatus, 0, buf_size);
 	needbytes = 0;
-	if (!::QueryServiceStatusEx(hsc, info, (LPBYTE)&sstatus, buf_size, &needbytes))
+	if (!::QueryServiceStatusEx(hsc, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 	{
 		auto _msg = std::format(L"when start service: QueryServiceStatusEx failed {}\n", GetLastError());
 		OutputDebugString(_msg.data());
@@ -566,16 +647,16 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
-	// ��ǰ����״̬
+	// service status
 	current_state = sstatus.dwCurrentState;
 	check_point = sstatus.dwCheckPoint;
 	wait_tick = GetTickCount();
 
-	// ������״̬Ϊ SERVICE_START_PENDING ʱ, �ȴ���������
+	// wait SERVICE_START_PENDING
 	do
 	{
-		// �ȴ�ʱ����Ҫ���� dwWaitHint, ����ҪС�� 1s.
-		// ���ʱ��Ϊ 1s < x < 10s
+		// get dwWaitHint, 1s.
+		// wait should: 1s < x < 10s
 		auto wait = static_cast<DWORD>(sstatus.dwWaitHint * 0.1);
 		if (wait < 1000)
 		{
@@ -590,7 +671,7 @@ bool start_service(LPCWSTR ip)
 
 		memset(&sstatus, 0, buf_size);
 		needbytes = 0;
-		if (!::QueryServiceStatusEx(hsc, info, (LPBYTE)&sstatus, buf_size, &needbytes))
+		if (!::QueryServiceStatusEx(hsc, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 		{
 			auto _msg = std::format(L"when start service: QueryServiceStatusEx failed {}\n", GetLastError());
 			OutputDebugString(_msg.data());
@@ -600,9 +681,7 @@ bool start_service(LPCWSTR ip)
 		}
 		current_state = sstatus.dwCurrentState;
 
-		// ��ʱ����
-
-		// ����״̬�ı�ʱ, ���¼�ʱ
+		// service status maybe changed.
 		if (sstatus.dwCheckPoint > check_point)
 		{
 			check_point = sstatus.dwCheckPoint;
@@ -619,7 +698,7 @@ bool start_service(LPCWSTR ip)
 		}
 	} while (current_state == SERVICE_START);
 
-	// ��֤�����Ѿ�����
+	// service started
 	if (current_state == SERVICE_START)
 	{
 		OutputDebugString(L"start service:rgmsvc successfully.\n");
@@ -662,8 +741,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		return false;
 	}
 
-	// ����״̬��ѯ
-
+	// query current service status
 	SERVICE_STATUS_PROCESS sstatus;
 	auto buf_size = sizeof(SERVICE_STATUS_PROCESS);
 	DWORD needbytes = 0;
@@ -688,7 +766,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 	auto current_state = sstatus.dwCurrentState;
 	auto wait_tick = GetTickCount();
 
-	// ������״̬Ϊ SERVICE_STOP_PENDING ʱ, �ȴ�ֹͣ
+	// wait SERVICE_STOP_PENDING
 	do
 	{
 		auto wait = sstatus.dwWaitHint / 10;
@@ -706,12 +784,6 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		needbytes = 0;
 		if (!::QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 		{
-			// ERROR_INVALID_HANDLE
-			// ERROR_ACCESS_DENIED
-			// ERROR_INSUFFICIENT_BUFFER
-			// ERROR_INVALID_PARAMETER
-			// ERROR_INVALID_LEVEL
-			// ERROR_SHUTDOWN_IN_PROGRESS
 			auto _msg = std::format(L"when start service: QueryServiceStatusEx failed {}\n", GetLastError());
 			OutputDebugString(_msg.data());
 			::CloseServiceHandle(service);
@@ -727,13 +799,12 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		auto duration = GetTickCount() - wait_tick;
 		if (duration > 30000)
 		{
-			// ��ʱ�˳� ...
+			// timeout ...
 			return false;
 		}
 	} while (current_state == SERVICE_STOP_PENDING);
 
-	// ����ֹͣ������
-	//SERVICE_STATUS stop_status; // ǰ������ SERVICE_STATUS_PROCESS �ṹ��ͬ
+	// send control code: stop
 	if (!::ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&sstatus))
 	{
 		::CloseServiceHandle(service);
@@ -741,22 +812,16 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 	}
 
 	current_state = sstatus.dwCurrentState;
-	// �ȴ�����ֹͣ
+	// wait service stop
 	do
 	{
-		// �ȴ�
+		// default 30s
 		Sleep(sstatus.dwWaitHint);
 
 		memset(&sstatus, 0, buf_size);
 		needbytes = 0;
 		if (!::QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, (LPBYTE)&sstatus, buf_size, &needbytes))
 		{
-			// ERROR_INVALID_HANDLE
-			// ERROR_ACCESS_DENIED
-			// ERROR_INSUFFICIENT_BUFFER
-			// ERROR_INVALID_PARAMETER
-			// ERROR_INVALID_LEVEL
-			// ERROR_SHUTDOWN_IN_PROGRESS
 			auto _msg = std::format(L"when start service: QueryServiceStatusEx failed {}\n", GetLastError());
 			OutputDebugString(_msg.data());
 			::CloseServiceHandle(service);
@@ -771,7 +836,7 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 		auto duration = GetTickCount() - wait_tick;
 		if (duration > 30000)
 		{
-			// ��ʱ ...
+			// timeout ...
 			break;
 		}
 
@@ -780,7 +845,8 @@ bool stop_service(SC_HANDLE service /*= nullptr*/)
 	return true;
 }
 
+// deprecated
 void default_configure_service()
 {
-
+	// set service description ...
 }

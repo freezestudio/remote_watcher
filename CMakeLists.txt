@@ -68,8 +68,8 @@ target_include_directories(${EXEC_NAME}
 set_target_properties(${EXEC_NAME} PROPERTIES LINK_FLAGS /MANIFESTUAC:"level='requireAdministrator' uiAccess='false'")
 # SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /level='requireAdministrator' /uiAccess='false'")
 target_sources(${EXEC_NAME} PUBLIC
-    ./assets/controller.rc
-    ./assets/controller.ico
+    ./assets/${EXEC_NAME}.rc
+    ./assets/${EXEC_NAME}.ico
     # ./assets/blob.tgz
     # TODO: test if exists
     ./assets/blob.tgz
