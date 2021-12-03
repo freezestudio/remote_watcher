@@ -104,20 +104,22 @@ public:
 		wcscpy_s(ip, str_ip.c_str());
 		if (install_service())
 		{
-			auto started = start_service(ip);
-			auto _msg = std::format(L"Start Service Result: {}"sv, started);
-			OutputDebugString(_msg.data());
-			if (started)
-			{
-				mEnableInstall = FALSE;
-				mEnableUninstall = TRUE;
-			}
-			else
-			{
-				mEnableInstall = TRUE;
-				mEnableUninstall = FALSE;
-			}
-			_SetButtonEnabled();
+			//Sleep(10000);
+			//auto started = start_service(ip);
+
+			//auto _msg = std::format(L"Start Service Result: {}"sv, started);
+			//OutputDebugString(_msg.data());
+			//if (started)
+			//{
+			//	mEnableInstall = FALSE;
+			//	mEnableUninstall = TRUE;
+			//}
+			//else
+			//{
+			//	mEnableInstall = TRUE;
+			//	mEnableUninstall = FALSE;
+			//}
+			//_SetButtonEnabled();
 		}
 		else
 		{
@@ -186,8 +188,8 @@ private:
 
 	void _SetButtonEnabled()
 	{
-		mInstallButton.EnableWindow(mEnableInstall);
-		mUninstallButton.EnableWindow(mEnableUninstall);
+		//mInstallButton.EnableWindow(mEnableInstall);
+		//mUninstallButton.EnableWindow(mEnableUninstall);
 	}
 
 	void _SetIcon(bool _small = false)

@@ -37,7 +37,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		auto _msg = std::format(L"@rg remote ip is: {}\n", _str_ip);
 		OutputDebugString(_msg.data());
 	}
-
+	OutputDebugStringA("@rg rgmsvc starting ...\n");
 	register_handler();
 }
 
@@ -61,6 +61,7 @@ void register_handler()
 		OutputDebugStringA("@rg register service control handler failure, exit.\n");
 		return;
 	}
+	OutputDebugStringA("@rg service control handler registered.\n");
 
 	// first init sevice status
 	SERVICE_STATUS status{};
@@ -70,6 +71,7 @@ void register_handler()
 	status.dwWaitHint = 3000; // wait 3s
 	status.dwCheckPoint = 0;
 	::SetServiceStatus(ss_handle, &status);
+	OutputDebugStringA("@rg service start pending 3s.\n");
 
 	hh_waitable = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable)
@@ -81,7 +83,7 @@ void register_handler()
 		status.dwCheckPoint = 0;
 		status.dwWin32ExitCode = 0;
 		::SetServiceStatus(ss_handle, &status);
-
+		OutputDebugStringA("@rg service CreateEvent Failure. stop pending.\n");
 		return;
 	}
 	bb_mockthread_exit = false;
@@ -92,7 +94,7 @@ void register_handler()
 	hh_mockthread = ::CreateThread(nullptr, 0, _MockThread, nullptr, 0, nullptr);
 	if (!hh_mockthread)
 	{
-		OutputDebugStringA("@rg Mock Thread failure.\n");
+		OutputDebugStringA("@rg servic create Mock Thread failure.\n");
 		goto theend;
 	}
 
@@ -105,6 +107,7 @@ void register_handler()
 	status.dwServiceSpecificExitCode = 0;
 	status.dwWaitHint = 0;
 	::SetServiceStatus(ss_handle, &status);
+	OutputDebugStringA("@rg service starting ...\n");
 
 	// loop here
 	while (true)
@@ -157,8 +160,18 @@ theend:
 	status.dwWin32ExitCode = 0;
 	::SetServiceStatus(ss_handle, &status);
 
-	::CloseHandle(hh_mockthread);
-	::CloseHandle(hh_waitable);
+	if (hh_mockthread)
+	{
+		::CloseHandle(hh_mockthread);
+		hh_mockthread = nullptr;
+	}
+
+	if (hh_waitable)
+	{
+		::CloseHandle(hh_waitable);
+		hh_waitable = nullptr;
+	}
+
 	OutputDebugStringA("@rg service:rgmsvc stopped.\n");
 }
 

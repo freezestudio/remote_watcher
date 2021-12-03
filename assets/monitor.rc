@@ -1,60 +1,163 @@
+// Microsoft Visual C++ generated resource script.
 //
-// rc.exe /I ../3rdpart/wtl/include /D _DEBUG /D _UNICODE /D UNICODE /L 0x804 /nologo /fo ../build/Debug/monitor.res
-//
-#include "../include/assets.h"
-#include "atlres.h"
+#include "resource.h"
+#include "../3rdpart/wtl/include/atlres.h"
+/////////////////////////////////////////////////////////////////////////////
+// resources
 
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 #pragma code_page(936)
 
-//IDR_MAINFRAME IDR_BLOB "blob.zip"
-IDR_MAINFRAME IDR_BLOB "blob.tgz"
+/////////////////////////////////////////////////////////////////////////////
+//
+// 257
+//
 
-IDR_MAINFRAME ICON "monitor.ico"
+IDR_MAINFRAME           257                     "blob.tgz"
 
-IDR_BMP_INSTALL BITMAP "btn_install.bmp"
-IDR_BMP_UNINSTALL BITMAP "Btn_uninstall.bmp"
 
-IDD_MAINDLG DIALOGEX 0,0,200,100
-STYLE DS_SETFONT|WS_MINIMIZEBOX|WS_CAPTION|WS_SYSMENU
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "monitor.ico"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDR_BMP_INSTALL         BITMAP                  "btn_install.bmp"
+
+IDR_BMP_UNINSTALL       BITMAP                  "Btn_uninstall.bmp"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_MAINDLG DIALOGEX 0, 0, 200, 100
+STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_CAPTION | WS_SYSMENU
 CAPTION "Monitor Service"
-FONT 9,"Segoe UI",0,0,0x00
+FONT 9, "Segoe UI", 0, 0, 0x0
 BEGIN
     LTEXT           "Remote:",IDC_STATIC,10,10,26,8
     CONTROL         "",IDC_REMOTEIP,"SysIPAddress32",WS_TABSTOP,37,7,100,15
-    PUSHBUTTON      "Install",IDC_BTN_INSTALL,37,31,50,36
-    PUSHBUTTON      "Uninstall",IDC_BTN_UNINSTALL,119,31,50,36
+    PUSHBUTTON      "Install",IDC_BTN_INSTALL,37,24,50,36
+    PUSHBUTTON      "Uninstall",IDC_BTN_UNINSTALL,119,24,50,36
     LTEXT           "Status:",IDC_STATIC,10,86,21,8
     LTEXT           "Ready!",IDC_STATUS,37,86,156,8
+    CONTROL         "<a>Start</a>",IDC_SYSLINK_START,"SysLink",WS_TABSTOP,37,67,60,14
+    CONTROL         "<a>Stop</a>",IDC_SYSLINK_STOP,"SysLink",WS_TABSTOP,119,67,60,14
 END
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
 VS_VERSION_INFO VERSIONINFO
-    FILEVERSION 1,0,0,1
-    PRODUCTVERSION 1,0,0,1
-    FILEFLAGSMASK 0x3fL
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
-    FILEFLAGS 0x1L
+ FILEFLAGS 0x1L
 #else
-    FILEFLAGS 0x0L
+ FILEFLAGS 0x0L
 #endif
-    FILEOS 0x4L
-    FILETYPE 0x2L
-    FILESUBTYPE 0x0L
+ FILEOS 0x4L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
         VALUE "FileDescription", "Install and Uninstall Service"
-        VALUE "FileVersion",     "1,0,0,1"  
+        VALUE "FileVersion", "1,0,0,1"
     END
 END
 
+
+#ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
 //
-// String table
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_MAINDLG, DIALOG
+    BEGIN
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_MAINDLG AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
 //
 
 STRINGTABLE
 BEGIN
-   IDS_DISPLAY   "FolderMointService"
-   IDS_DESC      "Watch a Folder, Send event to remote."
+    IDS_DISPLAY             "FolderMointService"
+    IDS_DESC                "Watch a Folder, Send event to remote."
 END
+
+#endif    // resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

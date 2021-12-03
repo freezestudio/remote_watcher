@@ -1,7 +1,7 @@
 //
 // rc.exe /I ../3rdpart/wtl/include /D _DEBUG /D _UNICODE /D UNICODE /L 0x804 /nologo /fo ../build/Debug/rgmsvc.res
 //
-#include "../include/assets.h"
+#include "resource.h"
 #include "../3rdpart/wtl/include/atlres.h"
 
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED

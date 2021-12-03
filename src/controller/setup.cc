@@ -5,7 +5,6 @@
 
 #include <cassert>
 
-#define SERVICE_PATH L"xMonit"
 #define BLOB_NAME L"blob.tgz"
 
 namespace fs = std::filesystem;
@@ -217,45 +216,45 @@ static bool add_svc_keyvalue(
 	// Start: SERVICE_START_PENDING; // 2
 	// Type:  SERVICE_WIN32;         // 30
 	// 
-	// DisplayName REG_SZ        @%ProgramFile%\\xMonit\\rgmsvc.dll,-101
-	// Description REG_SZ        @%ProgramFile%\\xMonit\\rgmsvc.dll,-102
-	// ImagePath   REG_EXPAND_SZ %SystemRoot%\\system32\\svchost.exe -k LocalService
-	// ObjectName  REG_SZ        NT Authority\\LocalService
+	// DisplayName REG_SZ        @%SystemRoot%\\system32\\rgmsvc.dll,-101
+	// Description REG_SZ        @%SystemRoot%\\system32\\rgmsvc.dll,-102
+	// ImagePath   REG_EXPAND_SZ  %SystemRoot%\\system32\\svchost.exe -k LocalService
+	// ObjectName  REG_SZ        NT AUTHORITY\\LocalService
 	// Start       REG_DWORD     2
 	// Type        REG_DWORD     30
 
-	auto display_name = std::format(L"@%ProgramFile%\\{}\\{}.dll,-101"sv, SERVICE_PATH, SERVICE_NAME);
+	auto display_name = std::format(L"@%SystemRoot%\\system32\\{}.dll,-101"sv, SERVICE_NAME);
 	status = svc.SetStringValue(L"DisplayName", display_name.data());
 	if (!_verify_status(L"Set Svc Value: DisplayName", status))
 	{
 		return false;
 	}
-	auto description = std::format(L"@%ProgramFile%\\{}\\{}.dll,-102"sv, SERVICE_PATH, SERVICE_NAME);
+	auto description = std::format(L"@%SystemRoot%\\system32\\{}.dll,-102"sv, SERVICE_NAME);
 	status = svc.SetStringValue(L"Description", description.data());
 	if (!_verify_status(L"Set Svc Value: Description", status))
 	{
 		return false;
 	}
-	status = svc.SetStringValue(L"ImagePath", L"%SystemRoot%\\system32\\svchost.exe -k LocalService", REG_EXPAND_SZ);
-	if (!_verify_status(L"Set Svc Value: ImagePath", status))
-	{
-		return false;
-	}
-	status = svc.SetStringValue(L"ObjectName", L"NT Authority\\LocalService");
+	//status = svc.SetStringValue(L"ImagePath", L"%SystemRoot%\\System32\\svchost.exe -k LocalService", REG_EXPAND_SZ);
+	//if (!_verify_status(L"Set Svc Value: ImagePath", status))
+	//{
+	//	return false;
+	//}
+	status = svc.SetStringValue(L"ObjectName", L"NT AUTHORITY\\LocalService");
 	if (!_verify_status(L"Set Svc Value: ObjectName", status))
 	{
 		return false;
 	}
-	status = svc.SetDWORDValue(L"Start", SERVICE_START_PENDING);
-	if (!_verify_status(L"Set Svc Value: Start", status))
-	{
-		return false;
-	}
-	status = svc.SetDWORDValue(L"Type", SERVICE_WIN32);
-	if (!_verify_status(L"Set Svc Value: Start", status))
-	{
-		return false;
-	}
+	//status = svc.SetDWORDValue(L"Start", SERVICE_START_PENDING);
+	//if (!_verify_status(L"Set Svc Value: Start", status))
+	//{
+	//	return false;
+	//}
+	//status = svc.SetDWORDValue(L"Type", SERVICE_WIN32);
+	//if (!_verify_status(L"Set Svc Value: Start", status))
+	//{
+	//	return false;
+	//}
 
 	svc.Close();
 
@@ -270,7 +269,7 @@ static bool add_svc_keyvalue(
 	// ServiceDllUnloadOnStop REG_DWORD     1 // * here ignore it
 	// ServiceMain            REG_SZ        ServiceMain
 
-	auto service_dll = std::format(L"%ProgramFile%\\{}\\{}.dll"sv, SERVICE_PATH, SERVICE_NAME);
+	auto service_dll = std::format(L"%SystemRoot%\\system32\\{}.dll"sv, SERVICE_NAME);
 	status = svc.SetStringValue(L"ServiceDll", service_dll.data(), REG_EXPAND_SZ);
 	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceDll", status))
 	{
@@ -278,6 +277,11 @@ static bool add_svc_keyvalue(
 	}
 	status = svc.SetStringValue(L"ServiceMain", L"ServiceMain");
 	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceMain", status))
+	{
+		return false;
+	}
+	status = svc.SetDWORDValue(L"ServiceDllUnloadOnStop", 1);
+	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceDllUnloadOnStop", status))
 	{
 		return false;
 	}
@@ -312,7 +316,6 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 	// tar(tgz, out_path);
 
 	auto _temp_path = fs::temp_directory_path();
-	_temp_path /= SERVICE_PATH;
 	if (!fs::exists(_temp_path))
 	{
 		std::error_code ec;
@@ -383,21 +386,21 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 
 bool install_service()
 {
-	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
+	auto _path = L"%SystemRoot%\\system32";
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
 	auto _install_path = fs::path(_path_buf);
-	if (!fs::exists(_install_path))
-	{
-		std::error_code ec;
-		auto created = fs::create_directories(_install_path, ec);
-		if (!created || ec)
-		{
-			auto _msg = ec.message();
-			OutputDebugStringA(_msg.data());
-			return false;
-		}
-	}
+	//if (!fs::exists(_install_path))
+	//{
+	//	std::error_code ec;
+	//	auto created = fs::create_directories(_install_path, ec);
+	//	if (!created || ec)
+	//	{
+	//		auto _msg = ec.message();
+	//		OutputDebugStringA(_msg.data());
+	//		return false;
+	//	}
+	//}
 	OutputDebugString(L"@rg Install Service: Set expand service dll path.\n");
 
 	// decompress blob
@@ -414,11 +417,48 @@ bool install_service()
 	_resource.Release();
 	OutputDebugString(L"@rg Install Service: Expand service dll to path.\n");
 
+	// open service control manager
+	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+	if (!hscm)
+	{
+		OutputDebugString(L"@rg Install Service: OpenSCManager Failure.\n");
+		return false;
+	}
+
+	// create service
+	//wchar_t _display_name[255]{};
+	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
+	auto _binary_path = L"%SystemRoot%\\System32\\svchost.exe -k LocalService";
+	auto hsc = CreateService(
+		hscm,
+		SERVICE_NAME,
+		nullptr,
+		SERVICE_ALL_ACCESS,
+		SERVICE_WIN32_OWN_PROCESS, //SERVICE_WIN32
+		SERVICE_AUTO_START,
+		SERVICE_ERROR_NORMAL,
+		_binary_path,
+		nullptr, nullptr, nullptr, nullptr, nullptr
+	);
+	if (!hsc)
+	{
+		//ERROR_INVALID_PARAMETER; // 87
+		auto _err = GetLastError();
+		auto _msg = std::format(L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv, _err, SERVICE_NAME, _binary_path);
+		OutputDebugString(_msg.data());
+		CloseServiceHandle(hscm);
+		return false;
+	}
+
+	CloseServiceHandle(hsc);
+	CloseServiceHandle(hscm);
+
 	// add service key
 	if (!add_svc_keyvalue())
 	{
 		return false;
 	}
+
 	// append value to svchost
 	if (!append_host_value())
 	{
@@ -433,6 +473,10 @@ bool uninstall_service()
 {
 	// assert service stopped.
 
+	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+	auto hsc = OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
+	auto _deleted = DeleteService(hsc);
+
 	if (!remove_host_value())
 	{
 		return false;
@@ -443,15 +487,15 @@ bool uninstall_service()
 		return false;
 	}
 
-	// delete %ProgramFiles%\\xMonit folder
-	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
+	// delete %SystemRoot%\\system32\\SERVICE_NAME file
+	auto _path = L"%SystemRoot%\\system32";
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
-	auto _uninstall_path = fs::path(_path_buf);
-	if (fs::exists(_uninstall_path))
+	auto _uninstall_file = fs::path(_path_buf)/std::format(L"{}.dll"sv, SERVICE_NAME).data();
+	if (fs::exists(_uninstall_file))
 	{
 		std::error_code ec;
-		auto removed = fs::remove_all(_uninstall_path, ec);
+		auto removed = fs::remove(_uninstall_file, ec);
 		if (!removed || ec)
 		{
 			auto _msg = ec.message();
@@ -480,6 +524,7 @@ bool start_service(LPCWSTR ip)
 	auto hsc = ::OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
+		//ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
 		auto _msg = std::format(L"@rg Start Service: OpenService failed {}\n", GetLastError());
 		OutputDebugString(_msg.data());
 		::CloseServiceHandle(hscm);
@@ -947,7 +992,7 @@ bool is_service_installed()
 	auto hsc = OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
-		auto _msg = std::format(L"@rg Check Service: OpenService Result={}"sv, GetLastError());
+		auto _msg = std::format(L"@rg Check Service: OpenService Result={}\n"sv, GetLastError());
 		OutputDebugString(_msg.data());
 		::CloseServiceHandle(hscm);
 		return false;
