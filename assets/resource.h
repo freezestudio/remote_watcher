@@ -1,4 +1,6 @@
 //{{NO_DEPENDENCIES}}
+// Microsoft Visual C++
+// monitor.rc
 //
 #define ID_SEPARATOR                    0
 #define ID_DEFAULT_PANE                 0
@@ -17,6 +19,8 @@
 #define IDC_SYSLINK_START               1000
 #define IDC_SYSLINK2                    1001
 #define IDC_SYSLINK_STOP                1001
+#define IDC_CHECK1                      1002
+#define IDC_CHECK_AUTO_START            1002
 #define ATL_IDC_TAB_CONTROL             0x3020
 #define ID_APPLY_NOW                    0x3021
 #define ID_WIZBACK                      0x3023
@@ -130,7 +134,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        102
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1001
+#define _APS_NEXT_CONTROL_VALUE         1003
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

@@ -48,6 +48,9 @@ public:
 		// PushButton
 		COMMAND_ID_HANDLER_EX(IDC_BTN_INSTALL, OnInstall)
 		COMMAND_ID_HANDLER_EX(IDC_BTN_UNINSTALL, OnUninstall)
+		// Checkbox
+		COMMAND_ID_HANDLER_EX(IDC_CHECK_AUTO_START, OnCheckAutoStart)
+		// SysLink of Notify
 		//NOTIFY_ID_HANDLER_EX(IDC_SYSLINK_START, OnStartService)
 		//COMMAND_ID_HANDLER_EX(IDC_SYSLINK_STOP, OnStopService)
 		MSG_WM_NOTIFY(OnNotify)
@@ -62,6 +65,7 @@ public:
 		mEnableInstall = is_installed ? FALSE : TRUE;
 		mEnableUninstall = is_installed ? TRUE : FALSE;
 		SetDlgItemText(IDC_STATUS, is_installed ? L"installed!" : L"not installed!");
+		CheckDlgButton(IDC_CHECK_AUTO_START, BST_CHECKED);
 
 		_SetIcon();
 		_SetIcon(true);
@@ -158,6 +162,15 @@ public:
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
 			_SetButtonEnabled();
+		}
+	}
+
+	void OnCheckAutoStart(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
+	{
+		auto checked = IsDlgButtonChecked(nID) == BST_CHECKED;
+		if (checked)
+		{
+
 		}
 	}
 

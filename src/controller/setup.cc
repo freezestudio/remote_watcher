@@ -8,7 +8,7 @@
 #define BLOB_NAME L"blob.tgz"
 // if defined, run %ProgramFiles%\SERVICE_PATH\*.exe service,
 // else run %SystemRoot%\System32\*.dll service
-// #define SERVICE_PATH L"xMonit"
+#define SERVICE_PATH L"xMonit"
 
 namespace fs = std::filesystem;
 using namespace std::literals;
@@ -467,7 +467,7 @@ bool install_service()
 	auto _resource = WTL::CResource();
 	void* _data = nullptr;
 	int _len = 0;
-	if(!read_resource(&_data, &_len))
+	if (!read_resource(&_data, &_len))
 	{
 		OutputDebugString(L"Read Service Resource Failure.\n");
 		return false;
@@ -518,7 +518,7 @@ bool install_service()
 		auto _err = GetLastError();
 		auto _msg = std::format(
 			L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
-			 _err, SERVICE_NAME, _binary_path);
+			_err, SERVICE_NAME, _binary_path);
 		OutputDebugString(_msg.data());
 		CloseServiceHandle(hscm);
 		return false;
@@ -786,7 +786,7 @@ bool start_service(LPCWSTR ip)
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
 	//    d. dwWaitHint = 2s;
-	wchar_t* args[]={
+	wchar_t const* args[] = {
 		SERVICE_NAME,
 		ip,
 	};

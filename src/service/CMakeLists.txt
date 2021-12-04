@@ -42,10 +42,10 @@ if(SERVICE_EXEC_TYPE)
                 #"${DEP_CORE_FILE_NAME}"
                 # more ...
         COMMAND ${CMAKE_COMMAND} -E rm -f 
-            "${PROJECT_SOURCE_DIR}/tools/${SERVICE_DLL_NAME}"
+            "${PROJECT_SOURCE_DIR}/tools/${SERVICE_EXE_NAME}"
             #"${PROJECT_SOURCE_DIR}/tools/${DEP_CORE_FILE_NAME}"
             # more ...
-        COMMAND ${CMAKE_COMMAND} -E echo "Make ${SERVICE_DLL} blob bundle done."
+        COMMAND ${CMAKE_COMMAND} -E echo "Make ${SERVICE_EXE} blob bundle done."
     )
 else()
     #

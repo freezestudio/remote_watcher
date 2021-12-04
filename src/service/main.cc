@@ -26,7 +26,7 @@ DWORD __stdcall _MockThread(LPVOID);
  * @param argc 参数个数
  * @param argv 参数列表
  */
-void __stdcall ServiceMain(DWORD argc, LPWSTR * argv)
+void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 {
 	// 初始化所有全局变量
 	// 如果初始化时间不超过 1s, 可以直接设置服务状态为 SERVICE_RUNNING
@@ -84,12 +84,12 @@ void init_service()
 		status.dwCheckPoint = 0;
 		status.dwWin32ExitCode = 0;
 		::SetServiceStatus(ss_handle, &status);
-		OutputDebugStringA("@rg service CreateEvent Failure. stop pending.\n");
+		OutputDebugString(L"@rg service CreateEvent Failure. stop pending.\n");
 		return;
 	}
 
 	// start multi threads
-	if(!init_threadpool())
+	if (!init_threadpool())
 	{
 		goto theend;
 	}
@@ -103,7 +103,7 @@ void init_service()
 	status.dwServiceSpecificExitCode = 0;
 	status.dwWaitHint = 0;
 	::SetServiceStatus(ss_handle, &status);
-	OutputDebugStringA("@rg service starting ...\n");
+	OutputDebugString(L"@rg service starting ...\n");
 
 	// loop here
 	while (true)
@@ -166,7 +166,7 @@ theend:
 		hh_waitable = nullptr;
 	}
 
-	OutputDebugStringA("@rg service:rgmsvc stopped.\n");
+	OutputDebugString(L"@rg service:rgmsvc stopped.\n");
 }
 
 DWORD __stdcall handler_proc_ex(
@@ -189,7 +189,7 @@ DWORD __stdcall handler_proc_ex(
 }
 
 bool init_threadpool()
-{	
+{
 	bb_mockthread_exit = false;
 	hh_mockthread = ::CreateThread(nullptr, 0, _MockThread, nullptr, 0, nullptr);
 	if (!hh_mockthread)
@@ -203,12 +203,12 @@ bool init_threadpool()
 
 int __stdcall wmain()
 {
-	wchar_t _service_name[]=SERVICE_NAME;
+	wchar_t _service_name[] = SERVICE_NAME;
 	SERVICE_TABLE_ENTRY _dispatch_table[] = {
 		{_service_name, static_cast<LPSERVICE_MAIN_FUNCTION>(ServiceMain)},
 		{nullptr, nullptr},
 	};
-	if(StartServiceCtrlDispatcher(_dispatch_table))
+	if (StartServiceCtrlDispatcher(_dispatch_table))
 	{
 		OutputDebugString(L"Dispatch Service Successfully.\n");
 	}

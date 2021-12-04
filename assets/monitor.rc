@@ -55,6 +55,7 @@ BEGIN
     LTEXT           "Ready!",IDC_STATUS,37,86,156,8
     CONTROL         "<a>Start</a>",IDC_SYSLINK_START,"SysLink",WS_TABSTOP,37,67,60,14
     CONTROL         "<a>Stop</a>",IDC_SYSLINK_STOP,"SysLink",WS_TABSTOP,119,67,60,14
+    CONTROL         "Auto Start",IDC_CHECK_AUTO_START,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,153,9,46,10
 END
 
 
@@ -146,7 +147,7 @@ BEGIN
     IDS_DESC                "Watch a Folder, Send event to remote."
 END
 
-#endif    // resources
+#endif    // ����(���壬�й�) resources
 /////////////////////////////////////////////////////////////////////////////
 
 
