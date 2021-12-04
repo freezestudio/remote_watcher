@@ -7,6 +7,7 @@ add_library(${SERVICE_NAME} SHARED
     ./utils.cc
     ./entry.cc
 )
+target_compile_definitions(${SERVICE_NAME} PUBLIC RGMSVC_EXPORTS)
 target_include_directories(${SERVICE_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
     PRIVATE ./

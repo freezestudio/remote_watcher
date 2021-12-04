@@ -6,6 +6,9 @@
 #include <cassert>
 
 #define BLOB_NAME L"blob.tgz"
+// if defined, run %ProgramFiles%\SERVICE_PATH\*.exe service,
+// else run %SystemRoot%\System32\*.dll service
+// #define SERVICE_PATH L"xMonit"
 
 namespace fs = std::filesystem;
 using namespace std::literals;
@@ -108,6 +111,7 @@ static bool _verify_status(LPCWSTR op, DWORD status)
 	return false;
 }
 
+#ifndef SERVICE_PATH
 static bool append_host_value(
 	LPCWSTR key = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
 	LPCWSTR subkey = L"LocalService",
@@ -131,6 +135,7 @@ static bool append_host_value(
 		return false;
 	}
 
+	// Append SERVICE_NAME to "LocalService"
 	auto wcs_value = std::wstring(exist_value, len);
 	auto pos = wcs_value.find(value);
 	if (pos == std::wstring::npos)
@@ -181,6 +186,7 @@ static bool remove_host_value(
 		return true;
 	}
 
+	// Erase SERVICE_NAME from "LocalService"
 	wcs_value.erase(pos);
 	auto _new_str = wcs_value.data();
 	auto _new_size = wcs_value.size();
@@ -195,6 +201,7 @@ static bool remove_host_value(
 	OutputDebugString(L"@rg Remove from Host Done.\n");
 	return true;
 }
+#endif
 
 static bool add_svc_keyvalue(
 	LPCWSTR key = L"SYSTEM\\CurrentControlSet\\Services",
@@ -216,35 +223,56 @@ static bool add_svc_keyvalue(
 	// Start: SERVICE_START_PENDING; // 2
 	// Type:  SERVICE_WIN32;         // 30
 	// 
-	// DisplayName REG_SZ        @%SystemRoot%\\system32\\rgmsvc.dll,-101
-	// Description REG_SZ        @%SystemRoot%\\system32\\rgmsvc.dll,-102
-	// ImagePath   REG_EXPAND_SZ  %SystemRoot%\\system32\\svchost.exe -k LocalService
+	// DisplayName REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-101
+	// Description REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-102
+	// ImagePath   REG_EXPAND_SZ  %SystemRoot%\\System32\\svchost.exe -k LocalService
 	// ObjectName  REG_SZ        NT AUTHORITY\\LocalService
 	// Start       REG_DWORD     2
 	// Type        REG_DWORD     30
 
-	auto display_name = std::format(L"@%SystemRoot%\\system32\\{}.dll,-101"sv, SERVICE_NAME);
+#ifdef SERVICE_PATH
+	auto display_name = std::format(L"@%ProgramFiles%\\{}\\{}.exe,-101"sv, SERVICE_PATH, SERVICE_NAME);
+#else
+	auto display_name = std::format(L"@%SystemRoot%\\System32\\{}.dll,-101"sv, SERVICE_NAME);
+#endif
 	status = svc.SetStringValue(L"DisplayName", display_name.data());
 	if (!_verify_status(L"Set Svc Value: DisplayName", status))
 	{
 		return false;
 	}
-	auto description = std::format(L"@%SystemRoot%\\system32\\{}.dll,-102"sv, SERVICE_NAME);
+
+#ifdef SERVICE_PATH
+	auto description = std::format(L"@%ProgramFiles%\\{}\\{}.exe,-102"sv, SERVICE_PATH, SERVICE_NAME);
+#else
+	auto description = std::format(L"@%SystemRoot%\\System32\\{}.dll,-102"sv, SERVICE_NAME);
+#endif
 	status = svc.SetStringValue(L"Description", description.data());
 	if (!_verify_status(L"Set Svc Value: Description", status))
 	{
 		return false;
 	}
+
+	// deprecated. use CreateService(...)
 	//status = svc.SetStringValue(L"ImagePath", L"%SystemRoot%\\System32\\svchost.exe -k LocalService", REG_EXPAND_SZ);
 	//if (!_verify_status(L"Set Svc Value: ImagePath", status))
 	//{
 	//	return false;
 	//}
+
+#ifndef SERVICE_PATH
 	status = svc.SetStringValue(L"ObjectName", L"NT AUTHORITY\\LocalService");
 	if (!_verify_status(L"Set Svc Value: ObjectName", status))
 	{
 		return false;
 	}
+	status = svc.SetDWORDValue(L"ServiceSidType", 1);
+	if (!_verify_status(L"Set Svc Value: ServiceSidType", status))
+	{
+		return false;
+	}
+#endif
+
+	// deprecated. use CreateService(...)
 	//status = svc.SetDWORDValue(L"Start", SERVICE_START_PENDING);
 	//if (!_verify_status(L"Set Svc Value: Start", status))
 	//{
@@ -265,11 +293,13 @@ static bool add_svc_keyvalue(
 		return false;
 	}
 
-	// ServiceDll             REG_EXPAND_SZ %ProgramFiles%\\xMonit\\rgmsvc.dll
-	// ServiceDllUnloadOnStop REG_DWORD     1 // * here ignore it
+	// ServiceDll             REG_EXPAND_SZ %ProgramFiles%\\SERVICE_PATH\\SERVICE_NAME.dll
+	// ServiceDll             REG_EXPAND_SZ %SystemRoot%\\System32\\SERVICE_NAME.dll
+	// ServiceDllUnloadOnStop REG_DWORD     1
 	// ServiceMain            REG_SZ        ServiceMain
 
-	auto service_dll = std::format(L"%SystemRoot%\\system32\\{}.dll"sv, SERVICE_NAME);
+#ifndef SERVICE_PATH
+	auto service_dll = std::format(L"%SystemRoot%\\System32\\{}.dll"sv, SERVICE_NAME);
 	status = svc.SetStringValue(L"ServiceDll", service_dll.data(), REG_EXPAND_SZ);
 	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceDll", status))
 	{
@@ -285,11 +315,13 @@ static bool add_svc_keyvalue(
 	{
 		return false;
 	}
+#endif
 
 	OutputDebugString(L"@rg Add Svc Key-Values Done.\n");
 	return true;
 }
 
+#ifndef SERVICE_PATH
 static bool remove_svc_keyvalue(
 	LPCWSTR key = L"SYSTEM\\CurrentControlSet\\Services",
 	LPCWSTR name = SERVICE_NAME
@@ -309,6 +341,7 @@ static bool remove_svc_keyvalue(
 	}
 	return ok;
 }
+#endif
 
 static bool decompress_blobs(void* blob, int len, const char* out_path)
 {
@@ -316,6 +349,8 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 	// tar(tgz, out_path);
 
 	auto _temp_path = fs::temp_directory_path();
+#ifdef SERVICE_PATH
+	_temp_path /= SERVICE_PATH;
 	if (!fs::exists(_temp_path))
 	{
 		std::error_code ec;
@@ -328,7 +363,7 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 			return false;
 		}
 	}
-
+#endif
 	auto _temp_tgz = _temp_path / BLOB_NAME;
 	auto _htmp = ::CreateFile(
 		_temp_tgz.c_str(),
@@ -345,6 +380,7 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 		return false;
 	}
 
+	// data write to temp/../blob.tgz
 	DWORD written;
 	auto writted = ::WriteFile(_htmp, blob, len, &written, nullptr);
 	CloseHandle(_htmp);
@@ -365,12 +401,25 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 	strcpy(_tgz, _str_tgz.c_str());
 	assert(strlen(_tgz) == _str_tgz.size());
 
+	// decompress temp/../blob.tgz to install path
 	auto ok = tar(_tgz, out_path) == 0;
 	if (!ok)
 	{
 		OutputDebugString(L"@rg decompress tgz failure.\n");
 	}
 
+#ifdef SERVICE_PATH
+	// remove temp path
+	std::error_code ec;
+	auto removed = fs::remove_all(_temp_tgz, ec);
+	if (!removed || ec)
+	{
+		auto _msg = ec.message();
+		OutputDebugString(L"@rg remove temp path to tgz file failure.\n");
+		OutputDebugStringA(_msg.data());
+		return false;
+	}
+#else
 	// remove temp file
 	std::error_code ec;
 	auto removed = fs::remove(_temp_tgz, ec);
@@ -381,26 +430,33 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 		OutputDebugStringA(_msg.data());
 		return false;
 	}
+#endif
 	return true;
 }
 
 bool install_service()
 {
-	auto _path = L"%SystemRoot%\\system32";
+#ifdef SERVICE_PATH
+	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
+#else
+	auto _path = L"%SystemRoot%\\System32";
+#endif
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
 	auto _install_path = fs::path(_path_buf);
-	//if (!fs::exists(_install_path))
-	//{
-	//	std::error_code ec;
-	//	auto created = fs::create_directories(_install_path, ec);
-	//	if (!created || ec)
-	//	{
-	//		auto _msg = ec.message();
-	//		OutputDebugStringA(_msg.data());
-	//		return false;
-	//	}
-	//}
+#ifdef SERVICE_PATH
+	if (!fs::exists(_install_path))
+	{
+		std::error_code ec;
+		auto created = fs::create_directories(_install_path, ec);
+		if (!created || ec)
+		{
+			auto _msg = ec.message();
+			OutputDebugStringA(_msg.data());
+			return false;
+		}
+	}
+#endif
 	OutputDebugString(L"@rg Install Service: Set expand service dll path.\n");
 
 	// decompress blob
@@ -426,15 +482,23 @@ bool install_service()
 	}
 
 	// create service
+
 	//wchar_t _display_name[255]{};
 	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
+
+#ifdef SERVICE_PATH
+	auto _binary_path = std::format(L"%ProgramFiles%\\{}\\{}.exe"sv, SERVICE_PATH, SERVICE_NAME).data();
+	auto _service_type = SERVICE_WIN32;
+#else
 	auto _binary_path = L"%SystemRoot%\\System32\\svchost.exe -k LocalService";
+	auto _service_type = SERVICE_USER_SHARE_PROCESS;
+#endif
 	auto hsc = CreateService(
 		hscm,
 		SERVICE_NAME,
 		nullptr,
 		SERVICE_ALL_ACCESS,
-		SERVICE_WIN32_OWN_PROCESS, //SERVICE_WIN32
+		_service_type,
 		SERVICE_AUTO_START,
 		SERVICE_ERROR_NORMAL,
 		_binary_path,
@@ -459,11 +523,13 @@ bool install_service()
 		return false;
 	}
 
+#ifndef SERVICE_PATH
 	// append value to svchost
 	if (!append_host_value())
 	{
 		return false;
 	}
+#endif
 
 	OutputDebugString(L"@rg Install Service Successfully.\n");
 	return true;
@@ -474,24 +540,72 @@ bool uninstall_service()
 	// assert service stopped.
 
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+	if (!hscm)
+	{
+		OutputDebugString(L"@rg Uninstall Service: OpenSCManager Failure.\n");
+		return false;
+	}
 	auto hsc = OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
-	auto _deleted = DeleteService(hsc);
+	if (!hsc)
+	{
+		auto _err = GetLastError();
+		auto _msg = std::format(L"@rg Uninstall Service: OpenService Failure: {}. name[{}]\n"sv, _err, SERVICE_NAME);
+		OutputDebugString(_msg.data());
+		CloseServiceHandle(hscm);
+		return false;
+	}
 
+	auto _deleted = DeleteService(hsc);
+	if (!_deleted)
+	{
+		auto _err = GetLastError();
+		auto _msg = std::format(L"@rg Uninstall Service: DeleteService Failure: {}\n"sv, _err);
+		OutputDebugString(_msg.data());
+		CloseServiceHandle(hsc);
+		CloseServiceHandle(hscm);
+	}
+
+#ifndef SERVICE_PATH
 	if (!remove_host_value())
 	{
 		return false;
 	}
+#endif
 
 	if (!remove_svc_keyvalue())
 	{
 		return false;
 	}
 
-	// delete %SystemRoot%\\system32\\SERVICE_NAME file
-	auto _path = L"%SystemRoot%\\system32";
+	// TODO: remove USER\...\keys
+	// HKEY_CURRENT_USER\Software\Classes\Local Settings\MuiCache\f7\AAF68885
+	// and:
+	// HKEY_CLASSES_ROOT\Local Settings\MuiCache\f7\AAF68885
+	// @%SystemRoot%\System32\rgmsvc.dll,-102 REG_SZ ...
+
+
+#ifdef SERVICE_PATH
+	auto _path = L"%ProgramFile%\\" SERVICE_PATH;
+#else
+	// delete %SystemRoot%\\System32\\SERVICE_NAME file
+	auto _path = L"%SystemRoot%\\System32";
+#endif
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
-	auto _uninstall_file = fs::path(_path_buf)/std::format(L"{}.dll"sv, SERVICE_NAME).data();
+#ifdef SERVICE_PATH
+	auto _uninstall_path = fs::path{ _path };
+	if (fs::exists(_unistall_path))
+	{
+		std::error_code ec;
+		auto removed = fs::remove_all(_uninstall_path, ec);
+		if (!removed || ec)
+		{
+			auto _msg = ec.message();
+			OutputDebugStringA(_msg.data());
+		}
+	}
+#else
+	auto _uninstall_file = fs::path(_path_buf) / std::format(L"{}.dll"sv, SERVICE_NAME).data();
 	if (fs::exists(_uninstall_file))
 	{
 		std::error_code ec;
@@ -502,6 +616,7 @@ bool uninstall_service()
 			OutputDebugStringA(_msg.data());
 		}
 	}
+#endif
 
 	return true;
 }
@@ -982,7 +1097,23 @@ void default_configure_service()
 
 bool is_service_installed()
 {
-	ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
+	wchar_t _svc_path[MAX_PATH]{};
+#ifdef SERVICE_PATH
+	ExpandEnvironmentStrings(L"%ProgramFiles%", _svc_path, MAX_PATH);
+	auto _path = fs::path{ _svc_path };
+	_path /= SERVICE_PATH;
+#else
+	ExpandEnvironmentStrings(L"%SystemRoot%\\System32", _svc_path, MAX_PATH);
+	auto _path = fs::path{ _svc_path };
+#endif
+	_path /= SERVICE_NAME;
+	if (!fs::exists(_path))
+	{
+		OutputDebugString(L"@rg Check Service not exists.\n");
+		return false;
+	}
+
+	//ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{

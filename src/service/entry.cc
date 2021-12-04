@@ -5,6 +5,12 @@
 #include "dep.h"
 #include "sdep.h"
 
+#ifdef RGMSVC_EXPORTS
+#define DLL_API __declspec(dllexport)
+#else
+#define DLL_API __declspec(dllimport)
+#endif
+
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable = nullptr;
 
@@ -26,7 +32,7 @@ DWORD __stdcall _MockThread(LPVOID);
  * @param argc 参数个数
  * @param argv 参数列表
  */
-void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
+extern "C" DLL_API void __stdcall ServiceMain(DWORD argc, LPWSTR * argv)
 {
 	// 初始化所有全局变量
 	// 如果初始化时间不超过 1s, 可以直接设置服务状态为 SERVICE_RUNNING

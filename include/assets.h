@@ -12,6 +12,8 @@
 
 #define IDR_BMP_INSTALL   133
 #define IDR_BMP_UNINSTALL 134
+#define IDC_SYSLINK_START               1000
+#define IDC_SYSLINK_STOP                1001
 
 // custom resource data type
 #define IDR_BLOB          257

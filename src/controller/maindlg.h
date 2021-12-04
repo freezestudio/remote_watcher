@@ -48,6 +48,9 @@ public:
 		// PushButton
 		COMMAND_ID_HANDLER_EX(IDC_BTN_INSTALL, OnInstall)
 		COMMAND_ID_HANDLER_EX(IDC_BTN_UNINSTALL, OnUninstall)
+		//NOTIFY_ID_HANDLER_EX(IDC_SYSLINK_START, OnStartService)
+		//COMMAND_ID_HANDLER_EX(IDC_SYSLINK_STOP, OnStopService)
+		MSG_WM_NOTIFY(OnNotify)
 		END_MSG_MAP()
 
 public:
@@ -104,22 +107,22 @@ public:
 		wcscpy_s(ip, str_ip.c_str());
 		if (install_service())
 		{
-			//Sleep(10000);
-			//auto started = start_service(ip);
+			Sleep(5000);
+			auto started = start_service(ip);
 
-			//auto _msg = std::format(L"Start Service Result: {}"sv, started);
-			//OutputDebugString(_msg.data());
-			//if (started)
-			//{
-			//	mEnableInstall = FALSE;
-			//	mEnableUninstall = TRUE;
-			//}
-			//else
-			//{
-			//	mEnableInstall = TRUE;
-			//	mEnableUninstall = FALSE;
-			//}
-			//_SetButtonEnabled();
+			auto _msg = std::format(L"Start Service Result: {}"sv, started);
+			OutputDebugString(_msg.data());
+			if (started)
+			{
+				mEnableInstall = FALSE;
+				mEnableUninstall = TRUE;
+			}
+			else
+			{
+				mEnableInstall = TRUE;
+				mEnableUninstall = FALSE;
+			}
+			_SetButtonEnabled();
 		}
 		else
 		{
@@ -156,6 +159,58 @@ public:
 			mEnableUninstall = FALSE;
 			_SetButtonEnabled();
 		}
+	}
+
+	LRESULT OnNotify(int idCtrl, LPNMHDR pnmh)
+	{
+		if (pnmh->code != NM_CLICK)
+		{
+			return FALSE;
+		}
+
+		if (idCtrl == IDC_SYSLINK_START)
+		{
+			return OnStartService(pnmh);
+		}
+
+		if (idCtrl == IDC_SYSLINK_STOP)
+		{
+			return OnStopService(pnmh);
+		}
+
+		return FALSE;
+	}
+
+	LRESULT OnStartService(LPNMHDR pnmh)
+	{
+		DWORD addr;
+		auto _ipfields = mIP.GetAddress(&addr);
+		int ip0, ip1, ip2, ip3;
+		if (_ipfields == 4)
+		{
+			ip0 = FIRST_IPADDRESS(addr);
+			ip1 = SECOND_IPADDRESS(addr);
+			ip2 = THIRD_IPADDRESS(addr);
+			ip3 = FOURTH_IPADDRESS(addr);
+		}
+		else
+		{
+			//error
+			return FALSE;
+		}
+
+		wchar_t ip[16]{};
+		auto str_ip = std::format(L"{}.{}.{}.{}", ip0, ip1, ip2, ip3);
+		wcscpy_s(ip, str_ip.c_str());
+		start_service(ip);
+
+		return TRUE;
+	}
+
+	LRESULT OnStopService(LPNMHDR pnmh)
+	{
+		stop_service();
+		return TRUE;
 	}
 
 private:
