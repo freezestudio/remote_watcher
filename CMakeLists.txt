@@ -5,6 +5,7 @@ project(remote_win32)
 
 #
 # compile nats
+# set some options
 #
 set(NATS_BUILD_NO_SPIN ON)
 set(NATS_BUILD_TLS_FORCE_HOST_VERIFY OFF)
@@ -43,7 +44,7 @@ list(APPEND CMAKE_MODULE_PATH
 include(common)
 
 #
-# rgmsvc.dll service
+# rgmsvc Service (.dll or .exe)
 #
 add_subdirectory(src/service ${PROJECT_BINARY_DIR}/service)
 

@@ -214,25 +214,17 @@ static bool add_svc_keyvalue(
 
 	ATL::CRegKey svc;
 	auto maybe_create_svc = std::wstring(key) + L"\\" + name;
+	// Create or Open key
 	auto status = svc.Create(HKEY_LOCAL_MACHINE, maybe_create_svc.c_str());
 	if (!_verify_status(L"Create or Open Svc Key", status))
 	{
 		return false;
 	}
 
-	// Start: SERVICE_START_PENDING; // 2
-	// Type:  SERVICE_WIN32;         // 30
-	// 
-	// DisplayName REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-101
-	// Description REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-102
-	// ImagePath   REG_EXPAND_SZ  %SystemRoot%\\System32\\svchost.exe -k LocalService
-	// ObjectName  REG_SZ        NT AUTHORITY\\LocalService
-	// Start       REG_DWORD     2
-	// Type        REG_DWORD     30
-
 #ifdef SERVICE_PATH
 	auto display_name = std::format(L"@%ProgramFiles%\\{}\\{}.exe,-101"sv, SERVICE_PATH, SERVICE_NAME);
 #else
+	// DisplayName REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-101
 	auto display_name = std::format(L"@%SystemRoot%\\System32\\{}.dll,-101"sv, SERVICE_NAME);
 #endif
 	status = svc.SetStringValue(L"DisplayName", display_name.data());
@@ -244,6 +236,7 @@ static bool add_svc_keyvalue(
 #ifdef SERVICE_PATH
 	auto description = std::format(L"@%ProgramFiles%\\{}\\{}.exe,-102"sv, SERVICE_PATH, SERVICE_NAME);
 #else
+	// Description REG_SZ        @%SystemRoot%\\System32\\rgmsvc.dll,-102
 	auto description = std::format(L"@%SystemRoot%\\System32\\{}.dll,-102"sv, SERVICE_NAME);
 #endif
 	status = svc.SetStringValue(L"Description", description.data());
@@ -252,6 +245,8 @@ static bool add_svc_keyvalue(
 		return false;
 	}
 
+#ifndef SERVICE_PATH
+	// ImagePath   REG_EXPAND_SZ  %SystemRoot%\\System32\\svchost.exe -k LocalService
 	// deprecated. use CreateService(...)
 	//status = svc.SetStringValue(L"ImagePath", L"%SystemRoot%\\System32\\svchost.exe -k LocalService", REG_EXPAND_SZ);
 	//if (!_verify_status(L"Set Svc Value: ImagePath", status))
@@ -259,7 +254,7 @@ static bool add_svc_keyvalue(
 	//	return false;
 	//}
 
-#ifndef SERVICE_PATH
+	// ObjectName  REG_SZ        NT AUTHORITY\\LocalService
 	status = svc.SetStringValue(L"ObjectName", L"NT AUTHORITY\\LocalService");
 	if (!_verify_status(L"Set Svc Value: ObjectName", status))
 	{
@@ -270,6 +265,11 @@ static bool add_svc_keyvalue(
 	{
 		return false;
 	}
+	// Start: SERVICE_START_PENDING; // 2
+	// Type:  SERVICE_WIN32;         // 30
+	// 
+	// Start       REG_DWORD     2
+	// Type        REG_DWORD     30
 #endif
 
 	// deprecated. use CreateService(...)
@@ -284,6 +284,7 @@ static bool add_svc_keyvalue(
 	//	return false;
 	//}
 
+#ifndef SERVICE_PATH
 	svc.Close();
 
 	auto maybe_create_svc_params = maybe_create_svc + L"\\Parameters";
@@ -298,7 +299,6 @@ static bool add_svc_keyvalue(
 	// ServiceDllUnloadOnStop REG_DWORD     1
 	// ServiceMain            REG_SZ        ServiceMain
 
-#ifndef SERVICE_PATH
 	auto service_dll = std::format(L"%SystemRoot%\\System32\\{}.dll"sv, SERVICE_NAME);
 	status = svc.SetStringValue(L"ServiceDll", service_dll.data(), REG_EXPAND_SZ);
 	if (!_verify_status(L"Set Svc\\Parameters Value: ServiceDll", status))
@@ -322,6 +322,7 @@ static bool add_svc_keyvalue(
 }
 
 #ifndef SERVICE_PATH
+// only for dll service
 static bool remove_svc_keyvalue(
 	LPCWSTR key = L"SYSTEM\\CurrentControlSet\\Services",
 	LPCWSTR name = SERVICE_NAME
@@ -345,8 +346,8 @@ static bool remove_svc_keyvalue(
 
 static bool decompress_blobs(void* blob, int len, const char* out_path)
 {
-	// save tgz = path/to/temp/blob.tgz
-	// tar(tgz, out_path);
+	// 1. save tgz = path/to/temp/../blob.tgz
+	// 2. tar(tgz, to out_path);
 
 	auto _temp_path = fs::temp_directory_path();
 #ifdef SERVICE_PATH
@@ -380,9 +381,10 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 		return false;
 	}
 
-	// data write to temp/../blob.tgz
+	// blob data write to temp/../blob.tgz
 	DWORD written;
 	auto writted = ::WriteFile(_htmp, blob, len, &written, nullptr);
+	// assert(len==written);
 	CloseHandle(_htmp);
 	if (!writted)
 	{
@@ -392,7 +394,7 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 
 	char _tgz[MAX_PATH]{};
 
-	// error?
+	// error? use to_utf8()
 	auto _str_tgz = _temp_tgz.generic_string();
 
 	//auto _generic_path = _temp_tgz.generic_wstring();
@@ -434,16 +436,18 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 	return true;
 }
 
+// install service
 bool install_service()
 {
+	wchar_t _path_buf[MAX_PATH]{};
 #ifdef SERVICE_PATH
 	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
 #else
 	auto _path = L"%SystemRoot%\\System32";
 #endif
-	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
 	auto _install_path = fs::path(_path_buf);
+
 #ifdef SERVICE_PATH
 	if (!fs::exists(_install_path))
 	{
@@ -463,7 +467,11 @@ bool install_service()
 	auto _resource = WTL::CResource();
 	void* _data = nullptr;
 	int _len = 0;
-	read_resource(&_data, &_len);
+	if(!read_resource(&_data, &_len))
+	{
+		OutputDebugString(L"Read Service Resource Failure.\n");
+		return false;
+	}
 	if (!decompress_blobs(_data, _len, _install_path.string().data()))
 	{
 		_resource.Release();
@@ -481,7 +489,7 @@ bool install_service()
 		return false;
 	}
 
-	// create service
+	// create service ...
 
 	//wchar_t _display_name[255]{};
 	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
@@ -508,7 +516,9 @@ bool install_service()
 	{
 		//ERROR_INVALID_PARAMETER; // 87
 		auto _err = GetLastError();
-		auto _msg = std::format(L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv, _err, SERVICE_NAME, _binary_path);
+		auto _msg = std::format(
+			L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
+			 _err, SERVICE_NAME, _binary_path);
 		OutputDebugString(_msg.data());
 		CloseServiceHandle(hscm);
 		return false;
@@ -570,7 +580,6 @@ bool uninstall_service()
 	{
 		return false;
 	}
-#endif
 
 	if (!remove_svc_keyvalue())
 	{
@@ -582,6 +591,8 @@ bool uninstall_service()
 	// and:
 	// HKEY_CLASSES_ROOT\Local Settings\MuiCache\f7\AAF68885
 	// @%SystemRoot%\System32\rgmsvc.dll,-102 REG_SZ ...
+
+#endif
 
 
 #ifdef SERVICE_PATH
@@ -775,7 +786,11 @@ bool start_service(LPCWSTR ip)
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
 	//    d. dwWaitHint = 2s;
-	if (!::StartService(hsc, 1, &ip))
+	wchar_t* args[]={
+		SERVICE_NAME,
+		ip,
+	};
+	if (!::StartService(hsc, 2, args))
 	{
 		// ERROR_SERVICE_REQUEST_TIMEOUT (<=30s)
 
