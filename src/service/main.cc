@@ -5,6 +5,8 @@
 #include "dep.h"
 #include "sdep.h"
 
+using namespace std::literals;
+
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable = nullptr;
 
@@ -34,11 +36,12 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	if (argc > 1)
 	{
 		ss_ip = argv[1];
-		auto _msg = std::format(L"@rg remote ip is: {}\n", ss_ip);
+		auto _msg = std::format(L"@rg remote ip is: {}\n"sv, ss_ip);
 		OutputDebugString(_msg.data());
 	}
 	OutputDebugString(L"@rg rgmsvc starting ...\n");
 	init_service();
+	OutputDebugString(L"@rg remsvc stopped.\n");
 }
 
 // deprecated. test only!
@@ -47,7 +50,7 @@ DWORD __stdcall _MockThread(LPVOID)
 	while (!bb_mockthread_exit)
 	{
 		Sleep(5000);
-		OutputDebugStringA("@rg Service Work Thread running over 5s ...");
+		OutputDebugString(L"@rg Service Work Thread running over 5s ...");
 	}
 
 	return 0;
@@ -56,32 +59,38 @@ DWORD __stdcall _MockThread(LPVOID)
 void init_service()
 {
 	DWORD check_point = 0;
-	ss_handle = ::RegisterServiceCtrlHandlerExW(SERVICE_NAME, handler_proc_ex, nullptr);
+	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
-		OutputDebugStringA("@rg register service control handler failure, exit.\n");
+		OutputDebugString(L"@rg register service control handler failure, exit.\n");
 		return;
 	}
-	OutputDebugStringA("@rg service control handler registered.\n");
+	OutputDebugString(L"@rg service control handler registered.\n");
 
 	// first init sevice status
+	// state=[SERVICE_START_PENDING]: dwControlsAcceptd=0
+	// state=[SERVICE_RUNNING|SERVICE_STOPPED]: dwCheckPoint=0
+	// 
 	SERVICE_STATUS status{};
-	status.dwServiceType = SERVICE_WIN32; // service type
+	status.dwServiceType = SERVICE_WIN32_OWN_PROCESS; // service type
 	status.dwCurrentState = SERVICE_START_PENDING; // wait start
 	status.dwControlsAccepted = 0; // 等待期间不接受控制
 	status.dwWaitHint = 3000; // wait 3s
 	status.dwCheckPoint = 0;
+	status.dwWin32ExitCode = 0;
+	status.dwServiceSpecificExitCode = 0;
 	::SetServiceStatus(ss_handle, &status);
-	OutputDebugStringA("@rg service start pending 3s.\n");
+	OutputDebugString(L"@rg service start pending 3s.\n");
 
 	hh_waitable = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable)
 	{
-		OutputDebugStringA("@rg create waitable handle failure, exit.\n");
+		OutputDebugString(L"@rg create waitable handle failure, exit.\n");
 
 		status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
+		status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
 		status.dwWaitHint = 30000; // wait 30s
-		status.dwCheckPoint = 0;
+		status.dwCheckPoint = ++check_point;
 		status.dwWin32ExitCode = 0;
 		::SetServiceStatus(ss_handle, &status);
 		OutputDebugString(L"@rg service CreateEvent Failure. stop pending.\n");
@@ -94,11 +103,10 @@ void init_service()
 		goto theend;
 	}
 
-	// 运行服务
-	check_point++;
-	status.dwCurrentState = SERVICE_START; // started
+	// service running
+	status.dwCurrentState = SERVICE_RUNNING; // started
 	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; // accept[stop, shutdown]
-	status.dwCheckPoint = check_point;
+	status.dwCheckPoint = 0;
 	status.dwWin32ExitCode = 0;
 	status.dwServiceSpecificExitCode = 0;
 	status.dwWaitHint = 0;
@@ -122,35 +130,37 @@ void init_service()
 		// ignore WAIT_TIMEOUT
 		if (res == WAIT_OBJECT_0)
 		{
-			OutputDebugStringA("@rg waitable handle signed: WAIT_OBJECT_0\n");
+			OutputDebugString(L"@rg waitable handle signed: WAIT_OBJECT_0\n");
 
 			// stop service
 			// ...
-
-			break;
 		}
 		else if (res == WAIT_IO_COMPLETION)
 		{
-			OutputDebugStringA("@rg i/o completion routine: WAIT_IO_COMPLETION\n");
+			OutputDebugString(L"@rg i/o completion routine: WAIT_IO_COMPLETION\n");
 			// continue...
 		}
 		else if (res == WAIT_ABANDONED)
 		{
 			// error, a thread terminated. but not release mutex object.
-			OutputDebugStringA("@rg mutex object not released: WAIT_ABANDONED\n");
+			OutputDebugString(L"@rg mutex object not released: WAIT_ABANDONED\n");
 		}
 		else if (res == WAIT_FAILED)
 		{
 			auto err = ::GetLastError();
-			auto _msg = std::format("@rg WaitForSingleObject: occuse an error: {}\n", err);
-			OutputDebugStringA(_msg.c_str());
+			auto _msg = std::format(L"@rg WaitForSingleObject: occuse an error: {}\n"sv, err);
+			OutputDebugString(_msg.c_str());
 		}
+
+		// here, all break?
+		break;
 	}
 
 theend:
 	status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
+	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
 	status.dwWaitHint = 30000; // 等待 30s
-	status.dwCheckPoint = 0;
+	status.dwCheckPoint = ++check_point;
 	status.dwWin32ExitCode = 0;
 	::SetServiceStatus(ss_handle, &status);
 
@@ -179,10 +189,11 @@ DWORD __stdcall handler_proc_ex(
 	{
 	default:
 		break;
-	case SERVICE_STOP:
+	case SERVICE_CONTROL_SHUTDOWN:
+	case SERVICE_CONTROL_STOP:
 		bb_mockthread_exit = true;
 		SetEvent(hh_waitable);
-		OutputDebugStringA("@rg Recv [stop] control code.\n");
+		OutputDebugString(L"@rg Recv [stop] control code.\n");
 		break;
 	}
 	return NO_ERROR;
@@ -194,7 +205,7 @@ bool init_threadpool()
 	hh_mockthread = ::CreateThread(nullptr, 0, _MockThread, nullptr, 0, nullptr);
 	if (!hh_mockthread)
 	{
-		OutputDebugStringA("@rg servic create Mock Thread failure.\n");
+		OutputDebugString(L"@rg servic create Mock Thread failure.\n");
 		bb_mockthread_exit = true;
 		return false;
 	}

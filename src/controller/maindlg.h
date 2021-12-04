@@ -23,6 +23,7 @@ public:
 
 	BOOL mEnableInstall = FALSE;
 	BOOL mEnableUninstall = FALSE;
+	bool mAutoStart = true;
 
 public:
 	virtual BOOL PreTranslateMessage(LPMSG pMsg) /* override */
@@ -111,26 +112,38 @@ public:
 		wcscpy_s(ip, str_ip.c_str());
 		if (install_service())
 		{
-			Sleep(5000);
-			auto started = start_service(ip);
-
-			auto _msg = std::format(L"Start Service Result: {}"sv, started);
-			OutputDebugString(_msg.data());
-			if (started)
+			if (mAutoStart)
 			{
-				mEnableInstall = FALSE;
-				mEnableUninstall = TRUE;
+				Sleep(5000);
+				auto started = start_service(ip);
+
+				auto _msg = std::format(L"Start Service Result: {}"sv, started);
+				OutputDebugString(_msg.data());
+				if (started)
+				{
+					mEnableInstall = FALSE;
+					mEnableUninstall = TRUE;
+					SetDlgItemText(IDC_STATUS, L"installed! started!");
+				}
+				else
+				{
+					mEnableInstall = TRUE;
+					mEnableUninstall = FALSE;
+					SetDlgItemText(IDC_STATUS, L"installed! start failure!");
+				}
 			}
 			else
 			{
-				mEnableInstall = TRUE;
-				mEnableUninstall = FALSE;
+				mEnableInstall = FALSE;
+				mEnableUninstall = TRUE;
+				SetDlgItemText(IDC_STATUS, L"installed! stopped!");
 			}
 			_SetButtonEnabled();
 		}
 		else
 		{
 			OutputDebugString(L"Install Service Failure.\n");
+			SetDlgItemText(IDC_STATUS, L"install failure!");
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
 			_SetButtonEnabled();
@@ -141,6 +154,7 @@ public:
 	{
 		if (stop_service())
 		{
+			SetDlgItemText(IDC_STATUS, L"stopped!");
 			auto uninstalled = uninstall_service();
 			auto _msg = std::format(L"Uninstall Service Result: {}"sv, uninstalled);
 			OutputDebugString(_msg.data());
@@ -148,16 +162,19 @@ public:
 			{
 				mEnableInstall = TRUE;
 				mEnableUninstall = FALSE;
+				SetDlgItemText(IDC_STATUS, L"uninstalled!");
 			}
 			else
 			{
 				mEnableInstall = FALSE;
 				mEnableUninstall = TRUE;
+				SetDlgItemText(IDC_STATUS, L"stopped! uninstall failure!");
 			}
 			_SetButtonEnabled();
 		}
 		else
 		{
+			SetDlgItemText(IDC_STATUS, L"stop failure!");
 			OutputDebugString(L"Stop Service Failure.\n");
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
@@ -167,11 +184,7 @@ public:
 
 	void OnCheckAutoStart(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
 	{
-		auto checked = IsDlgButtonChecked(nID) == BST_CHECKED;
-		if (checked)
-		{
-
-		}
+		mAutoStart = IsDlgButtonChecked(nID) == BST_CHECKED;
 	}
 
 	LRESULT OnNotify(int idCtrl, LPNMHDR pnmh)

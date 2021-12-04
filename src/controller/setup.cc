@@ -495,8 +495,14 @@ bool install_service()
 	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
 
 #ifdef SERVICE_PATH
-	auto _binary_path = std::format(L"%ProgramFiles%\\{}\\{}.exe"sv, SERVICE_PATH, SERVICE_NAME).data();
-	auto _service_type = SERVICE_WIN32;
+	wchar_t _binary_path[MAX_PATH]{};
+	auto _b_path = std::format(L"%ProgramFiles%\\{}\\{}.exe"sv, SERVICE_PATH, SERVICE_NAME);
+	//ExpandEnvironmentStrings(_b_path.data(), _binary_path, MAX_PATH);
+	wcscpy_s(_binary_path, _b_path.data());
+	//auto _b_path = fs::path{ L"%ProgramFiles%" } / SERVICE_PATH;
+	//_b_path /= SERVICE_NAME;
+	//wcscpy_s(_binary_path, _b_path.generic_wstring().c_str());
+	auto _service_type = SERVICE_WIN32_OWN_PROCESS; // SERVICE_WIN32;
 #else
 	auto _binary_path = L"%SystemRoot%\\System32\\svchost.exe -k LocalService";
 	auto _service_type = SERVICE_USER_SHARE_PROCESS;
@@ -507,7 +513,7 @@ bool install_service()
 		nullptr,
 		SERVICE_ALL_ACCESS,
 		_service_type,
-		SERVICE_AUTO_START,
+		SERVICE_DEMAND_START, //SERVICE_AUTO_START,
 		SERVICE_ERROR_NORMAL,
 		_binary_path,
 		nullptr, nullptr, nullptr, nullptr, nullptr
@@ -605,7 +611,7 @@ bool uninstall_service()
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
 #ifdef SERVICE_PATH
 	auto _uninstall_path = fs::path{ _path };
-	if (fs::exists(_unistall_path))
+	if (fs::exists(_uninstall_path))
 	{
 		std::error_code ec;
 		auto removed = fs::remove_all(_uninstall_path, ec);
@@ -630,7 +636,7 @@ bool uninstall_service()
 #endif
 
 	return true;
-}
+	}
 
 /**
  * @param ip remote ip address to string
