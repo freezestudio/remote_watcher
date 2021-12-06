@@ -62,10 +62,12 @@ namespace freeze
             case SERVICE_CONTROL_PAUSE:
                 // pause service
                 pservice->update_state(SERVICE_PAUSE_PENDING);
+                pservice->update_state(SERVICE_PAUSED);
                 break;
             case SERVICE_CONTROL_CONTINUE:
                 // resume service
                 pservice->update_state(SERVICE_CONTINUE_PENDING);
+                pservice->update_state(SERVICE_RUNNING);
                 break;
             case SERVICE_CONTROL_INTERROGATE:
                 // report current status, should simply return NO_ERROR
@@ -264,21 +266,34 @@ namespace freeze
                     SERVICE_ACCEPT_STOP;
             }
 
-            if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
-                service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
-                service_status.dwCurrentState == SERVICE_START_PENDING ||
-                service_status.dwCurrentState == SERVICE_STOP_PENDING)
-            {
-                service_status.dwCheckPoint = ++_check_point;
-                service_status.dwWaitHint = 3000;
-            }
-            else
+            // maybe need add wait-hint to SERVICE_PAUSED
+            // if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
+            // 	service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
+            // 	service_status.dwCurrentState == SERVICE_START_PENDING ||
+            // 	service_status.dwCurrentState == SERVICE_STOP_PENDING)
+            // {
+            // 	service_status.dwCheckPoint = cp_check_point++;
+            // 	service_status.dwWaitHint = 3000;
+            // }
+            // else
+            // {
+            // 	service_status.dwCheckPoint = 0;
+            // 	service_status.dwWaitHint = 0;
+            // }
+
+            if(service_status.dwCurrentState == SERVICE_RUNNING ||
+                service_status.dwCurrentState == SERVICE_STOPPED)
             {
                 service_status.dwCheckPoint = 0;
                 service_status.dwWaitHint = 0;
             }
+            else
+            {
+                service_status.dwCheckPoint = cp_check_point++;
+                service_status.dwWaitHint = 3000;
+            }
 
-            auto ok = SetServiceStatus(_ss_handle, &service_status) : true : false;
+            auto ok = SetServiceStatus(_ss_handle, &service_status) ? true : false;
             return ok;
         }
 

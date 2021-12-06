@@ -62,10 +62,30 @@ public:
 	{
 		CenterWindow();
 
-		auto is_installed = is_service_installed();
+		DWORD state = 0;
+		auto is_installed = is_service_installed(&state);
 		mEnableInstall = is_installed ? FALSE : TRUE;
 		mEnableUninstall = is_installed ? TRUE : FALSE;
-		SetDlgItemText(IDC_STATUS, is_installed ? L"installed!" : L"not installed!");
+		if (!is_installed)
+		{
+			SetDlgItemText(IDC_STATUS, L"not installed!");
+		}
+		else
+		{
+			if (state == SERVICE_RUNNING)
+			{
+				SetDlgItemText(IDC_STATUS, L"installed, running!");
+			}
+			else if (state == SERVICE_STOPPED)
+			{
+				SetDlgItemText(IDC_STATUS, L"installed, stopped!");
+			}
+			else
+			{
+				SetDlgItemText(IDC_STATUS, L"installed!");
+			}
+		}
+
 		CheckDlgButton(IDC_CHECK_AUTO_START, BST_CHECKED);
 
 		_SetIcon();
@@ -114,7 +134,7 @@ public:
 		{
 			if (mAutoStart)
 			{
-				Sleep(5000);
+				Sleep(1000);
 				auto started = start_service(ip);
 
 				auto _msg = std::format(L"Start Service Result: {}"sv, started);
@@ -123,20 +143,20 @@ public:
 				{
 					mEnableInstall = FALSE;
 					mEnableUninstall = TRUE;
-					SetDlgItemText(IDC_STATUS, L"installed! started!");
+					SetDlgItemText(IDC_STATUS, L"installed, running!");
 				}
 				else
 				{
 					mEnableInstall = TRUE;
 					mEnableUninstall = FALSE;
-					SetDlgItemText(IDC_STATUS, L"installed! start failure!");
+					SetDlgItemText(IDC_STATUS, L"installed, start failure!");
 				}
 			}
 			else
 			{
 				mEnableInstall = FALSE;
 				mEnableUninstall = TRUE;
-				SetDlgItemText(IDC_STATUS, L"installed! stopped!");
+				SetDlgItemText(IDC_STATUS, L"installed, stopped!");
 			}
 			_SetButtonEnabled();
 		}
@@ -168,7 +188,7 @@ public:
 			{
 				mEnableInstall = FALSE;
 				mEnableUninstall = TRUE;
-				SetDlgItemText(IDC_STATUS, L"stopped! uninstall failure!");
+				SetDlgItemText(IDC_STATUS, L"stopped, uninstall failure!");
 			}
 			_SetButtonEnabled();
 		}

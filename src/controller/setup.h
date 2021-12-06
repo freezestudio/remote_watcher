@@ -13,7 +13,7 @@
 
 #define MAX_REGVALUE 384
 
-bool is_service_installed();
+bool is_service_installed(LPDWORD=nullptr);
 bool install_service();
 bool uninstall_service();
 bool start_service(LPCWSTR ip);

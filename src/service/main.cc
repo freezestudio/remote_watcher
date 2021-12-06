@@ -15,6 +15,7 @@ DWORD cp_check_point = 0;
 HANDLE hh_mockthread = nullptr;
 // deprecated, test only!
 bool bb_mockthread_exit = false;
+bool bb_mockthread_run = false;
 
 std::wstring ss_ip;
 
@@ -31,8 +32,17 @@ DWORD __stdcall _MockThread(LPVOID)
 {
 	while (!bb_mockthread_exit)
 	{
+		// working ...
 		Sleep(5000);
-		OutputDebugString(L"@rg Service Work Thread running over 5s ...");
+
+		if (bb_mockthread_run)
+		{
+			OutputDebugString(L"@rg Service Work Thread running over 5s ...");
+		}
+		else
+		{
+			OutputDebugString(L"@rg Service Work Thread paused.");
+		}
 	}
 
 	return 0;
@@ -73,6 +83,7 @@ void init_service()
 
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
+	bb_mockthread_run = true;
 	OutputDebugString(L"@rg service starting ...\n");
 
 	// loop here
@@ -119,8 +130,12 @@ void init_service()
 	}
 
 theend:
+	// stop service
 	update_status(ss_handle, SERVICE_STOPPED);
+
 	cp_check_point = 0;
+	bb_mockthread_exit = true;
+	bb_mockthread_run = false;
 
 	if (hh_mockthread)
 	{
@@ -147,11 +162,21 @@ DWORD __stdcall handler_proc_ex(
 	{
 	case SERVICE_CONTROL_PAUSE:
 		// pause service
+		OutputDebugString(L"@rg Recv [pause] control code.\n");
 		update_status(ss_handle, SERVICE_PAUSE_PENDING);
+		bb_mockthread_run = false;
+		OutputDebugString(L"@rg Recv [pause] control code: dosomething ...\n");
+		update_status(ss_handle, SERVICE_PAUSED);
+		OutputDebugString(L"@rg Recv [pause] control code: Service Paused.\n");
 		break;
 	case SERVICE_CONTROL_CONTINUE:
 		// resume service
+		OutputDebugString(L"@rg Recv [resume] control code.\n");
 		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
+		bb_mockthread_run = true;
+		OutputDebugString(L"@rg Recv [resume] control code: dosomething...\n");
+		update_status(ss_handle, SERVICE_RUNNING);
+		OutputDebugString(L"@rg Recv [resume] control code: Service Running.\n");
 		break;
 	case SERVICE_CONTROL_INTERROGATE:
 		// report current status, should simply return NO_ERROR
@@ -168,9 +193,11 @@ DWORD __stdcall handler_proc_ex(
 	case SERVICE_CONTROL_STOP:
 		// stop service, eturn NO_ERROR;
 		bb_mockthread_exit = true;
+		bb_mockthread_run = false;
 		SetEvent(hh_waitable);
 		OutputDebugString(L"@rg Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);
+		// SERVICE_STOPPED in init_service()
 		break;
 	case SERVICE_CONTROL_NETWORK_CONNECT:
 		// return ERROR_CALL_NOT_IMPLEMENTED;
@@ -190,8 +217,9 @@ bool init_threadpool()
 	hh_mockthread = ::CreateThread(nullptr, 0, _MockThread, nullptr, 0, nullptr);
 	if (!hh_mockthread)
 	{
-		OutputDebugString(L"@rg servic create Mock Thread failure.\n");
+		OutputDebugString(L"@rg service create Mock Thread failure.\n");
 		bb_mockthread_exit = true;
+		bb_mockthread_run = false;
 		return false;
 	}
 	return true;
@@ -199,6 +227,10 @@ bool init_threadpool()
 
 bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 {
+	if (!hss)
+	{
+		return false;
+	}
 
 	SERVICE_STATUS service_status{
 		.dwServiceType = SERVICE_WIN32_OWN_PROCESS,
@@ -220,21 +252,34 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 			SERVICE_ACCEPT_STOP;
 	}
 
-	if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
-		service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
-		service_status.dwCurrentState == SERVICE_START_PENDING ||
-		service_status.dwCurrentState == SERVICE_STOP_PENDING)
-	{
-		service_status.dwCheckPoint = cp_check_point++;
-		service_status.dwWaitHint = 3000;
-	}
-	else
+	// maybe need add wait-hint to SERVICE_PAUSED
+	// if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
+	// 	service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
+	// 	service_status.dwCurrentState == SERVICE_START_PENDING ||
+	// 	service_status.dwCurrentState == SERVICE_STOP_PENDING)
+	// {
+	// 	service_status.dwCheckPoint = cp_check_point++;
+	// 	service_status.dwWaitHint = 3000;
+	// }
+	// else
+	// {
+	// 	service_status.dwCheckPoint = 0;
+	// 	service_status.dwWaitHint = 0;
+	// }
+
+	if(service_status.dwCurrentState == SERVICE_RUNNING ||
+		service_status.dwCurrentState == SERVICE_STOPPED)
 	{
 		service_status.dwCheckPoint = 0;
 		service_status.dwWaitHint = 0;
 	}
+	else
+	{
+		service_status.dwCheckPoint = cp_check_point++;
+		service_status.dwWaitHint = 3000;
+	}
 
-	auto ok = SetServiceStatus(hss, &service_status) : true : false;
+	auto ok = SetServiceStatus(hss, &service_status) ? true : false;
 	return ok;
 }
 
@@ -251,12 +296,18 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	if (argc > 1)
 	{
 		ss_ip = argv[1];
-		auto _msg = std::format(L"@rg remote ip is: {}\n"sv, ss_ip);
+		auto _msg = std::format(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, ss_ip);
 		OutputDebugString(_msg.data());
 	}
-	OutputDebugString(L"@rg rgmsvc starting ...\n");
+	for (auto i = 0; i < argc; ++i)
+	{
+		auto _msg = std::format(L"@rg ServiceMain: argc[{}], {}\n"sv, i, argv[i]);
+		OutputDebugString(_msg.c_str());
+	}
+
+	OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
 	init_service();
-	OutputDebugString(L"@rg remsvc stopped.\n");
+	OutputDebugString(L"@rg ServiceMain: rgmsvc stopped.\n");
 }
 
 int __stdcall wmain()
@@ -268,10 +319,25 @@ int __stdcall wmain()
 	};
 	if (StartServiceCtrlDispatcher(_dispatch_table))
 	{
-		OutputDebugString(L"Dispatch Service Successfully.\n");
+		OutputDebugString(L"@rg main: Dispatch Service Successfully.\n");
 	}
 	else
 	{
-		OutputDebugString(L"Dispatch Service Failure.\n");
+		OutputDebugString(L"@rg main: Dispatch Service Failure.\n");
 	}
+}
+
+//
+// TODO: add rundll32.exe interface %ProgramFiles% 改为为 c:\progra~1
+// TODO: rundll32.exe rgmsvc.exe, Install 192.168.0.1
+//
+
+VOID __stdcall Install(HWND hWnd, HINSTANCE hInst, LPWSTR lpCmdLine, int nCmdShow)
+{
+
+}
+
+VOID __stdcall Uninstall(HWND hWnd, HINSTANCE hInst, LPWSTR lpCmdLine, int nCmdShow)
+{
+
 }
