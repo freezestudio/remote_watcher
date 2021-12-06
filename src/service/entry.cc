@@ -215,3 +215,19 @@ void init_threadpool()
 {
 	SERVICE_WIN32;
 }
+
+//
+// TODO: add rundll32.exe interface %ProgramFiles% 改为为 c:\progra~1
+// TODO: rundll32.exe rgmsvc.exe, Install 192.168.0.1
+//
+
+extern "C" DLL_API VOID __stdcall Install(HWND hWnd, HINSTANCE hInst, LPSTR lpCmdLine, int nCmdShow)
+{
+	auto msg = std::format("Install service to {}\n"sv, lpCmdLine);
+	OutputDebugStringA(msg.c_str());
+}
+
+extern "C" DLL_API VOID __stdcall Uninstall(HWND hWnd, HINSTANCE hInst, LPSTR lpCmdLine, int nCmdShow)
+{
+	OutputDebugStringA("Uninstall service.\n");
+}

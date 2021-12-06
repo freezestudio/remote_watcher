@@ -797,6 +797,9 @@ bool uninstall_service()
 	// or:
 	// HKEY_CLASSES_ROOT\Local Settings\MuiCache\f7\AAF68885
 	// @%SystemRoot%\System32\rgmsvc.dll,-102 REG_SZ ...	
+	// HKEY_USERS\.DEFAULT\Software\Classes\Local Settings\MuiCache\fd\AAF68885
+	// @%ProgramFiles%\xMonit\rgmsvc.exe,-101
+	// @%ProgramFiles%\xMonit\rgmsvc.exe,-102@%ProgramFiles%\xMonit\rgmsvc.exe,-101@%ProgramFiles%\xMonit\rgmsvc.exe,-101
 
 	// delete service files ...
 #ifdef SERVICE_PATH

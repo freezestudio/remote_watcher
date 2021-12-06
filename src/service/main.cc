@@ -326,18 +326,3 @@ int __stdcall wmain()
 		OutputDebugString(L"@rg main: Dispatch Service Failure.\n");
 	}
 }
-
-//
-// TODO: add rundll32.exe interface %ProgramFiles% 改为为 c:\progra~1
-// TODO: rundll32.exe rgmsvc.exe, Install 192.168.0.1
-//
-
-VOID __stdcall Install(HWND hWnd, HINSTANCE hInst, LPWSTR lpCmdLine, int nCmdShow)
-{
-
-}
-
-VOID __stdcall Uninstall(HWND hWnd, HINSTANCE hInst, LPWSTR lpCmdLine, int nCmdShow)
-{
-
-}
