@@ -12,7 +12,8 @@ namespace freeze
         service(SC_HANDLE h = nullptr)
             : _sc_handle{h}, _ss_handle{nullptr}
         {
-            // OpenSCManager(nullptr,nullptr,SC_MANAGER_ALL_ACCESS);
+            // SC_HANDLE scm_handle =
+            //   OpenSCManager(nullptr,nullptr,SC_MANAGER_ALL_ACCESS);
         }
 
         explicit service(SC_HANDLE hsc, SERVICE_STATUS_HANDLE hss)
@@ -24,6 +25,7 @@ namespace freeze
 
         ~service()
         {
+            // SERVICE_STATUS_HANDLE should not close.
             // if(_ss_handle)
             // {
             //     CloseServiceHandle(_ss_handle);
@@ -32,6 +34,7 @@ namespace freeze
             {
                 CloseServiceHandle(_sc_handle);
             }
+            _check_point = 0;
         }
 
         explicit /* constexpr */ operator bool() const
@@ -40,7 +43,7 @@ namespace freeze
         }
 
     public:
-        static DWORD __stdcall controll_handler(
+        static DWORD __stdcall controll_handler_ex(
             DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext)
         {
             // dwEventType:
@@ -62,12 +65,14 @@ namespace freeze
             case SERVICE_CONTROL_PAUSE:
                 // pause service
                 pservice->update_state(SERVICE_PAUSE_PENDING);
-                pservice->update_state(SERVICE_PAUSED);
+                pservice->do_pause();
+                // pservice->update_state(SERVICE_PAUSED);
                 break;
             case SERVICE_CONTROL_CONTINUE:
                 // resume service
                 pservice->update_state(SERVICE_CONTINUE_PENDING);
-                pservice->update_state(SERVICE_RUNNING);
+                pservice->do_resume();
+                // pservice->update_state(SERVICE_RUNNING);
                 break;
             case SERVICE_CONTROL_INTERROGATE:
                 // report current status, should simply return NO_ERROR
@@ -80,10 +85,12 @@ namespace freeze
             // break;
             case SERVICE_CONTROL_SHUTDOWN:
                 // shutdown, return NO_ERROR;
-                break;
+                // break;
+                [[fallthrough]];
             case SERVICE_CONTROL_STOP:
                 // stop service, eturn NO_ERROR;
                 pservice->update_state(SERVICE_STOP_PENDING);
+                pservice->do_stop();
                 break;
             case SERVICE_CONTROL_NETWORK_CONNECT:
                 // return ERROR_CALL_NOT_IMPLEMENTED;
@@ -101,13 +108,9 @@ namespace freeze
         {
         }
 
+        // config progerties
     public:
-        bool create(std::wstring const &name)
-        {
-            return false;
-        }
-
-        void set_display_name(std::wstring const &name)
+        bool set_display_name(std::wstring const &name)
         {
             ChangeServiceConfig(
                 _sc_handle,
@@ -122,32 +125,42 @@ namespace freeze
                 nullptr,
                 name.data()
             );
+            return true;
         }
 
-        void set_descripation(std::wstring const &desc)
+        bool set_descripation(std::wstring const &desc)
         {
             SERVICE_DESCRIPTION sdesc{
                 .lpDescription=desc.c_str()
             };
 	        ChangeServiceConfig2(sc, SERVICE_CONFIG_DESCRIPTION, &sdesc);
+            return true;
         }
 
-        void set_binary_path(fs::path const &bin)
+        bool set_binary_path(fs::path const &bin)
         {
+            return false;
         }
 
-        void set_security_identifier(DWORD sid = SERVICE_SID_TYPE_NONE)
+        bool set_security_identifier(DWORD sid = SERVICE_SID_TYPE_NONE)
         {
             // SERVICE_SID_TYPE_NONE
             // SERVICE_SID_TYPE_RESTRICTED
             // SERVICE_SID_TYPE_UNRESTRICTED
+
             SERVICE_SID_INFO ssi {
                 .dwServiceSidType = sid,
             };
             ChangeServiceConfig2(_sc_handle, SERVICE_CONFIG_SERVICE_SID_INFO, &ssi);
+            return true;
         }
 
-        // control
+        bool set_start_type(DWORD stype)
+        {
+            return true;
+        }
+
+        // outer control
     public:
         bool pause()
         {
@@ -190,6 +203,11 @@ namespace freeze
         }
 
     public:
+        void set_status_handle(SERVICE_STATUS_HANDLE hss)
+        {
+            _ss_handle = hss;
+        }
+
         bool update_state(DWORD state, DWORD error_code = NO_ERROR)
         {
             if(!_ss_handle)
@@ -272,7 +290,7 @@ namespace freeze
             // 	service_status.dwCurrentState == SERVICE_START_PENDING ||
             // 	service_status.dwCurrentState == SERVICE_STOP_PENDING)
             // {
-            // 	service_status.dwCheckPoint = cp_check_point++;
+            // 	service_status.dwCheckPoint = _check_point++;
             // 	service_status.dwWaitHint = 3000;
             // }
             // else
@@ -289,7 +307,7 @@ namespace freeze
             }
             else
             {
-                service_status.dwCheckPoint = cp_check_point++;
+                service_status.dwCheckPoint = _check_point++;
                 service_status.dwWaitHint = 3000;
             }
 
@@ -297,6 +315,8 @@ namespace freeze
             return ok;
         }
 
+        // inner control
+    public:
         void do_pause()
         {
             // ...
@@ -420,6 +440,22 @@ namespace freeze
             return true;
         }
 
+        void asynchronous_procedure_call()
+        {
+            // DWORD QueueUserAPC(
+            //     [in] PAPCFUNC  pfnAPC,
+            //     [in] HANDLE    hThread,
+            //     [in] ULONG_PTR dwData
+            // );
+
+            // BOOL QueueUserAPC2(
+            //     PAPCFUNC             ApcRoutine,
+            //     HANDLE               Thread,
+            //     ULONG_PTR            Data,
+            //     QUEUE_USER_APC_FLAGS Flags
+            // );
+        }
+
     private:
         SC_HANDLE _sc_handle;
         SERVICE_STATUS_HANDLE _ss_handle;
@@ -432,14 +468,18 @@ namespace freeze
     class service_manager
     {
     public:
-        service_manager()
+        explicit service_manager(bool auto_open = true)
+            : _scm_handle{nullptr}
         {
-            _scm_handle = ::OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+            if(auto_open)
+            {
+                open();
+            }
         }
 
         ~service_manager()
         {
-            CloseServiceHandle(_scm_handle);
+            close();
         }
 
         service_manager(service_manager const &) = delete;
@@ -454,6 +494,20 @@ namespace freeze
         {
             _scm_handle = std::exchange(rhs._scm_handle, nullptr);
             return *this;
+        }
+
+        void open()
+        {
+            _scm_handle = ::OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+        }
+
+        void close()
+        {
+            if(_scm_handle)
+            {
+                CloseServiceHandle(_scm_handle);
+                _scm_handle = nullptr;
+            }
         }
 
     public:
@@ -522,9 +576,6 @@ namespace freeze
 
         bool exists(std::wstring const &name, bool ignore_case = true)
         {
-
-            using namespace std::ranges;
-            using namespace std::views;
             auto services = enum_win32_services();
 
             auto _end = std::end(services);
@@ -542,51 +593,55 @@ namespace freeze
             }
             auto finded = std::find(std::begin(services), std::end(services), name);
             return finded != _end;
-
-            // if (ignore_case)
-            // {
-            //     auto _c = services |
-            //               std::views::transform(::tolower) |
-            //               std::views::filter([&name](auto &&v)
-            //                                  {
-            //                                      auto lower_name = std::transform(std::begin(name), std::end(name), ::tolower);
-            //                                      return *lower_name == v;
-            //                                  });
-            //     for (auto &x : _c)
-            //     {
-            //         return true;
-            //     }
-            //     return false;
-            // }
-            // else
-            // {
-            //     auto _c = services |
-            //               std::views::filter([&name](auto &&v)
-            //                                  { return name == v; });
-            //     for (auto &x : _c)
-            //     {
-            //         return true;
-            //     }
-            //     return false;
-            // }
         }
 
-        service get_service(std::wstring const &name)
+        void lock()
         {
-            if (!exists(name))
+            // _sc_lock = LockServiceDatabase(_scm_handle);
+        }
+
+        void unlock()
+        {
+            // auto _unlocked = UnlockServiceDatabase(_sc_lock);
+        }
+
+        bool is_locked()
+        {
+            // auto ok = QueryServiceLockStatus(_scm_handle, ...);
+            return false;
+        }
+
+    public:
+        // service get_service(std::wstring const &name)
+        // {
+        //     if (!exists(name))
+        //     {
+        //         return nullptr;
+        //     }
+        // }
+
+        bool create(std::wstring const &name)
+        {
+            // extract files to ...
+            //
+
+            if(!_scm_handle)
             {
-                return nullptr;
+                open();
             }
-        }
 
-        service create(std::wstring const &name)
-        {
-            return nullptr;
+            // close();
+            return false;
         }
 
         service open(std::wstring const &name)
         {
-            return nullptr;
+            if(!exists(name))
+            {
+                return nullptr;
+            }
+
+            return nullptr;            
         }
 
         bool install_service(std::wstring const &name)
