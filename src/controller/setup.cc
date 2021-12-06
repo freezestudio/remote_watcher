@@ -13,6 +13,7 @@
 namespace fs = std::filesystem;
 using namespace std::literals;
 
+// deprecated.
 static std::string to_utf8(std::wstring const& wstr)
 {
 	char _path[MAX_PATH]{};
@@ -436,6 +437,18 @@ static bool decompress_blobs(void* blob, int len, const char* out_path)
 	return true;
 }
 
+static bool set_description(SC_HANDLE sc)
+{
+#if !(defined(_UNICODE) || defined(UNICODE))
+	return true;
+#endif
+	SERVICE_DESCRIPTION sdesc;
+	auto _desc = std::format(L"@%%\\{}\\{}.exe,-102"sv, SERVICE_PATH, SERVICE_NAME);
+	sdesc.lpDescription = _desc.data();
+	auto ok = ChangeServiceConfig2(sc, SERVICE_CONFIG_DESCRIPTION, &sdesc);
+	return ok;
+}
+
 // install service
 bool install_service()
 {
@@ -497,20 +510,20 @@ bool install_service()
 #ifdef SERVICE_PATH
 	wchar_t _binary_path[MAX_PATH]{};
 	auto _b_path = std::format(L"%ProgramFiles%\\{}\\{}.exe"sv, SERVICE_PATH, SERVICE_NAME);
-	//ExpandEnvironmentStrings(_b_path.data(), _binary_path, MAX_PATH);
 	wcscpy_s(_binary_path, _b_path.data());
-	//auto _b_path = fs::path{ L"%ProgramFiles%" } / SERVICE_PATH;
-	//_b_path /= SERVICE_NAME;
-	//wcscpy_s(_binary_path, _b_path.generic_wstring().c_str());
-	auto _service_type = SERVICE_WIN32_OWN_PROCESS; // SERVICE_WIN32;
+	auto _service_type = SERVICE_WIN32_OWN_PROCESS; // or SERVICE_WIN32;
+	wchar_t _display_name[100]{};
+	auto _d_name = std::format(L"@%ProgramFiles%\\{}\\{}.exe,-101"sv, SERVICE_PATH, SERVICE_NAME);
+	wcscpy_s(_display_name, _d_name.data());
 #else
 	auto _binary_path = L"%SystemRoot%\\System32\\svchost.exe -k LocalService";
 	auto _service_type = SERVICE_USER_SHARE_PROCESS;
+	auto _display_name = nullptr;
 #endif
 	auto hsc = CreateService(
 		hscm,
 		SERVICE_NAME,
-		nullptr,
+		_display_name,
 		SERVICE_ALL_ACCESS,
 		_service_type,
 		SERVICE_DEMAND_START, //SERVICE_AUTO_START,
@@ -530,16 +543,22 @@ bool install_service()
 		return false;
 	}
 
+#ifdef SERVICE_PATH
+	if (!set_description(hsc))
+	{
+		OutputDebugString(L"@rg Install Service Set Description Failure.\n");
+	}
+#endif
 	CloseServiceHandle(hsc);
 	CloseServiceHandle(hscm);
 
+#ifndef SERVICE_PATH
 	// add service key
 	if (!add_svc_keyvalue())
 	{
 		return false;
 	}
 
-#ifndef SERVICE_PATH
 	// append value to svchost
 	if (!append_host_value())
 	{
@@ -636,7 +655,7 @@ bool uninstall_service()
 #endif
 
 	return true;
-	}
+}
 
 /**
  * @param ip remote ip address to string

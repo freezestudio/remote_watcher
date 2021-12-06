@@ -13,13 +13,14 @@
 
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable = nullptr;
+DWORD check_point = 0;
 
 // deprecated, test only!
 HANDLE hh_mockthread = nullptr;
 // deprecated, test only!
 bool bb_mockthread_exit = false;
 
-DWORD __stdcall handler_proc(DWORD dwControl, DWORD, LPVOID, LPVOID);
+DWORD __stdcall handler_proc(DWORD, DWORD, LPVOID, LPVOID);
 void register_handler();
 void init_threadpool();
 
@@ -60,7 +61,6 @@ DWORD __stdcall _MockThread(LPVOID)
 
 void register_handler()
 {
-	DWORD check_point = 0;
 	ss_handle = ::RegisterServiceCtrlHandlerExW(SERVICE_NAME, handler_proc, nullptr);
 	if (!ss_handle)
 	{
@@ -75,7 +75,7 @@ void register_handler()
 	status.dwCurrentState = SERVICE_START_PENDING; // wait start
 	status.dwControlsAccepted = 0; // 等待期间不接受控制
 	status.dwWaitHint = 3000; // wait 3s
-	status.dwCheckPoint = 0;
+	status.dwCheckPoint = check_point++;;
 	::SetServiceStatus(ss_handle, &status);
 	OutputDebugStringA("@rg service start pending 3s.\n");
 
@@ -86,7 +86,7 @@ void register_handler()
 
 		status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
 		status.dwWaitHint = 30000; // wait 30s
-		status.dwCheckPoint = 0;
+		status.dwCheckPoint = check_point++;;
 		status.dwWin32ExitCode = 0;
 		::SetServiceStatus(ss_handle, &status);
 		OutputDebugStringA("@rg service CreateEvent Failure. stop pending.\n");
@@ -104,11 +104,10 @@ void register_handler()
 		goto theend;
 	}
 
-	// 运行服务
-	check_point++;
-	status.dwCurrentState = SERVICE_START; // started
+	// 运行服务	
+	status.dwCurrentState = SERVICE_RUNNING; // started
 	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; // accept[stop, shutdown]
-	status.dwCheckPoint = check_point;
+	status.dwCheckPoint = 0;
 	status.dwWin32ExitCode = 0;
 	status.dwServiceSpecificExitCode = 0;
 	status.dwWaitHint = 0;
@@ -158,13 +157,15 @@ void register_handler()
 	}
 
 theend:
-	bb_mockthread_exit = true;
+	bb_mockthread_exit = true;	
 
-	status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
-	status.dwWaitHint = 30000; // 等待 30s
+	status.dwCurrentState = SERVICE_STOPPED; // 停止
+	status.dwWaitHint = 0;
 	status.dwCheckPoint = 0;
 	status.dwWin32ExitCode = 0;
 	::SetServiceStatus(ss_handle, &status);
+
+	check_point = 0;
 
 	if (hh_mockthread)
 	{
@@ -192,9 +193,19 @@ DWORD __stdcall handler_proc(
 	default:
 		break;
 	case SERVICE_STOP:
+	{
 		bb_mockthread_exit = true;
 		SetEvent(hh_waitable);
 		OutputDebugStringA("@rg Recv [stop] control code.\n");
+		SERVICE_STATUS status{};
+		status.dwServiceType = SERVICE_WIN32; // service type
+		status.dwCurrentState = SERVICE_STOP_PENDING; // wait start
+		status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+		status.dwWaitHint = 3000; // wait 3s
+		status.dwCheckPoint = check_point++;;
+		::SetServiceStatus(ss_handle, &status);
+	}
+		
 		break;
 	}
 	return NO_ERROR;

@@ -9,40 +9,22 @@ using namespace std::literals;
 
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable = nullptr;
+DWORD cp_check_point = 0;
 
 // deprecated, test only!
 HANDLE hh_mockthread = nullptr;
 // deprecated, test only!
 bool bb_mockthread_exit = false;
+
 std::wstring ss_ip;
 
 void init_service();
 bool init_threadpool();
+bool update_status(SERVICE_STATUS_HANDLE, DWORD, DWORD = NO_ERROR);
 
 DWORD __stdcall handler_proc_ex(DWORD dwControl, DWORD, LPVOID, LPVOID);
 // deprecated, test only!
 DWORD __stdcall _MockThread(LPVOID);
-
-/**
- * @brief 服务入口
- * @param argc 参数个数
- * @param argv 参数列表
- */
-void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
-{
-	// 初始化所有全局变量
-	// 如果初始化时间不超过 1s, 可以直接设置服务状态为 SERVICE_RUNNING
-
-	if (argc > 1)
-	{
-		ss_ip = argv[1];
-		auto _msg = std::format(L"@rg remote ip is: {}\n"sv, ss_ip);
-		OutputDebugString(_msg.data());
-	}
-	OutputDebugString(L"@rg rgmsvc starting ...\n");
-	init_service();
-	OutputDebugString(L"@rg remsvc stopped.\n");
-}
 
 // deprecated. test only!
 DWORD __stdcall _MockThread(LPVOID)
@@ -58,7 +40,6 @@ DWORD __stdcall _MockThread(LPVOID)
 
 void init_service()
 {
-	DWORD check_point = 0;
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
@@ -71,15 +52,7 @@ void init_service()
 	// state=[SERVICE_START_PENDING]: dwControlsAcceptd=0
 	// state=[SERVICE_RUNNING|SERVICE_STOPPED]: dwCheckPoint=0
 	// 
-	SERVICE_STATUS status{};
-	status.dwServiceType = SERVICE_WIN32_OWN_PROCESS; // service type
-	status.dwCurrentState = SERVICE_START_PENDING; // wait start
-	status.dwControlsAccepted = 0; // 等待期间不接受控制
-	status.dwWaitHint = 3000; // wait 3s
-	status.dwCheckPoint = 0;
-	status.dwWin32ExitCode = 0;
-	status.dwServiceSpecificExitCode = 0;
-	::SetServiceStatus(ss_handle, &status);
+	update_status(ss_handle, SERVICE_START_PENDING);
 	OutputDebugString(L"@rg service start pending 3s.\n");
 
 	hh_waitable = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -87,12 +60,7 @@ void init_service()
 	{
 		OutputDebugString(L"@rg create waitable handle failure, exit.\n");
 
-		status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
-		status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
-		status.dwWaitHint = 30000; // wait 30s
-		status.dwCheckPoint = ++check_point;
-		status.dwWin32ExitCode = 0;
-		::SetServiceStatus(ss_handle, &status);
+		update_status(ss_handle, SERVICE_STOP_PENDING);
 		OutputDebugString(L"@rg service CreateEvent Failure. stop pending.\n");
 		return;
 	}
@@ -104,13 +72,7 @@ void init_service()
 	}
 
 	// service running
-	status.dwCurrentState = SERVICE_RUNNING; // started
-	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; // accept[stop, shutdown]
-	status.dwCheckPoint = 0;
-	status.dwWin32ExitCode = 0;
-	status.dwServiceSpecificExitCode = 0;
-	status.dwWaitHint = 0;
-	::SetServiceStatus(ss_handle, &status);
+	update_status(ss_handle, SERVICE_RUNNING);
 	OutputDebugString(L"@rg service starting ...\n");
 
 	// loop here
@@ -157,12 +119,8 @@ void init_service()
 	}
 
 theend:
-	status.dwCurrentState = SERVICE_STOP_PENDING; // 等待停止
-	status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
-	status.dwWaitHint = 30000; // 等待 30s
-	status.dwCheckPoint = ++check_point;
-	status.dwWin32ExitCode = 0;
-	::SetServiceStatus(ss_handle, &status);
+	update_status(ss_handle, SERVICE_STOPPED);
+	cp_check_point = 0;
 
 	if (hh_mockthread)
 	{
@@ -187,13 +145,40 @@ DWORD __stdcall handler_proc_ex(
 {
 	switch (dwControl)
 	{
-	default:
+	case SERVICE_CONTROL_PAUSE:
+		// pause service
+		update_status(ss_handle, SERVICE_PAUSE_PENDING);
 		break;
+	case SERVICE_CONTROL_CONTINUE:
+		// resume service
+		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
+		break;
+	case SERVICE_CONTROL_INTERROGATE:
+		// report current status, should simply return NO_ERROR
+		break;
+	case SERVICE_CONTROL_PARAMCHANGE:
+		// startup parameters changed
+		break;
+		// case SERVICE_CONTROL_PRESHUTDOWN:
+		// pre-shutdown
+		// break;
 	case SERVICE_CONTROL_SHUTDOWN:
+		// shutdown, return NO_ERROR;
+		// break;
 	case SERVICE_CONTROL_STOP:
+		// stop service, eturn NO_ERROR;
 		bb_mockthread_exit = true;
 		SetEvent(hh_waitable);
 		OutputDebugString(L"@rg Recv [stop] control code.\n");
+		update_status(ss_handle, SERVICE_STOP_PENDING);
+		break;
+	case SERVICE_CONTROL_NETWORK_CONNECT:
+		// return ERROR_CALL_NOT_IMPLEMENTED;
+		break;
+	case SERVICE_CONTROL_NETWORK_DISCONNECT:
+		// return ERROR_CALL_NOT_IMPLEMENTED;
+		break;
+	default:
 		break;
 	}
 	return NO_ERROR;
@@ -210,6 +195,68 @@ bool init_threadpool()
 		return false;
 	}
 	return true;
+}
+
+bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
+{
+
+	SERVICE_STATUS service_status{
+		.dwServiceType = SERVICE_WIN32_OWN_PROCESS,
+		.dwServiceSpecificExitCode = 0,
+	};
+
+	service_status.dwCurrentState = state;
+	service_status.dwWin32ExitCode = error_code;
+	if (service_status.dwCurrentState == SERVICE_START_PENDING)
+	{
+		service_status.dwControlsAccepted = 0;
+	}
+	else
+	{
+		service_status.dwControlsAccepted =
+			SERVICE_ACCEPT_PARAMCHANGE |
+			SERVICE_ACCEPT_PAUSE_CONTINUE |
+			SERVICE_ACCEPT_SHUTDOWN |
+			SERVICE_ACCEPT_STOP;
+	}
+
+	if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
+		service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
+		service_status.dwCurrentState == SERVICE_START_PENDING ||
+		service_status.dwCurrentState == SERVICE_STOP_PENDING)
+	{
+		service_status.dwCheckPoint = cp_check_point++;
+		service_status.dwWaitHint = 3000;
+	}
+	else
+	{
+		service_status.dwCheckPoint = 0;
+		service_status.dwWaitHint = 0;
+	}
+
+	auto ok = SetServiceStatus(hss, &service_status) : true : false;
+	return ok;
+}
+
+/**
+ * @brief 服务入口
+ * @param argc 参数个数
+ * @param argv 参数列表
+ */
+void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
+{
+	// 初始化所有全局变量
+	// 如果初始化时间不超过 1s, 可以直接设置服务状态为 SERVICE_RUNNING
+
+	if (argc > 1)
+	{
+		ss_ip = argv[1];
+		auto _msg = std::format(L"@rg remote ip is: {}\n"sv, ss_ip);
+		OutputDebugString(_msg.data());
+	}
+	OutputDebugString(L"@rg rgmsvc starting ...\n");
+	init_service();
+	OutputDebugString(L"@rg remsvc stopped.\n");
 }
 
 int __stdcall wmain()
