@@ -9,8 +9,8 @@ namespace freeze
     class service
     {
     public:
-        service(SC_HANDLE h = nullptr)
-            : _sc_handle{h}, _ss_handle{nullptr}
+        service(SC_HANDLE hsc = nullptr)
+            : _sc_handle{hsc}, _ss_handle{nullptr}
         {
             // SC_HANDLE scm_handle =
             //   OpenSCManager(nullptr,nullptr,SC_MANAGER_ALL_ACCESS);
@@ -203,7 +203,7 @@ namespace freeze
         }
 
     public:
-        void set_status_handle(SERVICE_STATUS_HANDLE hss)
+        void reset_status_handle(SERVICE_STATUS_HANDLE hss)
         {
             _ss_handle = hss;
         }
@@ -284,7 +284,10 @@ namespace freeze
                     SERVICE_ACCEPT_STOP;
             }
 
-            // maybe need add wait-hint to SERVICE_PAUSED
+            //
+            // maybe need add wait-hint to SERVICE_PAUSED etc.
+            //
+
             // if (service_status.dwCurrentState == SERVICE_CONTINUE_PENDING ||
             // 	service_status.dwCurrentState == SERVICE_PAUSE_PENDING ||
             // 	service_status.dwCurrentState == SERVICE_START_PENDING ||
@@ -299,6 +302,7 @@ namespace freeze
             // 	service_status.dwWaitHint = 0;
             // }
 
+            // use the following conditions instead above.
             if(service_status.dwCurrentState == SERVICE_RUNNING ||
                 service_status.dwCurrentState == SERVICE_STOPPED)
             {
@@ -350,6 +354,7 @@ namespace freeze
         }
 
     public:
+        // should call this action by other thread.
         bool notify_status()
         {
             // SERVICE_NOTIFY_2 {
@@ -364,6 +369,8 @@ namespace freeze
             SERVICE_NOTIFY_2 notify2{
                 .dwVersion = SERVICE_NOTIFY_STATUS_CHANGE,
                 .dwNotificationStatus = ERROR_SUCCESS,
+                .pfnNotifyCallback = &service::NotifyCallback,
+                .pContext = this,
             };
 
             // If the function succeeds, the return value is ERROR_SUCCESS.
@@ -377,20 +384,42 @@ namespace freeze
             // open a new handle, and call this function again.
             auto ret = NotifyServiceStatusChange(
                 _sc_handle,
-                SERVICE_NOTIFY_CREATED |
-                SERVICE_NOTIFY_CONTINUE_PENDING |
-                SERVICE_NOTIFY_DELETE_PENDING |
-                SERVICE_NOTIFY_DELETED |
-                SERVICE_NOTIFY_PAUSE_PENDING |
+                // SERVICE_NOTIFY_CREATED | // use scm handle
+                // SERVICE_NOTIFY_CONTINUE_PENDING |
+                // SERVICE_NOTIFY_DELETE_PENDING |
+                // SERVICE_NOTIFY_DELETED | // use scm handle
+                // SERVICE_NOTIFY_PAUSE_PENDING |
                 SERVICE_NOTIFY_PAUSED |
                 SERVICE_NOTIFY_RUNNING |
-                SERVICE_NOTIFY_START_PENDING |
-                SERVICE_NOTIFY_STOP_PENDING |
+                // SERVICE_NOTIFY_START_PENDING |
+                // SERVICE_NOTIFY_STOP_PENDING |
                 SERVICE_NOTIFY_STOPPED,
                 &notify2
             );
 
             return ret == ERROR_SUCCESS;
+        }
+
+        static VOID __stdcall NotifyCallback(PVOID pParameter)
+        {
+            auto pNotify = reinterpret_cast<LPSERVICE_NOTIFY_2>(pParameter);
+            if(!pNotify)
+            {
+                OutputDebugString(L"Notify Error: Notify is null.\n");
+            }
+
+            // test pNotify->dwNotificationStatus == ERROR_SUCCESS
+            // ...
+
+            // case all pNotify->ServiceStatus type[SERVICE_STATUS_PROCESS]
+            // ...
+
+            auto pservice = reinterpret_cast<service*>(pNotify->pContext);
+            if(!pservice)
+            {
+                // error.
+            }
+            pservice->notify_status();
         }
 
     private:
@@ -440,7 +469,7 @@ namespace freeze
             return true;
         }
 
-        void asynchronous_procedure_call()
+        void asynchronous_procedure_call(HANDLE hThread)
         {
             // DWORD QueueUserAPC(
             //     [in] PAPCFUNC  pfnAPC,
@@ -454,6 +483,29 @@ namespace freeze
             //     ULONG_PTR            Data,
             //     QUEUE_USER_APC_FLAGS Flags
             // );
+
+            auto ret = QueueUserAPC(&service::ApcCallback, hThread, reinterpret_cast<ULONG_PTR>(this));
+            if(!ret)
+            {
+                auto err = GetLastError();
+
+            }
+        }
+
+        //
+        // Alertable Thread:
+        //   SleepEx, SignalObjectAndWait, 
+        //   WaitForSingleObjectEx, WaitForMultipleObjectsEx,
+        //   MsgWaitForMultipleObjectsEx
+        //
+        static VOID ApcCallback(ULONG_PTR parameter)
+        {
+            auto pservice = reinterpret_cast<service*>(parameter);
+            if(!pservice)
+            {
+                OutputDebugString(L"APC: parameter is null.\n");
+                return;
+            }
         }
 
     private:
