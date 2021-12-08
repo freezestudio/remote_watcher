@@ -305,7 +305,7 @@ namespace freeze::detail
 
 namespace freeze
 {
-	void watchor::on_data(DWORD dwNumberOfBytesTransfered) try
+	void watchor::on_data(DWORD dwNumberOfBytesTransfered) /* try */
 	{
 		// std::cout << "watchor::on_data, bytes=" << dwNumberOfBytesTransfered << std::endl;
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > mReadBuffer.size())
@@ -344,24 +344,35 @@ namespace freeze
 			// std::cout << "watchor::on_data Error: " << err << std::endl;
 		}
 	}
-	catch (std::runtime_error& e)
-	{
-		// std::cout << "error: " << e.what() << std::endl;
-	}
+	// catch (std::runtime_error& e)
+	// {
+	// 	// std::cout << "error: " << e.what() << std::endl;
+	// }
 
 	void watchor::do_data(PFILE_NOTIFY_INFORMATION info)
 	{
-		if (info->Action)
+		if (info->Action == 0)
 		{
-			auto name = std::wstring(info->FileName, info->FileNameLength / sizeof(wchar_t)) + L"\0";
-			detail::_local_notify_info.emplace_back(
-				detail::folder_info(
-					mFolder, 
-					info->Action, 
-					info->FileNameLength / sizeof(wchar_t), 
-					info->FileName)
-			);
+			// print ...
+			return;
 		}
+
+		auto name = detail::to_utf8(info->FileName, info->FileNameLength);
+		for (auto const& n : detail::_local_notify_info)
+		{
+			if (n.filename == name)
+			{
+				// print exists.
+				return;
+			}
+		}
+
+		auto item = detail::folder_info(
+			mFolder,
+			info->Action,
+			info->FileNameLength / sizeof(wchar_t),
+			info->FileName);
+		detail::_local_notify_info.emplace_back(item);
 	}
 }
 
