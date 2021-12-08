@@ -12,6 +12,7 @@ if(SERVICE_EXEC_TYPE)
     add_executable(${SERVICE_EXE}
         ./main.cc
         ./utils.cc
+        ./watch.cc
     )
     target_include_directories(${SERVICE_EXE}
         PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
@@ -55,6 +56,7 @@ else()
     set(SERVICE_DLL rgmsvc)
     add_library(${SERVICE_DLL} SHARED
         ./utils.cc
+        ./watch.cc
         ./entry.cc
     )
     target_compile_definitions(${SERVICE_DLL} PUBLIC RGMSVC_EXPORTS)
