@@ -333,7 +333,9 @@ namespace freeze
 			}
 			pInfo = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(mReadBuffer.data() + pInfo->NextEntryOffset);
 		}
-		mReadBuffer.clear();
+		
+		// TODO: need clear?
+		// mReadBuffer.clear();
 
 		auto ret = QueueUserAPC(watchor::ApcCallback, mThread.native_handle(), (ULONG_PTR)(&detail::_local_notify_info));
 		if (!ret)
@@ -349,6 +351,7 @@ namespace freeze
 	// 	// std::cout << "error: " << e.what() << std::endl;
 	// }
 
+	// TODO: lock this.
 	void watchor::do_data(PFILE_NOTIFY_INFORMATION info)
 	{
 		if (info->Action == 0)
@@ -481,6 +484,7 @@ namespace freeze
 	{
 		auto pWatchor = reinterpret_cast<watchor*>(lpContext);
 
+		// block here.
 		DWORD bytes_transfer;
 		auto ret = GetOverlappedResult(pWatchor->mhDir, lpOverlapped, &bytes_transfer, TRUE);
 		if (!ret)
@@ -509,6 +513,8 @@ namespace freeze
 
 		DWORD bytes_transfer;
 		ULONG_PTR key;
+
+		// block here.
 		auto ret = GetQueuedCompletionStatus(hPort, &bytes_transfer, &key, &lpOverlapped, INFINITE);
 		if (!ret)
 		{
