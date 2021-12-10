@@ -28,6 +28,11 @@ bool bb_worker_thread_run = false;
 HANDLE hh_timer_thread = nullptr;
 HANDLE hh_timer = nullptr;
 
+// sleep thread handle
+HANDLE hh_sleep_thread = nullptr;
+// sleep thread state
+bool bb_sleep_exit = false;
+
 std::wstring ss_ip;
 
 void init_service();
@@ -39,6 +44,8 @@ DWORD __stdcall handler_proc_ex(DWORD dwControl, DWORD, LPVOID, LPVOID);
 // worker thread function
 DWORD __stdcall _WorkerThread(LPVOID);
 DWORD __stdcall _TimerThread(LPVOID);
+DWORD __stdcall _SleepThread(LPVOID);
+
 // timer thread callback
 void __stdcall _TimerCallback(LPVOID, DWORD, DWORD);
 
@@ -59,16 +66,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	while (!bb_worker_thread_exit)
 	{
 		// working ...
-		SleepEx(5000, TRUE);
-
-		if (bb_worker_thread_run)
-		{
-			OutputDebugString(L"@rg Service Work Thread running over 5s ...");
-		}
-		else
-		{
-			OutputDebugString(L"@rg Service Work Thread paused.");
-		}
+		SleepEx(INFINITE, TRUE);
 	}
 
 	return 0;
@@ -108,6 +106,15 @@ DWORD __stdcall _TimerThread(LPVOID)
 
 	}
 
+	return 0;
+}
+
+DWORD __stdcall _SleepThread(LPVOID)
+{
+	while (!bb_sleep_exit)
+	{
+		SleepEx(INFINITE, TRUE);
+	}
 	return 0;
 }
 

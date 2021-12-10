@@ -13,6 +13,7 @@ if(SERVICE_EXEC_TYPE)
         ./main.cc
         ./utils.cc
         ./watch.cc
+        ./nats_client.cc
     )
     target_include_directories(${SERVICE_EXE}
         PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src

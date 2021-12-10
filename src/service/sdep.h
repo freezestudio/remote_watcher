@@ -6,21 +6,15 @@
 #include <vector>
 #include <mutex>
 
-#include "nats.h"
-
-#define SERVICE_CONTROL_NETWORK_CONNECT    129
-#define SERVICE_CONTROL_NETWORK_DISCONNECT 130
-
-
 // out namespaces
 using namespace std::literals;
 namespace fs = std::filesystem;
 
 template<typename T>
 concept Stringify = requires (T t) {
-    t.c_str();
+	t.c_str();
 } || requires(T t) {
-    t.data();
+	t.data();
 };
 
 
@@ -42,9 +36,27 @@ FILE_ACTION_MODIFIED |
 FILE_ACTION_RENAMED_OLD_NAME |
 FILE_ACTION_RENAMED_NEW_NAME;
 
+namespace freeze::detail
+{
+	inline fs::path to_normal(fs::path const& path)
+	{
+		return path.lexically_normal();
+	}
+
+	inline bool check_exist(fs::path const& path)
+	{
+		return !path.empty() && fs::exists(path);
+	}
+
+	inline bool normal_check_exists(fs::path const& path)
+	{
+		return check_exist(to_normal(path));
+	}
+}
+
 namespace freeze
 {
-	enum class accept_type
+	enum class response_type
 	{
 		result, // GetOverlappedResult
 		status, // GetQueuedCompletionStatus
@@ -68,7 +80,7 @@ namespace freeze
 		bool set_folder(S&& folder);
 
 		void reset_buffer(DWORD = 1024 * 1024);
-		bool start(accept_type acctype = accept_type::overlapped);
+		bool start(response_type = response_type::overlapped);
 		void stop();
 
 	public:
@@ -88,6 +100,7 @@ namespace freeze
 
 	private:
 		void _move(watchor&&);
+		decltype(auto) _start_thread();
 		void _stop_thread();
 
 	public:
@@ -118,30 +131,39 @@ namespace freeze
 	template<Stringify S>
 	bool watchor::set_folder(S&& folder)
 	{
+		fs::path newFolder;
 		if constexpr (std::is_same_v<S, fs::path>)
 		{
-			mFolder = folder;
+			newFolder = detail::to_normal(folder);
 		}
 		else
 		{
-			mFolder = fs::path{ folder };
+			newFolder = detail::to_normal(fs::path{ folder });
 		}
 
-		if (!fs::exists(mFolder))
+		if (!(detail::check_exist(newFolder) && fs::is_directory(newFolder)))
 		{
 			mbRunning = false;
-			// error, not a folder
+			OutputDebugString(L"Error, not a folder.\n");
 			return false;
 		}
 
 		if (mhDir)
 		{
-			stop();
+			if (mbRunning && (newFolder == mFolder))
+			{
+				return true;
+			}
+			else
+			{
+				stop();
 
-			CloseHandle(mhDir);
-			mhDir = nullptr;
+				CloseHandle(mhDir);
+				mhDir = nullptr;
+			}
 		}
 
+		mFolder = newFolder;
 		mhDir = CreateFile(
 			mFolder.c_str(),
 			FILE_LIST_DIRECTORY,
@@ -155,8 +177,10 @@ namespace freeze
 		{
 			mbRunning = false;
 
-			auto err = GetLastError();
 			// error
+			auto err = GetLastError();
+			auto _msg = std::format(L"CreateFile Error: {}.\n"sv, err);
+			OutputDebugString(_msg.c_str());
 
 			return false;
 		}

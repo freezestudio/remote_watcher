@@ -46,7 +46,7 @@ static std::vector<std::wstring> enum_win32_services(SC_HANDLE scm)
 			nullptr);
 		if (!ret)
 		{
-			ERROR_MORE_DATA;
+			//ERROR_MORE_DATA; 234L
 			auto err = GetLastError();
 			if (err == ERROR_MORE_DATA)
 			{
@@ -69,9 +69,12 @@ static std::vector<std::wstring> enum_win32_services(SC_HANDLE scm)
 		else
 		{
 			auto ssp = reinterpret_cast<ENUM_SERVICE_STATUS_PROCESS*>(services);
-			for (int i = 0; i < static_cast<int>(service_count); ++i)
+			if (ssp)
 			{
-				vec_services.push_back(ssp[i].lpServiceName);
+				for (int i = 0; i < static_cast<int>(service_count); ++i)
+				{
+					vec_services.push_back(ssp[i].lpServiceName);
+				}
 			}
 			if (services)
 			{
@@ -105,51 +108,6 @@ bool service_exists(SC_HANDLE scm, std::wstring const& name, bool ignore_case = 
 	auto finded = std::find(std::begin(services), std::end(services), name);
 	return finded != _end;
 }
-
-// Need >= Windows 8
-// static void compress_blob()
-// {
-//
-//     DECOMPRESSOR_HANDLE hdecomp;
-//     auto _created = CreateDecompressor(COMPRESS_ALGORITHM_LZMS, nullptr, &hdecomp);
-//     if(!_created)
-//     {
-//         auto _msg = std::format(L"Failed to create decompressor: {}", GetLastError());
-//         OutputDebugString(_msg.data());
-//         return;
-//     }
-//
-//     PBYTE _buffer = nullptr;
-//     size_t _buffer_size = 0;
-//     auto _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
-//     if (!_decompressed)
-//     {
-//         auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
-//         OutputDebugString(_msg.data());
-//         auto _err = GetLastError();
-//         if(_err != ERROR_INSUFFICIENT_BUFFER)
-//         {
-//             return;
-//         }
-//         _buffer = new BYTE[_buffer_size];
-//         if(!_buffer)
-//         {
-//             return;
-//         }
-//     }
-//     _decompressed = Decompress(hdecomp, _data, _data_size, _buffer, _buffer_size, &_buffer_size);
-//     if(!_decompressed)
-//     {
-//         auto _msg = std::format(L"Failed to decompress: {}", GetLastError());
-//         OutputDebugString(_msg.data());
-//         return;
-//     } 
-//     // copy all decompressed files to install path
-//     // ...
-//
-//     delete [] _buffer;
-//     CloseDecompressor(hdecomp);   
-// }
 
 static bool read_resource(void** data, int* len)
 {
@@ -595,14 +553,6 @@ static bool query_status(SC_HANDLE sc, SERVICE_STATUS& service_status)
 
 std::wstring _state(DWORD state)
 {
-	//SERVICE_STOPPED                        0x00000001
-	//SERVICE_START_PENDING                  0x00000002
-	//SERVICE_STOP_PENDING                   0x00000003
-	//SERVICE_RUNNING                        0x00000004
-	//SERVICE_CONTINUE_PENDING               0x00000005
-	//SERVICE_PAUSE_PENDING                  0x00000006
-	//SERVICE_PAUSED                         0x00000007
-
 	std::wstring ret;
 	switch (state)
 	{
@@ -1131,13 +1081,6 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	auto current_state = sstatus.dwCurrentState;
 	do
 	{
-		//SERVICE_STOPPED                        0x00000001
-		//SERVICE_START_PENDING                  0x00000002
-		//SERVICE_STOP_PENDING                   0x00000003
-		//SERVICE_RUNNING                        0x00000004
-		//SERVICE_CONTINUE_PENDING               0x00000005
-		//SERVICE_PAUSE_PENDING                  0x00000006
-		//SERVICE_PAUSED                         0x00000007
 		auto _msg = std::format(L"@rg Stop Service: Current Service status: {}\n"sv, _state(current_state));
 		OutputDebugString(_msg.data());
 	} while (false);
@@ -1177,13 +1120,6 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		}
 		do
 		{
-			//SERVICE_STOPPED                        0x00000001
-			//SERVICE_START_PENDING                  0x00000002
-			//SERVICE_STOP_PENDING                   0x00000003
-			//SERVICE_RUNNING                        0x00000004
-			//SERVICE_CONTINUE_PENDING               0x00000005
-			//SERVICE_PAUSE_PENDING                  0x00000006
-			//SERVICE_PAUSED                         0x00000007
 			auto _msg = std::format(L"@rg Stop Service: Current service status: {}\n"sv, _state(current_state));
 			OutputDebugString(_msg.data());
 		} while (false);

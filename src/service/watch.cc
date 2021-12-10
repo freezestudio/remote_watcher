@@ -1,15 +1,17 @@
 #include "dep.h"
 #include "sdep.h"
+#include "utils.h"
+
 namespace freeze::detail
 {
-	inline std::wstring to_str(freeze::accept_type t)
+	inline std::wstring to_str(freeze::response_type t)
 	{
 		std::wstring s;
 		switch (t)
 		{
-		case freeze::accept_type::result: s = L"result"s; break;
-		case freeze::accept_type::status: s = L"status"s; break;
-		case freeze::accept_type::overlapped: s = L"overlapped"s; break;
+		case freeze::response_type::result: s = L"result"s; break;
+		case freeze::response_type::status: s = L"status"s; break;
+		case freeze::response_type::overlapped: s = L"overlapped"s; break;
 		default:
 			break;
 		}
@@ -35,6 +37,48 @@ namespace freeze::detail
 			break;
 		}
 		return s;
+	}
+}
+
+namespace freeze
+{
+	void watchor::_move(watchor&& rhs)
+	{
+		mbRunning = std::move(std::exchange(rhs.mbRunning, false));
+		mhDir = std::move(std::exchange(rhs.mhDir, nullptr));
+		mOverlapped = std::move(std::exchange(rhs.mOverlapped, {}));
+		mpCompletionRoutine = std::move(std::exchange(rhs.mpCompletionRoutine, nullptr));
+		mThread = std::move(std::exchange(rhs.mThread, {}));
+
+		// move buffers
+		mReadBuffer = std::move(std::exchange(rhs.mReadBuffer, {}));
+		mWriteBuffer = std::move(std::exchange(rhs.mWriteBuffer, {}));
+	}
+
+	decltype(auto) watchor::_start_thread()
+	{
+		auto _thread = std::thread([this]()
+			{
+				while (true)
+				{
+					// Alertable for apc.
+					SleepEx(INFINITE, TRUE);
+					if (!mbRunning)
+					{
+						break;
+					}
+				}
+			});
+		return std::move(_thread);
+	}
+
+	void watchor::_stop_thread()
+	{
+		if (!mbRunning && mThread.joinable())
+		{
+			QueueUserAPC([](auto) {}, mThread.native_handle(), 0);
+			mThread.join();
+		}
 	}
 }
 
@@ -77,39 +121,18 @@ namespace freeze
 		return *this;
 	}
 
-	void watchor::_move(watchor&& rhs)
-	{
-		mbRunning = std::move(std::exchange(rhs.mbRunning, false));
-		mhDir = std::move(std::exchange(rhs.mhDir, nullptr));
-		mOverlapped = std::move(std::exchange(rhs.mOverlapped, {}));
-		mpCompletionRoutine = std::move(std::exchange(rhs.mpCompletionRoutine, nullptr));
-		mThread = std::move(std::exchange(rhs.mThread, {}));
-
-		// move buffers
-		mReadBuffer = std::move(std::exchange(rhs.mReadBuffer, {}));
-		mWriteBuffer = std::move(std::exchange(rhs.mWriteBuffer, {}));
-	}
 
 	void watchor::reset_buffer(DWORD size)
 	{
 		mReadBuffer.resize(size);
 		mWriteBuffer.resize(size);
 	}
-
-	void watchor::_stop_thread()
-	{
-		if (!mbRunning && mThread.joinable())
-		{
-			QueueUserAPC([](auto) {}, mThread.native_handle(), 0);
-			mThread.join();
-		}
-	}
 }
 
 namespace freeze
 {
 	// expect to run in other alertable threads.
-	bool watchor::start(accept_type acctype)
+	bool watchor::start(response_type restype)
 	{
 		if (!mbRunning)
 		{
@@ -125,18 +148,18 @@ namespace freeze
 		}
 
 		mOverlapped = {};
-		switch (acctype)
+		switch (restype)
 		{
 		default:
 			break;
-		case freeze::accept_type::result:
+		case freeze::response_type::result:
 			mpCompletionRoutine = nullptr;
 			mOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 			break;
-		case freeze::accept_type::status:
+		case freeze::response_type::status:
 			mpCompletionRoutine = nullptr;
 			break;
-		case freeze::accept_type::overlapped:
+		case freeze::response_type::overlapped:
 			mOverlapped.hEvent = this;
 			mpCompletionRoutine = watchor::OverlappedCompletionRoutine;
 			break;
@@ -167,7 +190,7 @@ namespace freeze
 		} while (!ret);
 
 		// out, run in alertable threads.
-		if (accept_type::result == acctype)
+		if (response_type::result == restype)
 		{
 			QueueUserAPC([](auto param)
 				{
@@ -175,7 +198,7 @@ namespace freeze
 					watchor::OverlappedCompletionResult(&self->mOverlapped, self);
 				}, mThread.native_handle(), (ULONG_PTR)(this));
 		}
-		else if (accept_type::status == acctype)
+		else if (response_type::status == restype)
 		{
 			QueueUserAPC([](auto param)
 				{
@@ -216,27 +239,6 @@ namespace freeze::detail
 		DWORD action; // set to 1,2,5
 		std::wstring filename;
 	};
-
-	std::string to_utf8(const wchar_t* input, int length)
-	{
-		auto len = WideCharToMultiByte(CP_UTF8, 0, input, length, NULL, 0, NULL, NULL);
-		char* pstr = new char[len + 1];
-		WideCharToMultiByte(CP_UTF8, 0, input, length, pstr, len, NULL, NULL);
-		pstr[len] = '\0';
-		std::string str(pstr);
-		delete[] pstr;
-		return str;
-	}
-
-	std::wstring to_utf16(std::string const& input)
-	{
-		auto len = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, NULL, 0);
-		wchar_t* pwstr = new wchar_t[len];
-		MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, pwstr, len);
-		std::wstring res(pwstr);
-		delete[] pwstr;
-		return res;
-	}
 
 	notify_information_w folder_info_w(fs::path const& folder, DWORD action, std::wstring const& name)
 	{
@@ -287,7 +289,7 @@ namespace freeze::detail
 		return info;
 	}
 
-	// test only! global data used in golbal thread.
+	// test only! global data should used in golbal thread.
 	std::vector<notify_information_w> _local_notify_info_w{};
 }
 
@@ -297,7 +299,6 @@ namespace freeze
 	{
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > mReadBuffer.size())
 		{
-			// need more buffer size
 			OutputDebugString(L"watchor::on_data, maybe need more buffer.\n");
 			return;
 		}
@@ -334,25 +335,14 @@ namespace freeze
 			(ULONG_PTR)(&detail::_local_notify_info_w));
 		if (!ret)
 		{
+			auto err = GetLastError();
 			// When the thread is in the process of being terminated,
 			// calling QueueUserAPC to add to the thread's APC queue
 			// will fail with ERROR_GEN_FAILURE (31).
-			auto err = GetLastError();
 			if (err == ERROR_GEN_FAILURE)
 			{
 				// re-create thread
-				mThread = std::thread([this]
-					{
-						while (true)
-						{
-							// Alertable for apc.
-							SleepEx(INFINITE, TRUE);
-							if (!mbRunning)
-							{
-								break;
-							}
-						}
-					});
+				mThread = std::move(_start_thread());
 				start();
 				return;
 			}

@@ -17,6 +17,12 @@ void debug_output(std::wstring_view const &fmt, Args &&...args)
     OutputDebugString(msg.data());
 }
 
+namespace freeze::detail
+{	
+	std::string to_utf8(const wchar_t* input, int length);
+	std::wstring to_utf16(std::string const& input);
+}
+
 #else
 #define debug_output(...)
 #endif
