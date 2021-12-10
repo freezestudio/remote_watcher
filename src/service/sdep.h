@@ -4,6 +4,7 @@
 
 #include <thread>
 #include <vector>
+#include <mutex>
 
 #include "nats.h"
 
@@ -66,27 +67,28 @@ namespace freeze
 		template<Stringify S>
 		bool set_folder(S&& folder);
 
+		void reset_buffer(DWORD = 1024 * 1024);
 		bool start(accept_type acctype = accept_type::overlapped);
 		void stop();
 
 	public:
-		void on_data(DWORD dwNumberOfBytesTransfered);
-		void do_data(PFILE_NOTIFY_INFORMATION info);
+		void notify_information(DWORD dwNumberOfBytesTransfered);
+		void parse_information(PFILE_NOTIFY_INFORMATION info);
 
 	public:
-		static void ApcCallback(ULONG_PTR parameter);
-
 		static void OverlappedCompletionRoutine(
 			DWORD dwErrorCode,
 			DWORD dwNumberOfBytesTransfered,
 			LPOVERLAPPED lpOverlapped);
 
+	public:
+		static void OverlappedCompletionCallback(ULONG_PTR parameter);
 		static void OverlappedCompletionResult(LPOVERLAPPED, LPVOID lpContext);
 		static void OverlappedCompletionStatus(LPOVERLAPPED, LPVOID lpContext);
 
 	private:
 		void _move(watchor&&);
-		void _reset_buffer(DWORD = 1024 * 1024);
+		void _stop_thread();
 
 	public:
 		fs::path mFolder;
@@ -97,11 +99,13 @@ namespace freeze
 
 		// alertable thread, use run user-mode apc.
 		std::thread mThread;
+		// lock parse data
+		std::mutex mDataMutex;
 
 		// data need convert to PFILE_NOTIFY_INFORMATION
-		alignas(alignof(DWORD))
+		/*alignas(alignof(DWORD))*/
 		std::vector<std::byte> mWriteBuffer;
-		alignas(alignof(DWORD))
+		/*alignas(alignof(DWORD))*/
 		std::vector<std::byte> mReadBuffer;
 
 		OVERLAPPED mOverlapped;

@@ -1,32 +1,36 @@
 #include "dep.h"
 #include "sdep.h"
-
 namespace freeze::detail
 {
-	inline std::string to_str(freeze::accept_type t)
+	inline std::wstring to_str(freeze::accept_type t)
 	{
-		std::string s;
+		std::wstring s;
 		switch (t)
 		{
-		case freeze::accept_type::result: s = "result"s; break;
-		case freeze::accept_type::status: s = "status"s; break;
-		case freeze::accept_type::overlapped: s = "overlapped"s; break;
+		case freeze::accept_type::result: s = L"result"s; break;
+		case freeze::accept_type::status: s = L"status"s; break;
+		case freeze::accept_type::overlapped: s = L"overlapped"s; break;
 		default:
 			break;
 		}
 		return s;
 	}
 
-	inline std::string to_str(DWORD notify)
+	inline std::wstring to_str(DWORD notify)
 	{
-		std::string s;
+		std::wstring s;
 		switch (notify)
 		{
-		case FILE_ACTION_ADDED:s = "add"s; break;
-		case FILE_ACTION_REMOVED:s = "remove"s; break;
-		case FILE_ACTION_MODIFIED:s = "modify"s; break;
-		case FILE_ACTION_RENAMED_OLD_NAME:s = "rename-old-name"s; break;
-		case FILE_ACTION_RENAMED_NEW_NAME:s = "rename-new-name"s; break;
+			//case FILE_ACTION_ADDED:s = L"add"s; break;
+			//case FILE_ACTION_REMOVED:s = L"remove"s; break;
+			//case FILE_ACTION_MODIFIED:s = L"modify"s; break;
+			//case FILE_ACTION_RENAMED_OLD_NAME:s = L"rename-old-name"s; break;
+			//case FILE_ACTION_RENAMED_NEW_NAME:s = L"rename-new-name"s; break;
+		case FILE_ACTION_ADDED: [[fallthrough]];
+		case FILE_ACTION_RENAMED_NEW_NAME:s = L"create"s; break;
+		case FILE_ACTION_REMOVED: [[fallthrough]];
+		case FILE_ACTION_RENAMED_OLD_NAME:s = L"remove"s; break;
+		case FILE_ACTION_MODIFIED:s = L"modify"s; break;
 		default:
 			break;
 		}
@@ -41,19 +45,20 @@ namespace freeze
 		, mhDir{ nullptr }
 		, mOverlapped{}
 		, mpCompletionRoutine{ nullptr }
-        // TODO: modify this thread
-	, mThread([]() { while (true) { SleepEx(INFINITE, TRUE); }})
 	{
-		_reset_buffer();
-
-		// will block
-		//if (mThread.joinable())
-		//{
-		//	mThread.join();
-		//}
-
-		// will loss data
-		//mThread.detach();
+		mThread = std::thread([this]()
+			{
+				while (true)
+				{
+					// Alertable for apc.
+					SleepEx(INFINITE, TRUE);
+					if (!mbRunning)
+					{
+						break;
+					}
+				}
+			});
+		reset_buffer();
 	}
 
 	watchor::~watchor()
@@ -85,10 +90,19 @@ namespace freeze
 		mWriteBuffer = std::move(std::exchange(rhs.mWriteBuffer, {}));
 	}
 
-	void watchor::_reset_buffer(DWORD size)
+	void watchor::reset_buffer(DWORD size)
 	{
 		mReadBuffer.resize(size);
 		mWriteBuffer.resize(size);
+	}
+
+	void watchor::_stop_thread()
+	{
+		if (!mbRunning && mThread.joinable())
+		{
+			QueueUserAPC([](auto) {}, mThread.native_handle(), 0);
+			mThread.join();
+		}
 	}
 }
 
@@ -97,16 +111,16 @@ namespace freeze
 	// expect to run in other alertable threads.
 	bool watchor::start(accept_type acctype)
 	{
-		//std::cout << "watchor::start -> " << std::boolalpha << mbRunning << std::endl;
-
 		if (!mbRunning)
 		{
+			_stop_thread();
 			return false;
 		}
 
 		if (!mhDir)
 		{
 			mbRunning = false;
+			_stop_thread();
 			return false;
 		}
 
@@ -116,14 +130,10 @@ namespace freeze
 		default:
 			break;
 		case freeze::accept_type::result:
-			// use GetOverlappedResult
 			mpCompletionRoutine = nullptr;
 			mOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 			break;
-			//[[fallthrough]];
 		case freeze::accept_type::status:
-			// use GetQueuedCompletionStatus
-			// use CreateIoCompletionPort associate mhDir
 			mpCompletionRoutine = nullptr;
 			break;
 		case freeze::accept_type::overlapped:
@@ -134,7 +144,7 @@ namespace freeze
 
 		if (mWriteBuffer.empty())
 		{
-			_reset_buffer();
+			reset_buffer();
 		}
 
 		BOOL ret = FALSE;
@@ -146,62 +156,42 @@ namespace freeze
 				static_cast<DWORD>(mWriteBuffer.size()),
 				TRUE, // monitors subtree
 				gNotifyFilter,
-				nullptr, // bytes returned, for asynchronous call, undefined.
+				nullptr, // bytes returned. for asynchronous call, undefined.
 				&mOverlapped, // asynchronous operation
 				mpCompletionRoutine // maybe nullptr, run in alertable thread.
 			);
 			if (!ret)
 			{
-				auto err = GetLastError();
-				if (err == ERROR_INVALID_FUNCTION)
-				{
-					// the network redirector or the target file system does not support this operation
-					mbRunning = false;
-					return false;
-				}
-				else if (err == ERROR_INVALID_PARAMETER)
-				{
-					// buffer size > 64 kb and monitoring a directory over the network.
-					// TODO: shrink buffer size
-					_reset_buffer(64 * 1024);
-				}
-				else if (err == ERROR_NOACCESS)
-				{
-					// buffer is not aligned on a DWORD boundary
-					// TODO: set alignas(DWORD)
-					//std::align(alignof(DWORD), sizeof(DWORD), (void*)mWriteBuffer.data(), mWriteBuffer.size());
-				}
-				else
-				{
-					mbRunning = false;
-					return false;
-				}
+				stop();
 			}
 		} while (!ret);
 
 		// out, run in alertable threads.
-		//QueueUserAPC(
-		//	watchor::ApcCallback,
-		//	mThread.native_handle(),
-		//	reinterpret_cast<ULONG_PTR>(this));
-
 		if (accept_type::result == acctype)
 		{
-			watchor::OverlappedCompletionResult(&mOverlapped, this);
+			QueueUserAPC([](auto param)
+				{
+					auto self = reinterpret_cast<watchor*>(param);
+					watchor::OverlappedCompletionResult(&self->mOverlapped, self);
+				}, mThread.native_handle(), (ULONG_PTR)(this));
 		}
-
-		if (accept_type::status == acctype)
+		else if (accept_type::status == acctype)
 		{
-			watchor::OverlappedCompletionStatus(&mOverlapped, this);
+			QueueUserAPC([](auto param)
+				{
+					auto self = reinterpret_cast<watchor*>(param);
+					watchor::OverlappedCompletionStatus(&self->mOverlapped, self);
+				}, mThread.native_handle(), (ULONG_PTR)(this));
 		}
 
-		//std::cout << "watchor::start, accept_type=" << detail::to_str(acctype) << std::endl;
 		return true;
 	}
 
 	void watchor::stop()
 	{
 		mbRunning = false;
+		_stop_thread();
+
 		if (mhDir)
 		{
 			CancelIo(mhDir);
@@ -210,54 +200,51 @@ namespace freeze
 		}
 		mOverlapped = {};
 		mpCompletionRoutine = nullptr;
-
-		// TODO: how to exit thread?
-		std::exchange(mThread, {});
 	}
 }
 
 namespace freeze::detail
 {
-	struct notify_information
+	struct notify_information_w
 	{
 		LARGE_INTEGER size;
 		LARGE_INTEGER creation;
 		LARGE_INTEGER modification;
 		LARGE_INTEGER change;
 		DWORD attributes;
-		bool folder; // maybe mistake
-		DWORD action;
-		std::string filename;
+		bool folder;
+		DWORD action; // set to 1,2,5
+		std::wstring filename;
 	};
 
 	std::string to_utf8(const wchar_t* input, int length)
 	{
 		auto len = WideCharToMultiByte(CP_UTF8, 0, input, length, NULL, 0, NULL, NULL);
-		char* output = new char[len + 1];
-		WideCharToMultiByte(CP_UTF8, 0, input, length, output, len, NULL, NULL);
-		output[len] = '\0';
-		std::string str(output);
-		delete[] output;
+		char* pstr = new char[len + 1];
+		WideCharToMultiByte(CP_UTF8, 0, input, length, pstr, len, NULL, NULL);
+		pstr[len] = '\0';
+		std::string str(pstr);
+		delete[] pstr;
 		return str;
 	}
 
-	std::wstring to_utf16(std::string const& input) 
+	std::wstring to_utf16(std::string const& input)
 	{
 		auto len = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, NULL, 0);
-		WCHAR* output = new WCHAR[len];
-		MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, output, len);
-		std::wstring res(output);
-		delete[] output;
+		wchar_t* pwstr = new wchar_t[len];
+		MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, pwstr, len);
+		std::wstring res(pwstr);
+		delete[] pwstr;
 		return res;
 	}
 
-	notify_information folder_info(fs::path const& folder, DWORD action, int len, wchar_t const* name)
+	notify_information_w folder_info_w(fs::path const& folder, DWORD action, std::wstring const& name)
 	{
-		notify_information info;
+		notify_information_w info{};
 		info.action = action;
-		info.filename = to_utf8(name, len);
+		info.filename = name;
 
-		auto folder_path = folder / name;
+		auto folder_path = (folder / name).lexically_normal();
 		if (!fs::exists(folder_path))
 		{
 			return info;
@@ -287,9 +274,10 @@ namespace freeze::detail
 				static_cast<LONG>(data.ftLastWriteTime.dwHighDateTime),
 			};
 			info.change = LARGE_INTEGER{
-			data.ftLastAccessTime.dwLowDateTime,
-			static_cast<LONG>(data.ftLastAccessTime.dwHighDateTime),
+				data.ftLastAccessTime.dwLowDateTime,
+				static_cast<LONG>(data.ftLastAccessTime.dwHighDateTime),
 			};
+			info.folder = data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
 		}
 		else
 		{
@@ -300,138 +288,125 @@ namespace freeze::detail
 	}
 
 	// test only! global data used in golbal thread.
-	std::vector<notify_information> _local_notify_info{};
+	std::vector<notify_information_w> _local_notify_info_w{};
 }
 
 namespace freeze
 {
-	void watchor::on_data(DWORD dwNumberOfBytesTransfered) /* try */
+	void watchor::notify_information(DWORD dwNumberOfBytesTransfered)
 	{
-		// std::cout << "watchor::on_data, bytes=" << dwNumberOfBytesTransfered << std::endl;
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > mReadBuffer.size())
 		{
 			// need more buffer size
+			OutputDebugString(L"watchor::on_data, maybe need more buffer.\n");
 			return;
 		}
 
-		auto pInfo = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(mReadBuffer.data());
-		if (!pInfo)
+		std::lock_guard<std::mutex> lock(mDataMutex);
+		std::swap(mWriteBuffer, mReadBuffer);
+
+		// TODO: early return to start()
+		// TODO: move to other thread run.
+
+		auto info_ptr = mReadBuffer.data();
+		if (!info_ptr)
 		{
 			// error
-			// std::cout << "watchor::on_data, notify info is null." << std::endl;
+			OutputDebugString(L"watchor::on_data, notify info is null.\n");
 			return;
 		}
 
-		detail::_local_notify_info.clear();
+		detail::_local_notify_info_w.clear();
 		while (true)
 		{
-			do_data(pInfo);
-
-			if (pInfo->NextEntryOffset == 0)
+			auto pInfo = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(info_ptr);
+			parse_information(pInfo);
+			if (pInfo->NextEntryOffset == 0 || pInfo->NextEntryOffset > dwNumberOfBytesTransfered)
 			{
 				break;
 			}
-			pInfo = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(mReadBuffer.data() + pInfo->NextEntryOffset);
+			info_ptr += pInfo->NextEntryOffset;
 		}
-		
-		// TODO: need clear?
-		// mReadBuffer.clear();
 
-		auto ret = QueueUserAPC(watchor::ApcCallback, mThread.native_handle(), (ULONG_PTR)(&detail::_local_notify_info));
+		auto ret = QueueUserAPC(
+			watchor::OverlappedCompletionCallback,
+			mThread.native_handle(),
+			(ULONG_PTR)(&detail::_local_notify_info_w));
 		if (!ret)
 		{
 			// When the thread is in the process of being terminated,
-			// calling QueueUserAPC to add to the thread's APC queue will fail with ERROR_GEN_FAILURE (31).
+			// calling QueueUserAPC to add to the thread's APC queue
+			// will fail with ERROR_GEN_FAILURE (31).
 			auto err = GetLastError();
-			// std::cout << "watchor::on_data Error: " << err << std::endl;
+			if (err == ERROR_GEN_FAILURE)
+			{
+				// re-create thread
+				mThread = std::thread([this]
+					{
+						while (true)
+						{
+							// Alertable for apc.
+							SleepEx(INFINITE, TRUE);
+							if (!mbRunning)
+							{
+								break;
+							}
+						}
+					});
+				start();
+				return;
+			}
+
+			auto _msg = std::format(L"watchor::on_data Error: {}.\n"sv, err);
+			OutputDebugString(_msg.data());
+
+			stop();
 		}
 	}
-	// catch (std::runtime_error& e)
-	// {
-	// 	// std::cout << "error: " << e.what() << std::endl;
-	// }
 
-	// TODO: lock this.
-	void watchor::do_data(PFILE_NOTIFY_INFORMATION info)
+	void watchor::parse_information(PFILE_NOTIFY_INFORMATION info)
 	{
-		if (info->Action == 0)
+		if (info->Action < 1 || info->Action>5)
 		{
-			// print ...
+			auto _msg = std::format(L"when parse notify information, recv an bad action: {}\n"sv, info->Action);
+			OutputDebugString(_msg.data());
 			return;
 		}
 
-		auto name = detail::to_utf8(info->FileName, info->FileNameLength);
-		for (auto const& n : detail::_local_notify_info)
-		{
-			if (n.filename == name)
-			{
-				// print exists.
-				return;
-			}
-		}
-
-		auto item = detail::folder_info(
-			mFolder,
-			info->Action,
-			info->FileNameLength / sizeof(wchar_t),
-			info->FileName);
-		detail::_local_notify_info.emplace_back(item);
+		auto name = std::wstring(info->FileName, info->FileNameLength / sizeof(wchar_t));
+		auto notify_info = detail::folder_info_w(mFolder, info->Action, name);
+		detail::_local_notify_info_w.emplace_back(notify_info);
 	}
 }
 
 namespace freeze
 {
 	/*static*/
-	void watchor::ApcCallback(ULONG_PTR parameter)
+	void watchor::OverlappedCompletionCallback(ULONG_PTR parameter)
 	{
-		auto pData = reinterpret_cast<std::vector<detail::notify_information>*>(parameter);
+		// TODO: lock or wait ...
+		auto pData = reinterpret_cast<std::vector<detail::notify_information_w>*>(parameter);
 		if (!pData)
 		{
-			// std::cout << "monitor: error, data is null." << std::endl;
+			OutputDebugString(L"ApcCallback: notify-information is null.\n");
 			// error
 			return;
 		}
 
-        // TODO: to_utf16(filename)
-
-        // test only
 		for (auto d : *pData)
 		{
 			// output data
-			// std::cout << "monitor: name=" << d.filename 
-			// 	<< ", action=" << detail::to_str(d.action)
-			// 	<< ", is-folder=" << std::boolalpha << d.folder
-			// 	<< std::endl;
+			auto _msg = std::format(L"monitor: name={}, action={}, is-folder={}\n"sv, d.filename, detail::to_str(d.action), d.folder);
+			OutputDebugString(_msg.data());
 		}
 
-		// notify monitor event
+		// TODO: notify monitor event
 	}
 
-	//struct OVERLAPPED
-	//{
-	//    ULONG_PTR Internal;
-	//    ULONG_PTR InternalHigh;
-	// 
-	//    union
-	//    {
-	//        struct
-	//        {
-	//            DWORD Offset;
-	//            DWORD OffsetHigh;
-	//        } DUMMYSTRUCTNAME;
-	//        PVOID Pointer;
-	//    } DUMMYUNIONNAME;
-	// 
-	//    HANDLE    hEvent; // nullptr, or CreateEvent(manual-reset)
-	//};
-	// GetOverlappedResult
-	// HasOverlappedIoCompleted
-	// CancelIo
+}
 
-	/*
-	* maybe run in alertable thread.
-	*
-	*/
+namespace freeze
+{
 	/* static */
 	void watchor::OverlappedCompletionRoutine(
 		DWORD dwErrorCode,
@@ -442,7 +417,7 @@ namespace freeze
 		if (!pWatchor)
 		{
 			// error
-			// std::cout << "Overlapped Completion Routine: watchor pointer is null." << std::endl;
+			OutputDebugString(L"Overlapped Completion Routine: Watchor Pointer is nullptr.\n");
 			return;
 		}
 
@@ -450,41 +425,52 @@ namespace freeze
 		{
 			// error
 			auto err = GetLastError();
-
+			if (err == ERROR_INVALID_FUNCTION)
+			{
+				// the network redirector or the target file system does not support this operation
+				pWatchor->stop();
+			}
 			if (err == ERROR_OPERATION_ABORTED)
 			{
 				// operation abort
-				// std::cout << "Overlapped Completion Routine: Error{ERROR_OPERATION_ABORTED}." << std::endl;
+				OutputDebugString(L"Overlapped Completion Routine: Error{ERROR_OPERATION_ABORTED}.\n");
 				return;
 			}
 			else if (err == ERROR_INVALID_PARAMETER)
 			{
+				// buffer size > 64 kb and monitoring a directory over the network.
+				// TODO: shrink buffer size
+				pWatchor->reset_buffer(64 * 1024);
 				// resize buffer
-				// std::cout << "Overlapped Completion Routine: Error{ERROR_INVALID_PARAMETER}." << std::endl;
+				OutputDebugString(L"Overlapped Completion Routine: Error{ERROR_INVALID_PARAMETER}.\n");
+			}
+			else if (err == ERROR_NOACCESS)
+			{
+				// buffer is not aligned on a DWORD boundary
+				// TODO: set alignof(n) to alignas(DWORD)
 			}
 			else
 			{
-				// std::cout << "Overlapped Completion Routine: Error{Unknown}." << std::endl;
+				OutputDebugString(L"Overlapped Completion Routine: Error{Unknown}.\n");
 			}
-			// std::cout << "Overlapped Completion Routine Error: " << err << std::endl;
+			auto _msg = std::format(L"Overlapped Completion Routine Error: {}.\n"sv, err);
+			OutputDebugString(_msg.c_str());
 			return;
 		}
 
-		// ERROR_SUCCESS, but maybe has warnning
-		// DWORD num_trans;
-		//GetOverlappedResult(lpOverlapped->hEvent->mhDir, lpOverlapped, &num_trans, TRUE);
-		// auto err = GetLastError();
-
-		std::swap(pWatchor->mWriteBuffer, pWatchor->mReadBuffer);
-		pWatchor->on_data(dwNumberOfBytesTransfered);
+		pWatchor->notify_information(dwNumberOfBytesTransfered);
 	}
 
 	/* static */
 	void watchor::OverlappedCompletionResult(LPOVERLAPPED lpOverlapped, LPVOID lpContext)
 	{
 		auto pWatchor = reinterpret_cast<watchor*>(lpContext);
+		if (!pWatchor)
+		{
+			//error
+			return;
+		}
 
-		// block here.
 		DWORD bytes_transfer;
 		auto ret = GetOverlappedResult(pWatchor->mhDir, lpOverlapped, &bytes_transfer, TRUE);
 		if (!ret)
@@ -493,8 +479,7 @@ namespace freeze
 			return;
 		}
 
-		std::swap(pWatchor->mWriteBuffer, pWatchor->mReadBuffer);
-		pWatchor->on_data(bytes_transfer);
+		pWatchor->notify_information(bytes_transfer);
 
 		// manual-reset event
 		ResetEvent(lpOverlapped->hEvent);
@@ -513,8 +498,6 @@ namespace freeze
 
 		DWORD bytes_transfer;
 		ULONG_PTR key;
-
-		// block here.
 		auto ret = GetQueuedCompletionStatus(hPort, &bytes_transfer, &key, &lpOverlapped, INFINITE);
 		if (!ret)
 		{
@@ -522,8 +505,6 @@ namespace freeze
 			return;
 		}
 
-		// process data ...
-		std::swap(pWatchor->mWriteBuffer, pWatchor->mReadBuffer);
-		pWatchor->on_data(bytes_transfer);
+		pWatchor->notify_information(bytes_transfer);
 	}
 }
