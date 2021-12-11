@@ -1,10 +1,8 @@
-#include "dep.h"
-#include "sdep.h"
-#include "utils.h"
+#include "service_watch.h"
 
 namespace freeze::detail
 {
-	inline std::wstring to_str(freeze::response_type t)
+	static std::wstring to_str(freeze::response_type t)
 	{
 		std::wstring s;
 		switch (t)
@@ -18,7 +16,7 @@ namespace freeze::detail
 		return s;
 	}
 
-	inline std::wstring to_str(DWORD notify)
+	static std::wstring to_str(DWORD notify)
 	{
 		std::wstring s;
 		switch (notify)
@@ -69,7 +67,7 @@ namespace freeze
 					}
 				}
 			});
-		return std::move(_thread);
+		return _thread;
 	}
 
 	void watchor::_stop_thread()
@@ -90,18 +88,7 @@ namespace freeze
 		, mOverlapped{}
 		, mpCompletionRoutine{ nullptr }
 	{
-		mThread = std::thread([this]()
-			{
-				while (true)
-				{
-					// Alertable for apc.
-					SleepEx(INFINITE, TRUE);
-					if (!mbRunning)
-					{
-						break;
-					}
-				}
-			});
+		mThread = _start_thread();
 		reset_buffer();
 	}
 
@@ -342,7 +329,7 @@ namespace freeze
 			if (err == ERROR_GEN_FAILURE)
 			{
 				// re-create thread
-				mThread = std::move(_start_thread());
+				mThread = _start_thread();
 				start();
 				return;
 			}

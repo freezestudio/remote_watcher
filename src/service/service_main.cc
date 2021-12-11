@@ -3,37 +3,43 @@
 //
 
 #include "dep.h"
-#include "sdep.h"
+#include "service_dep.h"
+#include "service_watch.h"
+#include "service_nats_client.h"
 
-#define TIMER_SECOND 10000000
+#define SERVICE_TEST
+
+// file time: 100 nanosecond
+constexpr auto time_second = 10000000L;
 
 //
 // TODO: #include <netlistmgr.h>
 // com: INetworkConnection::get_IsConnected
 //
 
-using namespace std::literals;
-
+// service status handle.
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable_event = nullptr;
 DWORD cp_check_point = 0;
 
-// work thread handle
+// work thread handle.
 HANDLE hh_worker_thread = nullptr;
-// work thread status
+// work thread status.
 bool bb_worker_thread_exit = false;
-bool bb_worker_thread_run = false;
+fs::path g_work_folder;
 
-// timer thread handle
+// timer thread handle.
 HANDLE hh_timer_thread = nullptr;
-HANDLE hh_timer = nullptr;
+bool bb_timer_thread_exit = false;
 
-// sleep thread handle
+// sleep thread handle.
 HANDLE hh_sleep_thread = nullptr;
 // sleep thread state
-bool bb_sleep_exit = false;
+bool bb_sleep_thread_exit = false;
 
-std::wstring ss_ip;
+// remote address.
+std::wstring wcs_ip;
+freeze::nats_client g_nats_client{};
 
 void init_service();
 bool init_threadpool();
@@ -52,79 +58,152 @@ void __stdcall _TimerCallback(LPVOID, DWORD, DWORD);
 // worker thread function
 DWORD __stdcall _WorkerThread(LPVOID)
 {
-	// Alertable Thread
-
-	// watch folder, recv folder-notify, emit to nats
-	// watcher.on_data([](auto&& image){
-	//     send_to(nats_server, image);
-	// });
-	// recv message from nats
-	// nats_ptr->on_msg([](auto&& msg){});
-	// nats_ptr->on_cmd([](auto&& cmd){});
-	// 
-
+	auto watcher = freeze::watchor{};
 	while (!bb_worker_thread_exit)
 	{
 		// working ...
 		SleepEx(INFINITE, TRUE);
+		if (freeze::detail::check_exist(g_work_folder))
+		{
+			g_work_folder = freeze::detail::to_normal(g_work_folder);
+		}
+		if (watcher.set_folder(g_work_folder))
+		{
+			watcher.start();
+		}
 	}
-
 	return 0;
 }
 
 DWORD __stdcall _TimerThread(LPVOID)
 {
+
+	HANDLE hh_timer = nullptr;
+	auto _timer_name = L"Local\\Watcher_Timer";
+	do
+	{
+		hh_timer = ::CreateWaitableTimerEx(
+			nullptr,
+			_timer_name,
+			CREATE_WAITABLE_TIMER_MANUAL_RESET, // manual reset
+			TIMER_ALL_ACCESS);
+		if (!hh_timer)
+		{
+			auto err = GetLastError();
+			if (err == ERROR_ALREADY_EXISTS)
+			{
+				if (hh_timer)
+				{
+					CloseHandle(hh_timer);
+					hh_timer = nullptr;
+				}
+			}
+			else if (err == ERROR_INVALID_HANDLE)
+			{
+				_timer_name = nullptr;
+			}
+			else
+			{
+				auto _msg = std::format(L"@rg service create timer thread error: {}\n"sv, err);
+				OutputDebugString(_msg.c_str());
+			}
+		}
+	} while (!hh_timer);
+
 	if (!hh_timer)
 	{
+		OutputDebugString(L"@rg service create timer failure.\n");
 		return 0;
 	}
 
-	// Alertable Thread;
-	auto ret = WaitForSingleObjectEx(hh_timer, INFINITE, TRUE);
-	if (ret == WAIT_ABANDONED)
+	LARGE_INTEGER due_time{}; // 100 nanosecond
+	due_time.QuadPart = static_cast<ULONGLONG>(-30 * time_second);
+	LONG period = 30000; // millisecond
+	wchar_t reason_string[] = L"heart-beat";
+	REASON_CONTEXT reason{
+		POWER_REQUEST_CONTEXT_VERSION,
+		POWER_REQUEST_CONTEXT_SIMPLE_STRING,
+	};
+	reason.Reason.SimpleReasonString = reason_string;
+	ULONG delay = 5000; // tolerable delay
+	auto ok = ::SetWaitableTimerEx(hh_timer, &due_time, period, _TimerCallback, (LPVOID)(&g_nats_client), &reason, delay);
+	if (!ok)
 	{
-
+		auto err = GetLastError();
+		auto _msg = std::format(L"@rg service set timer error: {}\n"sv, err);
+		OutputDebugString(_msg.c_str());
+		return 0;
 	}
-	else if (ret == WAIT_IO_COMPLETION) // _TimerCallback
-	{
 
+	while (!bb_timer_thread_exit)
+	{
+		// Alertable Thread;
+		auto ret = SleepEx(INFINITE, TRUE);
+		if (ret == WAIT_ABANDONED)
+		{
+
+		}
+		else if (ret == WAIT_IO_COMPLETION) // _TimerCallback
+		{
+
+		}
+		else if (ret == WAIT_OBJECT_0) // SetWaitableTimerEx
+		{
+
+		}
+		else if (ret == WAIT_TIMEOUT)
+		{
+
+		}
+		else if (ret == WAIT_FAILED)
+		{
+
+		}
+		else
+		{
+
+		}
 	}
-	else if (ret == WAIT_OBJECT_0) // SetWaitableTimerEx
-	{
 
-	}
-	else if (ret == WAIT_TIMEOUT)
+	if (hh_timer)
 	{
-
-	}
-	else if (ret == WAIT_FAILED)
-	{
-
-	}
-	else
-	{
-
+		CancelWaitableTimer(hh_timer);
+		CloseHandle(hh_timer);
+		hh_timer = nullptr;
 	}
 
 	return 0;
 }
 
+void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
+{
+	auto ncp = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
+	if (!ncp)
+	{
+		OutputDebugString(L"@rg TimerCallback: args is null.\n");
+		return;
+	}
+
+	auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
+	auto _msg = std::format(L"@rg TimerCallback: ETA: {}\n."sv, _timout);
+	OutputDebugString(_msg.c_str());
+}
+
 DWORD __stdcall _SleepThread(LPVOID)
 {
-	while (!bb_sleep_exit)
+	// run nats client
+	// ...
+
+	while (!bb_sleep_thread_exit)
 	{
 		SleepEx(INFINITE, TRUE);
 	}
 	return 0;
 }
 
-void __stdcall _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
-{
-
-}
-
 void init_service()
 {
+#ifndef SERVICE_TEST
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
@@ -139,6 +218,7 @@ void init_service()
 	// 
 	update_status(ss_handle, SERVICE_START_PENDING);
 	OutputDebugString(L"@rg service start pending 3s.\n");
+#endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable_event)
@@ -156,10 +236,11 @@ void init_service()
 		goto theend;
 	}
 
+#ifndef SERVICE_TEST
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
-	bb_worker_thread_run = true;
 	OutputDebugString(L"@rg service starting ...\n");
+#endif
 
 	// loop here
 	while (true)
@@ -211,12 +292,15 @@ void init_service()
 	}
 
 theend:
+#ifndef SERVICE_TEST
 	// stop service
 	update_status(ss_handle, SERVICE_STOPPED);
+#endif
 
 	cp_check_point = 0;
 	bb_worker_thread_exit = true;
-	bb_worker_thread_run = false;
+	bb_timer_thread_exit = true;
+	bb_sleep_thread_exit = true;
 
 	if (hh_worker_thread)
 	{
@@ -251,7 +335,6 @@ DWORD __stdcall handler_proc_ex(
 		// pause service
 		OutputDebugString(L"@rg Recv [pause] control code.\n");
 		update_status(ss_handle, SERVICE_PAUSE_PENDING);
-		bb_worker_thread_run = false;
 		OutputDebugString(L"@rg Recv [pause] control code: dosomething ...\n");
 		update_status(ss_handle, SERVICE_PAUSED);
 		OutputDebugString(L"@rg Recv [pause] control code: Service Paused.\n");
@@ -260,7 +343,6 @@ DWORD __stdcall handler_proc_ex(
 		// resume service
 		OutputDebugString(L"@rg Recv [resume] control code.\n");
 		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
-		bb_worker_thread_run = true;
 		OutputDebugString(L"@rg Recv [resume] control code: dosomething...\n");
 		update_status(ss_handle, SERVICE_RUNNING);
 		OutputDebugString(L"@rg Recv [resume] control code: Service Running.\n");
@@ -279,8 +361,6 @@ DWORD __stdcall handler_proc_ex(
 		// break;
 	case SERVICE_CONTROL_STOP:
 		// stop service, eturn NO_ERROR;
-		bb_worker_thread_exit = true;
-		bb_worker_thread_run = false;
 		SetEvent(hh_waitable_event);
 		OutputDebugString(L"@rg Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);
@@ -308,64 +388,32 @@ bool init_threadpool()
 		{
 			OutputDebugString(L"@rg service create worker thread failure.\n");
 			bb_worker_thread_exit = true;
-			bb_worker_thread_run = false;
 			return false;
 		}
 	}
 
+	bb_timer_thread_exit = false;
 	if (!hh_timer_thread)
 	{
 		hh_timer_thread = ::CreateThread(nullptr, 0, _TimerThread, nullptr, 0, nullptr);
-
+		if (!hh_timer_thread)
+		{
+			bb_timer_thread_exit = true;
+			OutputDebugString(L"@rg service create timer thread failure.\n");
+			return false;
+		}
 	}
 
-	do
+	bb_sleep_thread_exit = false;
+	if (!hh_sleep_thread)
 	{
-		auto _name = L"Local\\WatcherTimer";
-		hh_timer = ::CreateWaitableTimerEx(
-			nullptr,
-			_name,
-			CREATE_WAITABLE_TIMER_MANUAL_RESET,
-			TIMER_ALL_ACCESS);
-		auto err = GetLastError();
-		if (err == ERROR_ALREADY_EXISTS)
+		hh_sleep_thread = ::CreateThread(nullptr, 0, _SleepThread, nullptr, 0, nullptr);
+		if (!hh_sleep_thread)
 		{
-			CloseHandle(hh_timer);
-			hh_timer = nullptr;
+			bb_sleep_thread_exit = true;
+			OutputDebugString(L"@rg service create sleep thread failure.\n");
+			return false;
 		}
-		else if (err == ERROR_INVALID_HANDLE)
-		{
-			_name = nullptr;
-		}
-		else
-		{
-			auto _msg = std::format(L"@rg service create timer thread error: {}\n"sv, err);
-			OutputDebugString(_msg.c_str());
-			break;
-		}
-
-	} while (!hh_timer);
-
-	if (!hh_timer)
-	{
-		OutputDebugString(L"@rg service create timer thread failure.\n");
-		return false;
-	}
-
-	LARGE_INTEGER due_time; // 100nanosecond
-	due_time.QuadPart = (LONGLONG)(-30 * TIMER_SECOND);
-	LONG period = 30000; // millisecond
-	REASON_CONTEXT reason{
-		.Version = POWER_REQUEST_CONTEXT_VERSION,
-		.Flags = POWER_REQUEST_CONTEXT_SIMPLE_STRING,
-	};
-	wchar_t sr[] = L"";
-	reason.Reason.SimpleReasonString = sr;
-	ULONG delay = 5000;
-	auto setted = ::SetWaitableTimerEx(hh_timer, &due_time, period, _TimerCallback, nullptr, &reason, delay);
-	if (!setted)
-	{
-		auto err = GetLastError();
 	}
 
 	return true;
@@ -441,8 +489,8 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 
 	if (argc > 1)
 	{
-		ss_ip = argv[1];
-		auto _msg = std::format(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, ss_ip);
+		wcs_ip = argv[1];
+		auto _msg = std::format(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, wcs_ip);
 		OutputDebugString(_msg.data());
 	}
 	for (auto i = 0; i < argc; ++i)
@@ -451,13 +499,37 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		OutputDebugString(_msg.c_str());
 	}
 
-	OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
-	init_service();
+	if (wcs_ip.empty())
+	{
+		OutputDebugString(L"@rg ServiceMain: ip is null.\n");
+	}
+	else
+	{
+		if (freeze::detail::make_ip_address(wcs_ip) == 0)
+		{
+			OutputDebugString(L"@rg ServiceMain: ip is wrong.\n");
+		}
+		else
+		{
+			OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
+			init_service();
+		}
+	}
+
 	OutputDebugString(L"@rg ServiceMain: rgmsvc stopped.\n");
 }
 
 int __stdcall wmain()
 {
+#ifdef SERVICE_TEST
+	wchar_t arg1[] = L"rgmsvc";
+	wchar_t arg2[] = L"192.168.2.95";
+	wchar_t* argv[] = {
+		arg1,
+		arg2,
+	};
+	ServiceMain(2, argv);
+#else
 	wchar_t _service_name[] = SERVICE_NAME;
 	SERVICE_TABLE_ENTRY _dispatch_table[] = {
 		{_service_name, static_cast<LPSERVICE_MAIN_FUNCTION>(ServiceMain)},
@@ -471,4 +543,6 @@ int __stdcall wmain()
 	{
 		OutputDebugString(L"@rg main: Dispatch Service Failure.\n");
 	}
-}
+#endif
+	OutputDebugString(L"@rg main: Done.\n");
+	}

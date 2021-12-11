@@ -4,7 +4,7 @@
 
 #include "dep.h"
 #include "assets.h"
-#include "wdep.h"
+#include "win32_dep.h"
 
 #include "setup.h"
 #include "maindlg.h"

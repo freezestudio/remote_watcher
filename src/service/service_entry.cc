@@ -3,7 +3,7 @@
 //
 
 #include "dep.h"
-#include "sdep.h"
+#include "service_dep.h"
 
 #ifdef RGMSVC_EXPORTS
 #define DLL_API __declspec(dllexport)

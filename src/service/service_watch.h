@@ -1,25 +1,12 @@
-//
-// service dependence head files
-//
+#ifndef SERVICE_WATCH_H
+#define SERVICE_WATCH_H
 
-#include <thread>
-#include <vector>
-#include <mutex>
-
-// out namespaces
-using namespace std::literals;
-namespace fs = std::filesystem;
-
-template<typename T>
-concept Stringify = requires (T t) {
-	t.c_str();
-} || requires(T t) {
-	t.data();
-};
-
+#include "dep.h"
+#include "service_dep.h"
+#include "service_utils.h"
 
 // ignore FILE_NOTIFY_CHANGE_SECURITY
-constexpr auto gNotifyFilter =
+inline constexpr auto gNotifyFilter =
 FILE_NOTIFY_CHANGE_FILE_NAME |
 FILE_NOTIFY_CHANGE_DIR_NAME |
 FILE_NOTIFY_CHANGE_ATTRIBUTES |
@@ -29,30 +16,19 @@ FILE_NOTIFY_CHANGE_LAST_ACCESS |
 FILE_NOTIFY_CHANGE_CREATION;
 
 // accept all actions
-constexpr auto gNotifyAction =
+inline constexpr auto gNotifyAction =
 FILE_ACTION_ADDED |
 FILE_ACTION_REMOVED |
 FILE_ACTION_MODIFIED |
 FILE_ACTION_RENAMED_OLD_NAME |
 FILE_ACTION_RENAMED_NEW_NAME;
 
-namespace freeze::detail
-{
-	inline fs::path to_normal(fs::path const& path)
-	{
-		return path.lexically_normal();
-	}
-
-	inline bool check_exist(fs::path const& path)
-	{
-		return !path.empty() && fs::exists(path);
-	}
-
-	inline bool normal_check_exists(fs::path const& path)
-	{
-		return check_exist(to_normal(path));
-	}
-}
+template<typename T>
+concept Stringify = requires (T t) {
+	t.c_str();
+} || requires(T t) {
+	t.data();
+};
 
 namespace freeze
 {
@@ -116,9 +92,9 @@ namespace freeze
 		std::mutex mDataMutex;
 
 		// data need convert to PFILE_NOTIFY_INFORMATION
-		/*alignas(alignof(DWORD))*/
+		/* alignas(alignof(DWORD)) */
 		std::vector<std::byte> mWriteBuffer;
-		/*alignas(alignof(DWORD))*/
+		/* alignas(alignof(DWORD)) */
 		std::vector<std::byte> mReadBuffer;
 
 		OVERLAPPED mOverlapped;
@@ -189,3 +165,4 @@ namespace freeze
 		return true;
 	}
 }
+#endif

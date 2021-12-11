@@ -1,5 +1,7 @@
-#include "nats_client.h"
-#include "utils.h"
+#include "service_nats_client.h"
+#include "service_utils.h"
+
+#include <atomic>
 
 namespace freeze::detail
 {
@@ -449,8 +451,8 @@ namespace freeze::detail
 	public:
 		std::string remote_ip()
 		{
-			char ip[21]{};
-			auto status = natsConnection_GetConnectedServerId(_nc, ip, 21);
+			char ip[16]{};
+			auto status = natsConnection_GetConnectedServerId(_nc, ip, 16);
 			if (status == NATS_OK)
 			{
 				return ip;
@@ -573,7 +575,7 @@ namespace freeze::detail
 
 		}
 
-		~ _nats()
+		~_nats()
 		{
 
 		}
@@ -598,5 +600,37 @@ namespace freeze::detail
 
 namespace freeze
 {
+	nats_client::nats_client()
+	{
 
+	}
+
+	nats_client::~nats_client()
+	{
+
+	}
+
+	void nats_client::change_ip(DWORD ip)
+	{
+
+	}
+
+	void nats_client::connect(std::string const& token/* = {}*/)
+	{
+
+	}
+
+	void nats_client::close()
+	{
+
+	}
+
+	void nats_client::notify_message()
+	{
+
+	}
+	void nats_client::notify_command()
+	{
+
+	}
 }

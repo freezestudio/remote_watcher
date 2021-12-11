@@ -1,25 +1,17 @@
 #include "dep.h"
-#include "wdep.h"
+#include "win32_dep.h"
 #include "setup.h"
 #include "assets.h"
 
 #include <cassert>
 
 #define BLOB_NAME L"blob.tgz"
-// if defined, run %ProgramFiles%\SERVICE_PATH\*.exe service,
-// else run %SystemRoot%\System32\*.dll service
+// if defined, run %ProgramFiles%\SERVICE_PATH\SERVICE_NAME.exe service,
+// else run %SystemRoot%\System32\SERVICE_NAME.dll service
 #define SERVICE_PATH L"xMonit"
 
 namespace fs = std::filesystem;
 using namespace std::literals;
-
-// deprecated.
-static std::string to_utf8(std::wstring const& wstr)
-{
-	char _path[MAX_PATH]{};
-	auto _len = ::WideCharToMultiByte(CP_ACP, 0, wstr.data(), wstr.size(), _path, MAX_PATH, nullptr, nullptr);
-	return std::string(_path, _len);
-}
 
 static std::vector<std::wstring> enum_win32_services(SC_HANDLE scm)
 {
@@ -87,11 +79,9 @@ static std::vector<std::wstring> enum_win32_services(SC_HANDLE scm)
 	return vec_services;
 }
 
-bool service_exists(SC_HANDLE scm, std::wstring const& name, bool ignore_case = true)
+static bool service_exists(SC_HANDLE scm, std::wstring const& name, bool ignore_case = true)
 {
-
 	auto services = enum_win32_services(scm);
-
 	auto _end = std::end(services);
 	if (ignore_case)
 	{
@@ -111,7 +101,6 @@ bool service_exists(SC_HANDLE scm, std::wstring const& name, bool ignore_case = 
 
 static bool read_resource(void** data, int* len)
 {
-
 	auto _resource = WTL::CResource();
 	auto _loaded = _resource.Load(MAKEINTRESOURCE(IDR_BLOB), MAKEINTRESOURCE(IDR_MAINFRAME));
 	if (!_loaded)
@@ -126,7 +115,9 @@ static bool read_resource(void** data, int* len)
 	return true;
 }
 
-
+//
+// verify regkey operator status
+//
 static bool _verify_status(LPCWSTR op, DWORD status)
 {
 	if (ERROR_SUCCESS == status)
@@ -151,7 +142,6 @@ static bool _verify_status(LPCWSTR op, DWORD status)
 		OutputDebugString(msg.data());
 		LocalFree(pBuffer);
 	}
-
 	return false;
 }
 
@@ -551,7 +541,7 @@ static bool query_status(SC_HANDLE sc, SERVICE_STATUS& service_status)
 	return true;
 }
 
-std::wstring _state(DWORD state)
+std::wstring _service_state(DWORD state)
 {
 	std::wstring ret;
 	switch (state)
@@ -623,7 +613,7 @@ bool install_service()
 		return false;
 	}
 
-	// create service ...
+	// create service: for dll, use manual, for exe, use SCM
 
 	//wchar_t _display_name[255]{};
 	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
@@ -644,7 +634,7 @@ bool install_service()
 	auto hsc = CreateService(
 		hscm,
 		SERVICE_NAME,
-		_display_name,
+		_display_name,        // dll, manual regkey
 		SERVICE_ALL_ACCESS,
 		_service_type,
 		SERVICE_DEMAND_START, // change to SERVICE_AUTO_START,
@@ -673,6 +663,7 @@ bool install_service()
 	CloseServiceHandle(hsc);
 	CloseServiceHandle(hscm);
 
+// for dll
 #ifndef SERVICE_PATH
 	// add service key
 	if (!add_svc_keyvalue())
@@ -693,8 +684,6 @@ bool install_service()
 
 bool uninstall_service()
 {
-	// assert service stopped.
-
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{
@@ -729,12 +718,12 @@ bool uninstall_service()
 	}
 	OutputDebugString(L"@rg Uninstall Service: DeleteService Successfully.\n");
 
+// for dll
 #ifndef SERVICE_PATH
 	if (!remove_host_value())
 	{
 		return false;
 	}
-
 #endif
 
 	if (!remove_svc_keyvalue())
@@ -742,7 +731,7 @@ bool uninstall_service()
 		return false;
 	}
 
-	// TODO: remove USER\...\keys
+	// TODO: maybe need remove USER\...\keys
 	// HKEY_CURRENT_USER\Software\Classes\Local Settings\MuiCache\f7\AAF68885
 	// or:
 	// HKEY_CLASSES_ROOT\Local Settings\MuiCache\f7\AAF68885
@@ -751,8 +740,8 @@ bool uninstall_service()
 	// @%ProgramFiles%\xMonit\rgmsvc.exe,-101
 	// @%ProgramFiles%\xMonit\rgmsvc.exe,-102@%ProgramFiles%\xMonit\rgmsvc.exe,-101@%ProgramFiles%\xMonit\rgmsvc.exe,-101
 
-	// delete service files ...
 #ifdef SERVICE_PATH
+	// delete tree %ProgramFiles%\\SERVICE_PATH folder.
 	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
@@ -772,7 +761,7 @@ bool uninstall_service()
 		}
 	}
 #else
-	// delete %SystemRoot%\\System32\\SERVICE_NAME file
+	// delete %SystemRoot%\\System32\\SERVICE_NAME.dll file.
 	auto _path = L"%SystemRoot%\\System32";
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
@@ -855,7 +844,7 @@ bool start_service(LPCWSTR ip)
 		//SERVICE_CONTINUE_PENDING               0x00000005
 		//SERVICE_PAUSE_PENDING                  0x00000006
 		//SERVICE_PAUSED                         0x00000007
-		auto _msg = std::format(L"Start Service: Current Service status: {}\n"sv, _state(current_state));
+		auto _msg = std::format(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
 		OutputDebugString(_msg.data());
 	} while (false);
 
@@ -886,13 +875,18 @@ bool start_service(LPCWSTR ip)
 			return false;
 		}
 	}
-	assert(current_state == SERVICE_STOPPED);
 
-	auto check_point = sstatus.dwCheckPoint;
-	auto wait_tick = GetTickCount64();
+	assert(current_state == SERVICE_STOPPED);
+	if(current_state != SERVICE_STOPPED)
+	{
+		OutputDebugString(L"@rg Start Service: Stop Service Failure.\n");
+		::CloseServiceHandle(hsc);
+		::CloseServiceHandle(hscm);
+		return false;
+	}
 
 	// service control manager set:
-	// 1. default paramters:
+	// default paramters:
 	//    a. dwCurrentState = SERVICE_START_PENDING
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
@@ -904,7 +898,6 @@ bool start_service(LPCWSTR ip)
 	if (!::StartService(hsc, 1, args))
 	{
 		// ERROR_SERVICE_REQUEST_TIMEOUT (<=30s)
-
 		auto _msg = std::format(L"@rg Start Service: service start failed {}\n", GetLastError());
 		OutputDebugString(_msg.data());
 		::CloseServiceHandle(hsc);
@@ -934,12 +927,12 @@ bool start_service(LPCWSTR ip)
 		//SERVICE_CONTINUE_PENDING               0x00000005
 		//SERVICE_PAUSE_PENDING                  0x00000006
 		//SERVICE_PAUSED                         0x00000007
-		auto _msg = std::format(L"@rg Start Service: Current service status: {}\n"sv, _state(current_state));
+		auto _msg = std::format(L"@rg Start Service: Current service status: {}\n"sv, _service_state(current_state));
 		OutputDebugString(_msg.data());
 	} while (false);
 
-	check_point = sstatus.dwCheckPoint;
-	wait_tick = GetTickCount64();
+	auto check_point = sstatus.dwCheckPoint;
+	auto wait_tick = GetTickCount64();
 
 	// wait SERVICE_START_PENDING
 	while (current_state == SERVICE_START_PENDING)
@@ -955,9 +948,9 @@ bool start_service(LPCWSTR ip)
 		{
 			wait = 10000;
 		}
-
 		Sleep(wait);
 
+		// check state again.
 		if (!query_status(hsc, sstatus))
 		{
 			auto _msg = std::format(L"@rg Start Service: after StartService() QueryServiceStatusEx failed {}\n", GetLastError());
@@ -969,18 +962,11 @@ bool start_service(LPCWSTR ip)
 		current_state = sstatus.dwCurrentState;
 		do
 		{
-			//SERVICE_STOPPED                        0x00000001
-			//SERVICE_START_PENDING                  0x00000002
-			//SERVICE_STOP_PENDING                   0x00000003
-			//SERVICE_RUNNING                        0x00000004
-			//SERVICE_CONTINUE_PENDING               0x00000005
-			//SERVICE_PAUSE_PENDING                  0x00000006
-			//SERVICE_PAUSED                         0x00000007
-			auto _msg = std::format(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _state(current_state));
+			auto _msg = std::format(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _service_state(current_state));
 			OutputDebugString(_msg.data());
 		} while (false);
 
-		// service status maybe changed.
+		// service check point maybe changed.
 		if (sstatus.dwCheckPoint > check_point)
 		{
 			check_point = sstatus.dwCheckPoint;
@@ -991,7 +977,7 @@ bool start_service(LPCWSTR ip)
 			auto duration = GetTickCount64() - wait_tick;
 			if (duration > sstatus.dwWaitHint)
 			{
-				// dwWaitHint timeout!
+				OutputDebugString(L"@rg Start Service: Wait Service Start Pending Timeout.\n");
 				break;
 			}
 		}
@@ -1000,19 +986,17 @@ bool start_service(LPCWSTR ip)
 	// service started
 	if (current_state == SERVICE_RUNNING)
 	{
-		OutputDebugString(L"@rg Start Service:rgmsvc Successfully.\n");
+		OutputDebugString(L"@rg Start Service[rgmsvc] Successfully.\n");
 	}
 	else
 	{
 		// failure
-		OutputDebugString(L"@rg Start Service:rgmsvc Failure.\n");
-
+		OutputDebugString(L"@rg Start Service[rgmsvc] Failure.\n");
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
 	}
 
-successed:
 	::CloseServiceHandle(hsc);
 	::CloseServiceHandle(hscm);
 	return true;
@@ -1081,7 +1065,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	auto current_state = sstatus.dwCurrentState;
 	do
 	{
-		auto _msg = std::format(L"@rg Stop Service: Current Service status: {}\n"sv, _state(current_state));
+		auto _msg = std::format(L"@rg Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
 		OutputDebugString(_msg.data());
 	} while (false);
 
@@ -1103,7 +1087,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 		if (!query_status(service, sstatus))
 		{
-			auto _msg = std::format(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
+			auto _msg = std::format(L"@rg Stop Service: QueryServiceStatusEx failed {}.\n", GetLastError());
 			OutputDebugString(_msg.data());
 			if (!is_outer)
 			{
@@ -1120,14 +1104,14 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		}
 		do
 		{
-			auto _msg = std::format(L"@rg Stop Service: Current service status: {}\n"sv, _state(current_state));
+			auto _msg = std::format(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
 			OutputDebugString(_msg.data());
 		} while (false);
 
 		auto duration = GetTickCount64() - wait_tick;
-		if (duration > 30000)
+		if (duration > sstatus.dwWaitHint)
 		{
-			OutputDebugString(L"@rg Stop Service: failure, 30s timeout!\n");
+			OutputDebugString(L"@rg Stop Service: failure, timeout!\n");
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
@@ -1150,10 +1134,11 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	OutputDebugString(L"@rg Stop Service: send [stop] control code.\n");
 
 	current_state = sstatus.dwCurrentState;
-	// wait service stop
+	wait_tick = GetTickCount64();
+	// wait service stopped.
 	do
 	{
-		// default 30s
+		// default 30s, set 3s.
 		Sleep(sstatus.dwWaitHint);
 
 		if (!query_status(service, sstatus))
@@ -1194,7 +1179,8 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 // deprecated
 void default_configure_service()
 {
-	// set service description ...
+	// set service description.
+	// set service start type to auto start.
 }
 
 bool is_service_installed(LPDWORD state)
@@ -1209,7 +1195,7 @@ bool is_service_installed(LPDWORD state)
 	auto _path = fs::path{ _expath };
 	if (!fs::exists(_path))
 	{
-		OutputDebugString(L"@rg Check Service not exists.\n");
+		OutputDebugString(L"@rg Check Service: Not Exists.\n");
 		return false;
 	}
 
@@ -1229,7 +1215,7 @@ bool is_service_installed(LPDWORD state)
 		::CloseServiceHandle(hscm);
 		return false;
 	}
-	if (state)
+	if (state != nullptr)
 	{
 		SERVICE_STATUS status;
 		if (query_status(hsc, status))

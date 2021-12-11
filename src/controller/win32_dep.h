@@ -1,6 +1,8 @@
 //
 // Window Dependence Files
 //
+#ifndef WIN32_DEP_H
+#define WIN32_DEP_H
 
 #include <atlbase.h>
 #include "atlapp.h"
@@ -24,3 +26,5 @@ extern WTL::CAppModule _AppModule;
 	language='*' \
 \""
 #pragma comment(linker, COMMCTL6_X64)
+
+#endif

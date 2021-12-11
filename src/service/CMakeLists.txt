@@ -10,10 +10,10 @@ if(SERVICE_EXEC_TYPE)
     #
     set(SERVICE_EXE rgmsvc)
     add_executable(${SERVICE_EXE}
-        ./main.cc
-        ./utils.cc
-        ./watch.cc
-        ./nats_client.cc
+        ./service_main.cc
+        ./service_utils.cc
+        ./service_watch.cc
+        ./service_nats_client.cc
     )
     target_include_directories(${SERVICE_EXE}
         PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
@@ -56,9 +56,9 @@ else()
 
     set(SERVICE_DLL rgmsvc)
     add_library(${SERVICE_DLL} SHARED
-        ./utils.cc
-        ./watch.cc
-        ./entry.cc
+        ./service_utils.cc
+        ./service_watch.cc
+        ./service_entry.cc
     )
     target_compile_definitions(${SERVICE_DLL} PUBLIC RGMSVC_EXPORTS)
     target_include_directories(${SERVICE_DLL}

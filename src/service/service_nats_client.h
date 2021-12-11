@@ -1,11 +1,10 @@
+#ifndef SERVICE_NATS_CLIENT_H
+#define SERVICE_NATS_CLIENT_H
+
 #include "dep.h"
+#include "service_dep.h"
 #include "nats.h"
 #include "json.hpp"
-
-#include <fstream>
-
-namespace fs = std::filesystem;
-using namespace std::literals;
 
 namespace freeze::detail
 {
@@ -56,7 +55,21 @@ namespace freeze
 
 	class nats_client
 	{
+	public:
+		nats_client();
+		~nats_client();
+	public:
+		void change_ip(DWORD ip);
+		void connect(std::string const& = {});
+		void close();
+
+	public:
+		void notify_message();
+		void notify_command();
+
 	private:
 		std::unique_ptr<detail::_nats> piml;
 	};
 }
+
+#endif
