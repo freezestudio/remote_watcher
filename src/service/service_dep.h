@@ -6,6 +6,7 @@
 
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <vector>
 #include <fstream>
 #include <filesystem>
@@ -17,6 +18,8 @@ namespace fs = std::filesystem;
 #define SERVICE_CONTROL_NETWORK_CONNECT    129
 #define SERVICE_CONTROL_NETWORK_DISCONNECT 130
 
+template<typename T>
+concept ServiceEnum = std::is_enum_v<T>;
 
 namespace freeze
 {
@@ -36,7 +39,9 @@ namespace freeze
 		continue_pending = SERVICE_CONTINUE_PENDING,
 		pause_pending = SERVICE_PAUSE_PENDING,
 		paused = SERVICE_PAUSED,
-   };
+		network_connect = SERVICE_CONTROL_NETWORK_CONNECT,
+		network_disconnect = SERVICE_CONTROL_NETWORK_DISCONNECT,
+	};
 
 	enum class service_control
 	{
@@ -56,6 +61,47 @@ namespace freeze
 		shutdown = SERVICE_ACCEPT_SHUTDOWN,
 		param_change = SERVICE_ACCEPT_PARAMCHANGE,
 	};
+
+}
+
+template<ServiceEnum T>
+constexpr auto to_dword(T&& e)
+{
+	return static_cast<DWORD>(e);
+}
+
+template<ServiceEnum T>
+constexpr T to_enum(DWORD d)
+{
+	return static_cast<T>(d);
+}
+
+template<typename B, typename E>
+	requires ServiceEnum<B> || ServiceEnum<E> || std::same_as<DWORD, B> || std::same_as<DWORD, E>
+constexpr DWORD operator|(B && t1, E && t2)
+{
+	if constexpr (std::is_enum_v<B>)
+	{
+		if constexpr (std::is_enum_v<E>)
+		{
+			return to_dword(t1) | to_dword(t2);
+		}
+		else
+		{
+			return to_dword(t1) | t2;
+		}
+	}
+	else
+	{
+		if constexpr (std::is_enum_v<E>)
+		{
+			return t1 | to_dword(t2);
+		}
+		else
+		{
+			return t1 | t2;
+		}
+	}
 }
 
 namespace freeze
@@ -103,5 +149,6 @@ namespace freeze
 	};
 }
 
+extern freeze::atomic_sync global_folder_change_signal;
 
 #endif

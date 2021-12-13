@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common_dep.h"
+
 // user-defined service control range 128~255
 #define SERVICE_CONTROL_NETWORK_CONNECT 129 
 #define SERVICE_CONTROL_NETWORK_DISCONNECT 130
@@ -58,21 +60,21 @@ namespace freeze
             // lpContext
             //   user-defined data from RegisterServiceCtrlHandlerEx
 
-            auto pservice = reinterpret_cast<service *>(lpContext);
+            auto service_ptr = reinterpret_cast<service *>(lpContext);
 
             switch (dwControl)
             {
             case SERVICE_CONTROL_PAUSE:
                 // pause service
-                pservice->update_state(SERVICE_PAUSE_PENDING);
-                pservice->do_pause();
-                // pservice->update_state(SERVICE_PAUSED);
+                service_ptr->update_state(SERVICE_PAUSE_PENDING);
+                service_ptr->do_pause();
+                // service_ptr->update_state(SERVICE_PAUSED);
                 break;
             case SERVICE_CONTROL_CONTINUE:
                 // resume service
-                pservice->update_state(SERVICE_CONTINUE_PENDING);
-                pservice->do_resume();
-                // pservice->update_state(SERVICE_RUNNING);
+                service_ptr->update_state(SERVICE_CONTINUE_PENDING);
+                service_ptr->do_resume();
+                // service_ptr->update_state(SERVICE_RUNNING);
                 break;
             case SERVICE_CONTROL_INTERROGATE:
                 // report current status, should simply return NO_ERROR
@@ -89,8 +91,8 @@ namespace freeze
                 [[fallthrough]];
             case SERVICE_CONTROL_STOP:
                 // stop service, eturn NO_ERROR;
-                pservice->update_state(SERVICE_STOP_PENDING);
-                pservice->do_stop();
+                service_ptr->update_state(SERVICE_STOP_PENDING);
+                service_ptr->do_stop();
                 break;
             case SERVICE_CONTROL_NETWORK_CONNECT:
                 // return ERROR_CALL_NOT_IMPLEMENTED;

@@ -1,8 +1,8 @@
 //
 // Window Dependence Files
 //
-#ifndef WIN32_DEP_H
-#define WIN32_DEP_H
+#ifndef CTRL_WIN32_DEP_H
+#define CTRL_WIN32_DEP_H
 
 #include <atlbase.h>
 #include "atlapp.h"

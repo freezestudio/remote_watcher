@@ -4,10 +4,10 @@
 // 3. (deprecated) default configure service
 //
 
-#ifndef SETUP_H
-#define SETUP_H
+#ifndef CTRL_SETUP_H
+#define CTRL_SETUP_H
 
-#define MAX_REGVALUE 384
+#include "ctrl_dep.h"
 
 bool is_service_installed(LPDWORD=nullptr);
 bool install_service();
@@ -17,8 +17,5 @@ bool stop_service(SC_HANDLE=nullptr, SC_HANDLE=nullptr);
 
 [[deprecated]]
 void default_configure_service();
-
-// decompress *.tgz
-int tar(const char*, const char*);
 
 #endif

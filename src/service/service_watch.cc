@@ -215,18 +215,6 @@ namespace freeze
 
 namespace freeze::detail
 {
-	struct notify_information_w
-	{
-		LARGE_INTEGER size;
-		LARGE_INTEGER creation;
-		LARGE_INTEGER modification;
-		LARGE_INTEGER change;
-		DWORD attributes;
-		bool folder;
-		DWORD action; // set to 1,2,5
-		std::wstring filename;
-	};
-
 	notify_information_w folder_info_w(fs::path const& folder, DWORD action, std::wstring const& name)
 	{
 		notify_information_w info{};
@@ -277,7 +265,11 @@ namespace freeze::detail
 	}
 
 	// test only! global data should used in golbal thread.
-	std::vector<notify_information_w> _local_notify_info_w{};
+	std::vector<notify_information_w> g_local_notify_info_w{};
+	std::vector<notify_information_w>& get_changed_information()
+	{
+		return g_local_notify_info_w;
+	}
 }
 
 namespace freeze
@@ -304,7 +296,7 @@ namespace freeze
 			return;
 		}
 
-		detail::_local_notify_info_w.clear();
+		detail::g_local_notify_info_w.clear();
 		while (true)
 		{
 			auto pInfo = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(info_ptr);
@@ -319,7 +311,7 @@ namespace freeze
 		auto ret = QueueUserAPC(
 			watchor::OverlappedCompletionCallback,
 			mThread.native_handle(),
-			(ULONG_PTR)(&detail::_local_notify_info_w));
+			(ULONG_PTR)(&detail::g_local_notify_info_w));
 		if (!ret)
 		{
 			auto err = GetLastError();
@@ -352,17 +344,17 @@ namespace freeze
 
 		auto name = std::wstring(info->FileName, info->FileNameLength / sizeof(wchar_t));
 		auto notify_info = detail::folder_info_w(mFolder, info->Action, name);
-		detail::_local_notify_info_w.emplace_back(notify_info);
+		detail::g_local_notify_info_w.emplace_back(notify_info);
 	}
 }
 
 namespace freeze
 {
 	/*static*/
-	void watchor::OverlappedCompletionCallback(ULONG_PTR parameter)
+	void watchor::OverlappedCompletionCallback(ULONG_PTR Parameter)
 	{
 		// TODO: lock or wait ...
-		auto pData = reinterpret_cast<std::vector<detail::notify_information_w>*>(parameter);
+		auto pData = reinterpret_cast<std::vector<detail::notify_information_w>*>(Parameter);
 		if (!pData)
 		{
 			OutputDebugString(L"ApcCallback: notify-information is null.\n");
@@ -370,14 +362,18 @@ namespace freeze
 			return;
 		}
 
-		for (auto d : *pData)
-		{
-			// output data
-			auto _msg = std::format(L"monitor: name={}, action={}, is-folder={}\n"sv, d.filename, detail::to_str(d.action), d.folder);
-			OutputDebugString(_msg.data());
-		}
+		// for (auto d : *pData)
+		// {
+		// 	// output data
+		// 	auto _msg = std::format(L"monitor: name={}, action={}, is-folder={}\n"sv, d.filename, detail::to_str(d.action), d.folder);
+		// 	OutputDebugString(_msg.data());
+		// }
 
 		// TODO: notify monitor event
+		if (pData->size() > 0)
+		{
+			global_folder_change_signal.notify();
+		}
 	}
 
 }

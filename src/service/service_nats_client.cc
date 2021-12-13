@@ -12,6 +12,13 @@ namespace freeze::detail
 
 	struct _nats_options
 	{
+	public:
+		_nats_options(/*std::nullptr_t*/)
+			: _options{ nullptr }
+		{
+
+		}
+
 		_nats_options(
 			std::string const& url,
 			std::string const& user,
@@ -45,16 +52,34 @@ namespace freeze::detail
 			_buffer_size(64 * 1024);
 		}
 
+		_nats_options(_nats_options const&) = default;
+		_nats_options& operator=(_nats_options const&) = default;
+
 		~_nats_options()
 		{
-			natsOptions_Destroy(_options);
-			_options = nullptr;
+			_destroy();
 		}
 
 		operator natsOptions* () const
 		{
 			return _options;
 		}
+
+	public:
+		_nats_options& reset(std::string const& url, std::string const& token, std::string const& name = {})
+		{
+			_destroy();
+			_create();
+			if (!name.empty())
+			{
+				_name(name);
+			}
+			_buffer_size(64 * 1024);
+			_url(url);
+			_token(token);
+			return *this;
+		}
+
 	public:
 		bool set_url(std::string const& url)
 		{
@@ -75,6 +100,15 @@ namespace freeze::detail
 		bool _create()
 		{
 			return natsOptions_Create(&_options) == natsStatus::NATS_OK;
+		}
+
+		void _destroy()
+		{
+			if (_options)
+			{
+				natsOptions_Destroy(_options);
+				_options = nullptr;
+			}
 		}
 
 		bool _name(std::string const& name)
@@ -375,21 +409,71 @@ namespace freeze::detail
 
 	struct _nats_connect
 	{
-		_nats_connect(std::string const& url, std::string const& user, std::string const& pwd, std::string const& name = {})
+	public:
+		_nats_connect(/*std::nullopt_t*/) noexcept
+			: _opts{}
+			, _nc{nullptr}
+		{
+
+		}
+
+		_nats_connect(
+			std::string const& url, 
+			std::string const& user, 
+			std::string const& pwd, 
+			std::string const& name = {}
+		) noexcept
 			: _opts(url, user, pwd, name)
 		{
 			_connect();
 		}
 
-		_nats_connect(std::string const& url, std::string const& token, std::string const& name = {})
+		_nats_connect(
+			std::string const& url, 
+			std::string const& token, 
+			std::string const& name = {}
+		) noexcept
 			: _opts(url, token, name)
 		{
 			_connect();
 		}
 
-		~_nats_connect()
+		~_nats_connect() noexcept
 		{
 			_destroy();
+		}
+
+	public:
+		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
+		{
+			//if (is_connected)
+			//{
+			//	natsConnection_Close(_nc);
+			//	_destroy();
+			//}
+			_destroy();
+			_opts.reset(url, token, name);
+			return *this;
+		}
+
+		void close()
+		{
+			_destroy();
+		}
+
+		void change_ip(DWORD ip)
+		{
+			auto str_ip = detail::parse_ip_address(ip);
+			if (remote_ip() == str_ip)
+			{
+				return;
+			}
+
+			if (is_connected())
+			{
+				auto token = ""s;
+				reset(str_ip, token);
+			}
 		}
 
 	public:
@@ -567,40 +651,12 @@ namespace freeze::detail
 		natsConnection* _nc = nullptr;
 		_nats_options _opts;
 	};
-
-	struct _nats
-	{
-		_nats()
-		{
-
-		}
-
-		~_nats()
-		{
-
-		}
-
-		_nats(_nats const&) = delete;
-		_nats& operator=(_nats const&) = delete;
-
-		_nats(_nats&& rhs)
-		{
-
-		}
-
-		_nats& operator =(_nats&& rhs)
-		{
-			return *this;
-		}
-
-	private:
-		_nats_connect* _cnn;
-	};
 }
 
 namespace freeze
 {
 	nats_client::nats_client()
+		:pimpl{ std::make_unique<detail::_nats_connect>() }
 	{
 
 	}
@@ -612,7 +668,7 @@ namespace freeze
 
 	void nats_client::change_ip(DWORD ip)
 	{
-
+		pimpl->change_ip(ip);
 	}
 
 	void nats_client::connect(std::string const& token/* = {}*/)
@@ -622,7 +678,7 @@ namespace freeze
 
 	void nats_client::close()
 	{
-
+		pimpl->close();
 	}
 
 	void nats_client::notify_message()

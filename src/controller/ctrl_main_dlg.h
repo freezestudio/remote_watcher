@@ -1,5 +1,5 @@
-#ifndef MAINDLG_H
-#define MAINDLG_H
+#ifndef CTRL_MAIN_DLG_H
+#define CTRL_MAIN_DLG_H
 
 using namespace std::literals;
 

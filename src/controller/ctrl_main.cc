@@ -2,12 +2,12 @@
 // service manager
 //
 
-#include "dep.h"
-#include "assets.h"
-#include "win32_dep.h"
+#include "common_dep.h"
+#include "common_assets.h"
 
-#include "setup.h"
-#include "maindlg.h"
+#include "ctrl_win32_dep.h"
+#include "ctrl_setup.h"
+#include "ctrl_main_dlg.h"
 
 WTL::CAppModule _AppModule;
 

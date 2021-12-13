@@ -2,7 +2,7 @@
 // dll service entry
 //
 
-#include "dep.h"
+#include "common_dep.h"
 #include "service_dep.h"
 
 #ifdef RGMSVC_EXPORTS

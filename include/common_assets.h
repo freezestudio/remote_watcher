@@ -1,3 +1,6 @@
+#ifndef COMMON_ASSETS_H
+#define COMMON_ASSETS_H
+
 #define IDD_MAINDLG       100
 
 #define IDS_DISPLAY       101
@@ -18,3 +21,5 @@
 
 // custom resource data type
 #define IDR_BLOB          257
+
+#endif

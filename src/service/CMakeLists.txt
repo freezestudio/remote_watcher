@@ -10,10 +10,12 @@ if(SERVICE_EXEC_TYPE)
     #
     set(SERVICE_EXE rgmsvc)
     add_executable(${SERVICE_EXE}
-        ./service_main.cc
         ./service_utils.cc
         ./service_watch.cc
         ./service_nats_client.cc
+        ./service_impl.cc
+        ./service_thread.cc
+        ./service_main.cc
     )
     target_include_directories(${SERVICE_EXE}
         PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/3rdpart/nats/src
@@ -22,6 +24,7 @@ if(SERVICE_EXEC_TYPE)
     target_sources(${SERVICE_EXE} PUBLIC
         ${PROJECT_SOURCE_DIR}/assets/${SERVICE_EXE}.rc
     )
+    target_link_libraries(${SERVICE_EXE} nats_static)
 
     set(SERVICE_EXE_NAME "${SERVICE_EXE}.exe")
     # set(DEP_CORE_FILE_NAME "api-ms-win-core-file-l1-2-0.dll")
@@ -58,6 +61,9 @@ else()
     add_library(${SERVICE_DLL} SHARED
         ./service_utils.cc
         ./service_watch.cc
+        ./service_nats_client.cc
+        ./service_impl.cc
+        ./service_thread.cc
         ./service_entry.cc
     )
     target_compile_definitions(${SERVICE_DLL} PUBLIC RGMSVC_EXPORTS)
@@ -68,6 +74,7 @@ else()
     target_sources(${SERVICE_DLL} PUBLIC
         ${PROJECT_SOURCE_DIR}/assets/${SERVICE_DLL}.rc
     )
+    target_link_libraries(${SERVICE_DLL} nats_static)
 
     #
     # compress rgmsvc.dll and dependencies

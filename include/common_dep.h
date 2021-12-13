@@ -1,8 +1,8 @@
 //
 // common head files
 //
-#ifndef _DEP_H_
-#define _DEP_H_
+#ifndef COMMON_DEP_H
+#define COMMON_DEP_H
 
 // Windows
 

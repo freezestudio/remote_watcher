@@ -1,15 +1,15 @@
 #ifndef SERVICE_NATS_CLIENT_H
 #define SERVICE_NATS_CLIENT_H
 
-#include "dep.h"
+#include "common_dep.h"
 #include "service_dep.h"
+
 #include "nats.h"
 #include "json.hpp"
 
 namespace freeze::detail
 {
-	struct _nats;
-
+	struct _nats_connect;
 	struct _nats_cmd
 	{
 		std::string name;
@@ -58,6 +58,7 @@ namespace freeze
 	public:
 		nats_client();
 		~nats_client();
+
 	public:
 		void change_ip(DWORD ip);
 		void connect(std::string const& = {});
@@ -68,7 +69,7 @@ namespace freeze
 		void notify_command();
 
 	private:
-		std::unique_ptr<detail::_nats> piml;
+		std::unique_ptr<detail::_nats_connect> pimpl;
 	};
 }
 
