@@ -15,6 +15,7 @@ if(SERVICE_EXEC_TYPE)
         ./service_nats_client.cc
         ./service_impl.cc
         ./service_thread.cc
+        ./service_thread_nats.cc
         ./service_main.cc
     )
     target_include_directories(${SERVICE_EXE}
@@ -64,6 +65,7 @@ else()
         ./service_nats_client.cc
         ./service_impl.cc
         ./service_thread.cc
+        ./service_thread_nats.cc
         ./service_entry.cc
     )
     target_compile_definitions(${SERVICE_DLL} PUBLIC RGMSVC_EXPORTS)

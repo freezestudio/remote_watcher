@@ -1,4 +1,5 @@
 #include "service.h"
+#include "service_thread_nats.h"
 
 
 // file time: 100 nanosecond
@@ -199,12 +200,8 @@ DWORD __stdcall _SleepThread(LPVOID)
 	{
 		//wait folder changed.
 		global_folder_change_signal.wait();
-		auto& vec_changes = freeze::detail::get_changed_information();
-		for (auto& d : vec_changes)
-		{
-			auto _msg = std::format(L"action={}, name={}\n"sv, d.action, d.filename);
-			OutputDebugString(_msg.c_str());
-		}
+		// if reason is folder changed.
+		freeze::maybe_send_data(nats_client);
 	}
 	return 0;
 }

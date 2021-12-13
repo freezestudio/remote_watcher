@@ -104,6 +104,26 @@ constexpr DWORD operator|(B && t1, E && t2)
 	}
 }
 
+namespace freeze::detail
+{
+	struct notify_information_w
+	{
+		LARGE_INTEGER size;
+		LARGE_INTEGER creation;
+		LARGE_INTEGER modification;
+		LARGE_INTEGER change;
+		DWORD attributes;
+		bool folder;
+		DWORD action; // set to 1,2,5
+		std::wstring filename;
+	};
+
+	// test only! global data should used in golbal thread.
+	extern std::vector<notify_information_w> g_local_notify_info_w;
+
+	std::vector<notify_information_w>& get_changed_information();
+}
+
 namespace freeze
 {
 	class atomic_sync
