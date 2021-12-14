@@ -33,7 +33,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		OutputDebugString(_msg.c_str());
 	}
 
-	// TODO: read from .ini
+	// TODO: read (ip,token) from .ini
 	// ...
 
 	if (wcs_ip.empty())

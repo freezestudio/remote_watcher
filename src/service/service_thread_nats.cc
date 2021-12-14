@@ -9,6 +9,9 @@ namespace freeze
 		{
 			auto _msg = std::format(L"action={}, name={}\n"sv, d.action, d.filename);
 			OutputDebugString(_msg.c_str());
+
+			// send to remote ...
+			// ...
 		}
     }
 }

@@ -1,17 +1,15 @@
 #include "service.h"
+#include "service_thread_worker.h"
 #include "service_thread_nats.h"
+#include "service_thread_timer.h"
 
-
-// file time: 100 nanosecond
+// file time: 100 nanosecond.
 constexpr auto time_second = 10000000L;
 
 // work thread handle.
 HANDLE hh_worker_thread = nullptr;
 // work thread status.
 bool bb_worker_thread_exit = false;
-fs::path g_work_folder;
-// global signal for folder-change-to-nats-thread
-freeze::atomic_sync global_folder_change_signal{};
 
 // timer thread handle.
 HANDLE hh_timer_thread = nullptr;
@@ -19,13 +17,17 @@ bool bb_timer_thread_exit = false;
 
 // sleep thread handle.
 HANDLE hh_sleep_thread = nullptr;
-// sleep thread state
+// sleep thread state.
 bool bb_sleep_thread_exit = false;
 
+// local watchor folder.
+fs::path g_work_folder;
 // remote address.
 freeze::nats_client g_nats_client{};
+// global signal for communicate-with-nats with reason.
+freeze::atomic_sync_reason global_reason_signal{};
 
-// worker thread function
+// worker thread.
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	auto watcher = freeze::watchor{};
@@ -39,12 +41,13 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	{
 		SleepEx(INFINITE, TRUE);
 #ifndef SERVICE_TEST
+		// maybe service paused.
 		if (ss_current_status != freeze::service_state::running)
 		{
 			continue;
 		}
 #endif
-		if (freeze::detail::check_exist(g_work_folder))
+		if (freeze::detail::check_exists(g_work_folder))
 		{
 			g_work_folder = freeze::detail::to_normal(g_work_folder);
 		}
@@ -58,7 +61,6 @@ DWORD __stdcall _WorkerThread(LPVOID)
 
 DWORD __stdcall _TimerThread(LPVOID)
 {
-
 	HANDLE hh_timer = nullptr;
 	auto _timer_name = L"Local\\Watcher_Timer";
 	do
@@ -158,20 +160,6 @@ DWORD __stdcall _TimerThread(LPVOID)
 	return 0;
 }
 
-void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
-{
-	auto ncp = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
-	if (!ncp)
-	{
-		OutputDebugString(L"@rg TimerCallback: args is null.\n");
-		return;
-	}
-
-	auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
-	auto _msg = std::format(L"@rg TimerCallback: ETA: {}\n."sv, dwTimerLowValue);
-	OutputDebugString(_msg.c_str());
-}
-
 DWORD __stdcall _SleepThread(LPVOID)
 {
 	freeze::nats_client nats_client;
@@ -180,7 +168,11 @@ DWORD __stdcall _SleepThread(LPVOID)
 		auto ip = freeze::detail::make_ip_address(wcs_ip);
 		if (ip > 0)
 		{
-			nats_client.change_ip(ip);
+			// TODO: read (ip, token) from .ini
+			//nats_client.change_ip(ip/*, token*/);
+			auto connected = nats_client.connect(ip);
+			nats_client.listen_message();
+			nats_client.listen_command();
 		}
 		else
 		{
@@ -199,9 +191,25 @@ DWORD __stdcall _SleepThread(LPVOID)
 	while (!bb_sleep_thread_exit)
 	{
 		//wait folder changed.
-		global_folder_change_signal.wait();
-		// if reason is folder changed.
-		freeze::maybe_send_data(nats_client);
+		auto reason = global_reason_signal.wait_reason();
+		switch (reason)
+		{
+		default: [[fallthrough]];
+		case sync_reason_none__reason:
+			break;
+		case sync_reason_recv_command:
+			break;
+		case sync_reason_recv_message:
+			break;
+		case sync_reason_send_command:
+			break;
+		case sync_reason_send_message:
+			break;
+		case sync_reason_send_payload:
+			// if reason is folder changed.
+			freeze::maybe_send_data(nats_client);
+			break;
+		}
 	}
 	return 0;
 }

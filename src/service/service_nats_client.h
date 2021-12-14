@@ -10,18 +10,18 @@
 namespace freeze::detail
 {
 	struct _nats_connect;
-	struct _nats_cmd
+	struct nats_cmd
 	{
 		std::string name;
 		std::string action;
 	};
 
-	constexpr _nats_cmd make_cmd(std::string const& name, std::string const& action)
+	constexpr nats_cmd make_cmd(std::string const& name, std::string const& action)
 	{
 		return { name, action };
 	}
 
-	inline _nats_cmd to_cmd(char const* str, std::size_t len)
+	inline nats_cmd to_cmd(char const* str, std::size_t len)
 	{
 		using json = nlohmann::json;
 		auto j = json::parse(str, str + len);
@@ -32,12 +32,12 @@ namespace freeze::detail
 
 	}
 
-	inline _nats_cmd to_cmd(std::string const& str)
+	inline nats_cmd to_cmd(std::string const& str)
 	{
 		return to_cmd(str.c_str(), str.size());
 	}
 
-	inline std::string from_cmd(_nats_cmd const& cmd)
+	inline std::string from_cmd(nats_cmd const& cmd)
 	{
 		using json = nlohmann::json;
 		json j;
@@ -52,6 +52,9 @@ namespace freeze
 	constexpr auto message_channel = "message-channel"sv;
 	constexpr auto command_channel = "command-channel"sv;
 	constexpr auto payload_channel = "payload-channel"sv;
+	constexpr auto json_type = "json"sv;
+	constexpr auto data_type = "data"sv;
+	constexpr auto text_type = "text"sv;
 
 	class nats_client
 	{
@@ -60,16 +63,32 @@ namespace freeze
 		~nats_client();
 
 	public:
-		void change_ip(DWORD ip);
-		void connect(std::string const& = {});
+		void change_ip(DWORD ip, std::string const & = {});
+		bool connect(DWORD ip, std::string const& = {});
 		void close();
+
+	public:
+		void listen_message();
+		void listen_command();
 
 	public:
 		void notify_message();
 		void notify_command();
+		void notify_payload();
+
+	public:
+		void on_message();
+		void on_command();
+		void on_payload();
 
 	private:
 		std::unique_ptr<detail::_nats_connect> pimpl;
+
+	private:
+		std::thread _msg_thread;
+		std::thread _cmd_thread;
+		bool _msg_thread_running{false};
+		bool _cmd_thread_running{false};
 	};
 }
 

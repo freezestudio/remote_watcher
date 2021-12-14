@@ -28,7 +28,4 @@ DWORD __stdcall _WorkerThread(LPVOID);
 DWORD __stdcall _TimerThread(LPVOID);
 DWORD __stdcall _SleepThread(LPVOID);
 
-// timer thread callback
-void __stdcall _TimerCallback(LPVOID, DWORD, DWORD);
-
 #endif

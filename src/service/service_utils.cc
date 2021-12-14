@@ -101,13 +101,13 @@ namespace freeze::detail
 		return path.lexically_normal();
 	}
 
-	bool check_exist(fs::path const& path)
+	bool check_exists(fs::path const& path)
 	{
 		return !path.empty() && fs::exists(path);
 	}
 
 	bool normal_check_exists(fs::path const& path)
 	{
-		return check_exist(to_normal(path));
+		return check_exists(to_normal(path));
 	}
 }

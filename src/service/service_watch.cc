@@ -353,7 +353,6 @@ namespace freeze
 	/*static*/
 	void watchor::OverlappedCompletionCallback(ULONG_PTR Parameter)
 	{
-		// TODO: lock or wait ...
 		auto pData = reinterpret_cast<std::vector<detail::notify_information_w>*>(Parameter);
 		if (!pData)
 		{
@@ -362,20 +361,11 @@ namespace freeze
 			return;
 		}
 
-		// for (auto d : *pData)
-		// {
-		// 	// output data
-		// 	auto _msg = std::format(L"monitor: name={}, action={}, is-folder={}\n"sv, d.filename, detail::to_str(d.action), d.folder);
-		// 	OutputDebugString(_msg.data());
-		// }
-
-		// TODO: notify monitor event
 		if (pData->size() > 0)
 		{
-			global_folder_change_signal.notify();
+			global_reason_signal.notify_reason(sync_reason_send_payload);
 		}
 	}
-
 }
 
 namespace freeze

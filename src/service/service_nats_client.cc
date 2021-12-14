@@ -3,6 +3,9 @@
 
 #include <atomic>
 
+freeze::atomic_sync g_message_signal{};
+freeze::atomic_sync g_command_signal{};
+
 namespace freeze::detail
 {
 	//constexpr void verify_status(natsStatus status)
@@ -204,13 +207,13 @@ namespace freeze::detail
 			return std::string(data, len);
 		}
 
-		_nats_cmd get_cmd()
+		nats_cmd get_cmd()
 		{
 			auto cmd = get_msg();
 			return detail::to_cmd(cmd);
 		}
 
-		bool set_cmd(_nats_cmd const& cmd)
+		bool set_cmd(nats_cmd const& cmd)
 		{
 			auto _s = from_cmd(cmd);
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, _s.data(), _s.size()) == NATS_OK;
@@ -262,6 +265,22 @@ namespace freeze::detail
 					goto fail;
 				}
 				ok = _add_header("size", std::to_string(len));
+				if (!ok)
+				{
+					goto fail;
+				}
+				auto prefix = "mime/"s;
+				auto suffix = file.extension();
+				auto str_suf = suffix.string();
+				if (str_suf.starts_with("."))
+				{
+					prefix += str_suf.substr(1);
+				}
+				else
+				{
+					prefix += str_suf;
+				}
+				ok = _add_header("mime", prefix);
 				if (!ok)
 				{
 					goto fail;
@@ -409,18 +428,19 @@ namespace freeze::detail
 
 	struct _nats_connect
 	{
+		// TODO: make default name = {nats-pcname-pid}
 	public:
 		_nats_connect(/*std::nullopt_t*/) noexcept
 			: _opts{}
-			, _nc{nullptr}
+			, _nc{ nullptr }
 		{
 
 		}
 
 		_nats_connect(
-			std::string const& url, 
-			std::string const& user, 
-			std::string const& pwd, 
+			std::string const& url,
+			std::string const& user,
+			std::string const& pwd,
 			std::string const& name = {}
 		) noexcept
 			: _opts(url, user, pwd, name)
@@ -429,8 +449,8 @@ namespace freeze::detail
 		}
 
 		_nats_connect(
-			std::string const& url, 
-			std::string const& token, 
+			std::string const& url,
+			std::string const& token,
 			std::string const& name = {}
 		) noexcept
 			: _opts(url, token, name)
@@ -444,36 +464,37 @@ namespace freeze::detail
 		}
 
 	public:
-		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
-		{
-			//if (is_connected)
-			//{
-			//	natsConnection_Close(_nc);
-			//	_destroy();
-			//}
-			_destroy();
-			_opts.reset(url, token, name);
-			return *this;
-		}
-
 		void close()
 		{
 			_destroy();
 		}
 
-		void change_ip(DWORD ip)
+		void change_ip(DWORD ip, std::string const& token /*= {}*/)
 		{
 			auto str_ip = detail::parse_ip_address(ip);
-			if (remote_ip() == str_ip)
-			{
-				return;
-			}
-
 			if (is_connected())
 			{
-				auto token = ""s;
+				if (remote_ip() == str_ip)
+				{
+					return;
+				}
 				reset(str_ip, token);
 			}
+		}
+
+		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
+		{
+			auto _token = token;
+			if (token.empty())
+			{
+				// TODO: read from .ini
+				_token = "aH7g8Rxq0q"s;
+			}
+
+			_destroy();
+			_opts.reset(url, _token, name);
+			_connect();
+			return *this;
 		}
 
 	public:
@@ -483,7 +504,7 @@ namespace freeze::detail
 			return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
 		}
 
-		bool publish_command(_nats_cmd const& cmd)
+		bool publish_command(nats_cmd const& cmd)
 		{
 			auto _m = _nats_msg{ command_channel.data() };
 			_m.set_cmd(cmd);
@@ -505,10 +526,18 @@ namespace freeze::detail
 			return ok;
 		}
 
-		std::string subject_message()
+		bool subject_message()
 		{
-			//natsConnection_Subscribe()
-			return {};
+			_nats_sub _sub{nullptr};
+			auto status = natsConnection_Subscribe(_sub.put(), _nc, message_channel.data(),
+				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
+				{
+					_nats_msg m{ msg };
+					auto self = reinterpret_cast<_nats_connect*>(closure);
+					auto str_msg = m.get_msg();
+					self->on_message(str_msg);
+				}, this);
+			return status == NATS_OK;
 		}
 
 		// TODO: use coroutine
@@ -545,6 +574,14 @@ namespace freeze::detail
 			{
 				return {};
 			}
+		}
+
+		_nats_connect& connect(std::string const& url, std::string const& token, std::string const& name = {})
+		{
+			auto _token = "aH7g8Rxq0q"s;
+			_opts.reset(url, _token, name);
+			_connect();
+			return *this;
 		}
 
 		bool is_connected()
@@ -611,19 +648,22 @@ namespace freeze::detail
 		void on_message(std::string const& msg)
 		{
 			auto wstr = detail::to_utf16(msg);
+			OutputDebugString(wstr.c_str());
+			g_message_signal.notify();
 		}
 
-		void on_command(_nats_cmd const& cmd)
+		void on_command(nats_cmd const& cmd)
 		{
 			auto name = cmd.name;
 			auto action = cmd.action;
+			auto _a = std::format("name={}, action={}\n"sv, name, action);
+			OutputDebugStringA(_a.c_str());
+			g_command_signal.notify();
 		}
 
-		// step by step send one file
+		// noop, unused.
 		void on_payload(std::string const& msg)
 		{
-			auto wstr = detail::to_utf16(msg);
-			// send next file
 		}
 
 	private:
@@ -656,24 +696,78 @@ namespace freeze::detail
 namespace freeze
 {
 	nats_client::nats_client()
-		:pimpl{ std::make_unique<detail::_nats_connect>() }
+		: pimpl{ std::make_unique<detail::_nats_connect>() }
 	{
-
+		_msg_thread = std::thread([](auto&& self)
+			{
+				while (true)
+				{
+					g_message_signal.wait();
+					if (!self)
+					{
+						break;
+					}
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (self_ptr)
+					{
+						self_ptr->on_message();
+					}
+					if (!self_ptr->_msg_thread_running)
+					{
+						break;
+					}
+				}
+			}, this);
+		_cmd_thread = std::thread([](auto&& self)
+			{
+				while (true)
+				{
+					g_command_signal.wait();
+					if (!self)
+					{
+						break;
+					}
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (self_ptr)
+					{
+						self_ptr->on_command();
+					}
+					if (!self_ptr->_cmd_thread_running)
+					{
+						break;
+					}
+				}
+			}, this);
 	}
 
 	nats_client::~nats_client()
 	{
+		_msg_thread_running = false;
+		g_message_signal.notify();
+		if (_msg_thread.joinable())
+		{
+			_msg_thread.join();
+		}
 
+		_cmd_thread_running = false;
+		g_message_signal.notify();
+		if (_cmd_thread.joinable())
+		{
+			_cmd_thread.join();
+		}
 	}
 
-	void nats_client::change_ip(DWORD ip)
+	void nats_client::change_ip(DWORD ip, std::string const& token /*= {}*/)
 	{
-		pimpl->change_ip(ip);
+		pimpl->change_ip(ip, token);
 	}
 
-	void nats_client::connect(std::string const& token/* = {}*/)
+	bool nats_client::connect(DWORD ip, std::string const& token/* = {}*/)
 	{
-
+		auto url = detail::parse_ip_address(ip);
+		//pimpl.swap(detail::_nats_connect(url, token));
+		pimpl->connect(url, token);
+		return pimpl->is_connected();
 	}
 
 	void nats_client::close()
@@ -681,11 +775,58 @@ namespace freeze
 		pimpl->close();
 	}
 
+	void nats_client::listen_message()
+	{
+		if (pimpl->subject_message())
+		{
+			_msg_thread_running = true;
+		}
+		else
+		{
+			_msg_thread_running = false;
+			g_message_signal.notify();
+		}
+	}
+
+	void nats_client::listen_command()
+	{
+		if (pimpl->subject_command())
+		{
+			_cmd_thread_running = true;
+		}
+		else
+		{
+			_cmd_thread_running = false;
+			g_command_signal.notify();
+		}
+	}
+
 	void nats_client::notify_message()
 	{
 
 	}
+
 	void nats_client::notify_command()
+	{
+
+	}
+
+	void nats_client::notify_payload()
+	{
+
+	}
+
+	void nats_client::on_command()
+	{
+		int cmd = 0;
+	}
+
+	void nats_client::on_message()
+	{
+		int msg = 0;
+	}
+
+	void nats_client::on_payload()
 	{
 
 	}

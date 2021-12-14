@@ -118,7 +118,7 @@ namespace freeze
 			newFolder = detail::to_normal(fs::path{ folder });
 		}
 
-		if (!(detail::check_exist(newFolder) && fs::is_directory(newFolder)))
+		if (!(detail::check_exists(newFolder) && fs::is_directory(newFolder)))
 		{
 			mbRunning = false;
 			OutputDebugString(L"Error, not a folder.\n");

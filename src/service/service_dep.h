@@ -61,7 +61,6 @@ namespace freeze
 		shutdown = SERVICE_ACCEPT_SHUTDOWN,
 		param_change = SERVICE_ACCEPT_PARAMCHANGE,
 	};
-
 }
 
 template<ServiceEnum T>
@@ -124,6 +123,13 @@ namespace freeze::detail
 	std::vector<notify_information_w>& get_changed_information();
 }
 
+constexpr auto sync_reason_none__reason = 0L;
+constexpr auto sync_reason_recv_command = 1L;
+constexpr auto sync_reason_recv_message = 2L;
+constexpr auto sync_reason_send_command = 3L;
+constexpr auto sync_reason_send_message = 4L;
+constexpr auto sync_reason_send_payload = 5L;
+
 namespace freeze
 {
 	class atomic_sync
@@ -167,8 +173,56 @@ namespace freeze
 	private:
 		std::atomic_flag _flag;
 	};
+
+	class atomic_sync_reason
+	{
+	public:
+		atomic_sync_reason()
+		{
+			reset();
+		}
+
+	public:
+		long wait_reason()
+		{
+			_reason.wait(sync_reason_none__reason);
+			return reset();
+		}
+
+		long notify_reason(long reason, bool all = false)
+		{
+			until_wait(reason);
+			if (all)
+			{
+				_reason.notify_all();
+			}
+			else
+			{
+				_reason.notify_one();
+			}
+			return _reason.load();
+		}
+
+	private:
+		bool until_wait(long reason)
+		{
+			auto expected = sync_reason_none__reason;
+			while (!_reason.compare_exchange_strong(expected, reason))
+			{
+				expected = sync_reason_none__reason;
+			}
+			return true;
+		}
+
+		long reset()
+		{
+			return _reason.exchange(sync_reason_none__reason);
+		}
+	private:
+		std::atomic_long _reason;
+	};
 }
 
-extern freeze::atomic_sync global_folder_change_signal;
+extern freeze::atomic_sync_reason global_reason_signal;
 
 #endif

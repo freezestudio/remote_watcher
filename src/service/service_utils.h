@@ -36,7 +36,7 @@ namespace freeze::detail
 namespace freeze::detail
 {
 	fs::path to_normal(fs::path const& path);
-	bool check_exist(fs::path const& path);
+	bool check_exists(fs::path const& path);
 	bool normal_check_exists(fs::path const& path);
 }
 
