@@ -1041,13 +1041,7 @@ namespace freeze
 		// switch(known cmd)
 		// ...
 
-		//std::lock_guard<std::mutex> lock(command_mutex);
-		//// ack command: {name: cmdname, action: string, result: xxx}
-		//detail::nats_cmd_ack _cmd_ack;
-		//_cmd_ack.name = g_current_command.name;
-		//_cmd_ack.action = g_current_command.action;
-		//_cmd_ack.result = true;
-		//pimpl->ack_command(g_current_command_reply, _cmd_ack);
+		global_reason_signal.notify_reason(sync_reason_recv_command);
 	}
 
 	void nats_client::on_message()

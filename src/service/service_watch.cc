@@ -308,6 +308,14 @@ namespace freeze
 			info_ptr += pInfo->NextEntryOffset;
 		}
 
+		// Test Only!
+		auto _idx = 1;
+		for (auto x : detail::g_local_notify_info_w)
+		{
+			auto _mm = std::format(L"{}: watch: action={}, name={}, isfile={}\n"sv, _idx++, x.action, x.filename, x.isfile);
+			OutputDebugString(_mm.c_str());
+		}
+
 		auto ret = QueueUserAPC(
 			watchor::OverlappedCompletionCallback,
 			mThread.native_handle(),
@@ -335,7 +343,7 @@ namespace freeze
 
 	void watchor::parse_information(PFILE_NOTIFY_INFORMATION info)
 	{
-		if (info->Action < 1 || info->Action>5)
+		if (info->Action < 1 || info->Action > 5)
 		{
 			auto _msg = std::format(L"when parse notify information, recv an bad action: {}\n"sv, info->Action);
 			OutputDebugString(_msg.data());

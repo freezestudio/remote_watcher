@@ -198,6 +198,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		case sync_reason_none__reason:
 			break;
 		case sync_reason_recv_command:
+			OutputDebugString(L"@rg wakeup reason: recv command.\n");
 			break;
 		case sync_reason_recv_message:
 			break;
