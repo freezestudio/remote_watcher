@@ -70,6 +70,7 @@ int __stdcall wmain()
 {
 #ifdef SERVICE_TEST
 	g_work_folder = fs::path{ L"f:/templ/abc"s };
+	OutputDebugString(L"@rg Warning: current mock watch f:/templ/abc, shoud change it from remote.\n");
 
 	wchar_t arg1[] = L"rgmsvc";
 	wchar_t arg2[] = L"192.168.2.95";

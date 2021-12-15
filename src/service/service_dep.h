@@ -112,7 +112,7 @@ namespace freeze::detail
 		LARGE_INTEGER modification;
 		LARGE_INTEGER change;
 		DWORD attributes;
-		bool folder;
+		bool isfile;
 		DWORD action; // set to 1,2,5
 		std::wstring filename;
 	};

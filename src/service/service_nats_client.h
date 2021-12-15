@@ -158,7 +158,7 @@ namespace freeze
 		void on_command();
 
 	public:
-		void on_payload_response();
+		//void on_payload_response();
 
 	private:
 		std::unique_ptr<detail::_nats_connect> pimpl;
@@ -166,10 +166,10 @@ namespace freeze
 	private:
 		std::thread _msg_thread;
 		std::thread _cmd_thread;
-		std::thread _pal_thread;
+		//std::thread _pal_thread;
 		bool _msg_thread_running{ true };
 		bool _cmd_thread_running{ true };
-		bool _pal_thread_running{ true };
+		//bool _pal_thread_running{ true };
 	};
 }
 

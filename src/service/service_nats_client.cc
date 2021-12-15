@@ -5,7 +5,7 @@
 
 freeze::atomic_sync g_message_signal{};
 freeze::atomic_sync g_command_signal{};
-freeze::atomic_sync g_payload_signal{};
+//freeze::atomic_sync g_payload_signal{};
 
 //std::mutex command_mutex;
 //std::string g_current_command_reply;
@@ -337,6 +337,7 @@ namespace freeze::detail
 			{
 				ifs.read(data, len);
 				ifs.close();
+
 				_destroy();
 				auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, data, len) == NATS_OK;
 				if (!ok)
@@ -642,22 +643,35 @@ namespace freeze::detail
 				return false;
 			}
 
-			_nats_sub _sub{ nullptr };
-			auto ok = natsConnection_Subscribe(_sub.put(), _nc, payload_channel.data(),
-				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
-				{
-					_nats_msg m{ msg };
-					auto self = reinterpret_cast<_nats_connect*>(closure);
-					auto str_msg = m.get_msg();
-					self->on_payload_response(str_msg);
-				}, this) == NATS_OK;
+			//_nats_sub _sub{ nullptr };
+			//auto ok = natsConnection_Subscribe(_sub.put(), _nc, payload_channel.data(),
+			//	[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
+			//	{
+			//		_nats_msg m{ msg };
+			//		auto self = reinterpret_cast<_nats_connect*>(closure);
+			//		auto str_msg = m.get_msg();
+			//		self->on_payload_response(str_msg);
+			//	}, this) == NATS_OK;
+			//if (!ok)
+			//{
+			//	goto theend;
+			//}
+
+			_nats_msg reply_msg{ nullptr };
+			auto status = natsConnection_RequestMsg(reply_msg.put(), _nc, m, 3 * 60 * 1000);
+			auto ok = status == NATS_OK;
 			if (!ok)
 			{
-				goto theend;
+				delete pdata;
+				return ok;
 			}
 
-			//no head: natsConnection_Publish(_nc, subj, data, len);
-			ok = natsConnection_PublishMsg(_nc, m) == NATS_OK;
+			// { name, size, result: true }
+			auto _json_msg = reply_msg.get_msg();
+			using json = nlohmann::json;
+			auto j = json::parse(_json_msg);
+			std::string _reply_name = j["name"];
+			ok = fs::path{ _reply_name } == file;
 
 		theend:
 			delete pdata;
@@ -808,10 +822,10 @@ namespace freeze::detail
 			g_command_signal.notify();
 		}
 
-		void on_payload_response(std::string const& msg)
-		{
-			g_payload_signal.notify();
-		}
+		//void on_payload_response(std::string const& msg)
+		//{
+		//	g_payload_signal.notify();
+		//}
 
 	private:
 		bool _connect()
@@ -879,23 +893,23 @@ namespace freeze
 					}
 				}
 			}, this);
-		_pal_thread = std::thread([](auto&& self)
-			{
-				while (true)
-				{
-					g_payload_signal.wait();
-					auto self_ptr = reinterpret_cast<nats_client*>(self);
-					if (!self_ptr)
-					{
-						break;
-					}
-					self_ptr->on_payload_response();
-					if (!(self_ptr->_pal_thread_running))
-					{
-						break;
-					}
-				}
-			}, this);
+		//_pal_thread = std::thread([](auto&& self)
+		//	{
+		//		while (true)
+		//		{
+		//			g_payload_signal.wait();
+		//			auto self_ptr = reinterpret_cast<nats_client*>(self);
+		//			if (!self_ptr)
+		//			{
+		//				break;
+		//			}
+		//			self_ptr->on_payload_response();
+		//			if (!(self_ptr->_pal_thread_running))
+		//			{
+		//				break;
+		//			}
+		//		}
+		//	}, this);
 	}
 
 	nats_client::~nats_client()
@@ -914,12 +928,12 @@ namespace freeze
 			_cmd_thread.join();
 		}
 
-		_pal_thread_running = false;
-		g_payload_signal.notify();
-		if (_pal_thread.joinable())
-		{
-			_pal_thread.join();
-		}
+		//_pal_thread_running = false;
+		//g_payload_signal.notify();
+		//if (_pal_thread.joinable())
+		//{
+		//	_pal_thread.join();
+		//}
 	}
 
 	void nats_client::change_ip(DWORD ip, std::string const& token /*= {}*/)
@@ -978,7 +992,7 @@ namespace freeze
 
 	void nats_client::notify_payload(fs::path const& folder, std::vector<detail::notify_information_w> const& info)
 	{
-		auto _f = std::format(L"watcher: {}\n"sv, folder.c_str());
+		auto _f = std::format(L"nats client watcher: {}\n"sv, folder.c_str());
 		OutputDebugString(_f.c_str());
 
 		// TODO: async send image data step by step
@@ -986,8 +1000,36 @@ namespace freeze
 
 		for (auto& d : info)
 		{
-			auto _msg = std::format(L"action={}, name={}\n"sv, d.action, d.filename);
+			auto _msg = std::format(L"action={}, name={}, isfile={}\n"sv, d.action, d.filename, d.isfile);
 			OutputDebugString(_msg.c_str());
+
+			switch (d.action)
+			{
+			default:
+				break;
+			case FILE_ACTION_ADDED:
+				if (d.isfile)
+				{
+					pimpl->publish_payload(folder, d.filename);
+				}
+				break;
+			case FILE_ACTION_REMOVED:
+				break;
+			case FILE_ACTION_MODIFIED:
+				if (d.isfile)
+				{
+					pimpl->publish_payload(folder, d.filename);
+				}
+				break;
+			case FILE_ACTION_RENAMED_OLD_NAME:
+				break;
+			case FILE_ACTION_RENAMED_NEW_NAME:
+				if (d.isfile)
+				{
+					pimpl->publish_payload(folder, d.filename);
+				}
+				break;
+			}
 
 			// send to remote ...
 			// ...
@@ -1013,8 +1055,7 @@ namespace freeze
 		int msg = 0;
 	}
 
-	void nats_client::on_payload_response()
-	{
-		// expect recv { name, size, result: true }
-	}
+	//void nats_client::on_payload_response()
+	//{
+	//}
 }

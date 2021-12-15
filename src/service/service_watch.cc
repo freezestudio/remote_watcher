@@ -227,7 +227,7 @@ namespace freeze::detail
 			return info;
 		}
 
-		info.folder = fs::is_directory(folder_path);
+		info.isfile = !fs::is_directory(folder_path);
 		if (fs::is_regular_file(folder_path))
 		{
 			info.size.QuadPart = fs::file_size(folder_path);
@@ -254,7 +254,7 @@ namespace freeze::detail
 				data.ftLastAccessTime.dwLowDateTime,
 				static_cast<LONG>(data.ftLastAccessTime.dwHighDateTime),
 			};
-			info.folder = data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+			info.isfile = !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		}
 		else
 		{
