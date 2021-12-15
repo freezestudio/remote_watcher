@@ -207,7 +207,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			break;
 		case sync_reason_send_payload:
 			// if reason is folder changed.
-			freeze::maybe_send_data(nats_client);
+			freeze::maybe_send_data(g_work_folder, nats_client);
 			break;
 		}
 	}

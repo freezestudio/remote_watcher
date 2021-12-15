@@ -5,7 +5,7 @@
 
 namespace freeze
 {
-    void maybe_send_data(nats_client&);
+    void maybe_send_data(fs::path const&, nats_client&);
 }
 
 #endif

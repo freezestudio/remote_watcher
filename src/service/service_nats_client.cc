@@ -5,6 +5,11 @@
 
 freeze::atomic_sync g_message_signal{};
 freeze::atomic_sync g_command_signal{};
+freeze::atomic_sync g_payload_signal{};
+
+//std::mutex command_mutex;
+//std::string g_current_command_reply;
+freeze::detail::nats_cmd g_current_command;
 
 namespace freeze::detail
 {
@@ -167,15 +172,14 @@ namespace freeze::detail
 			}
 		}
 
-		explicit _nats_msg(std::string const& sub, bool pak = false)
+		explicit _nats_msg(std::string const& sub, bool heartbeat = false)
 			:_sub{ sub }
 		{
 			// as heartbeat package
-			if (pak)
+			if (heartbeat)
 			{
-				_create(sub);
+				_create_empty(sub);
 			}
-
 		}
 
 		_nats_msg(std::string const& sub, std::string const& m)
@@ -200,6 +204,21 @@ namespace freeze::detail
 		}
 
 	public:
+		std::string get_reply()
+		{
+			if (!_msg)
+			{
+				return {};
+			}
+			auto _reply = natsMsg_GetReply(_msg);
+			if (!_reply)
+			{
+				return {};
+			}
+			return _reply;
+		}
+
+	public:
 		std::string get_msg()
 		{
 			auto data = natsMsg_GetData(_msg);
@@ -213,8 +232,59 @@ namespace freeze::detail
 			return detail::to_cmd(cmd);
 		}
 
+		nats_cmd_ack get_cmd_ack()
+		{
+			auto ack = get_msg();
+			return detail::to_cmd_ack(ack);
+		}
+
+		nats_pal_ack get_pal_ack()
+		{
+			auto ack = get_msg();
+			return detail::to_pal_ack(ack);
+		}
+
+		bool set_msg(std::string const& msg, std::string const& _type)
+		{
+			_destroy();
+			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, msg.c_str(), msg.size()) == NATS_OK;
+			if (!ok)
+			{
+				return false;
+			}
+			const char* value = nullptr;
+			auto status = natsMsgHeader_Get(_msg, "type", &value);
+			if (status == NATS_OK)
+			{
+				if (text_type != std::string_view(value))
+				{
+					ok = _set_header("type", "text");
+				}
+			}
+			else if (status == NATS_NOT_FOUND)
+			{
+				ok = _add_header("type", "text");
+			}
+			else
+			{
+				return false;
+			}
+
+			if (!ok)
+			{
+				return false;
+			}
+
+			if (json_type == _type)
+			{
+				ok = _set_header("type", "json");
+			}
+			return ok;
+		}
+
 		bool set_cmd(nats_cmd const& cmd)
 		{
+			_destroy();
 			auto _s = from_cmd(cmd);
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, _s.data(), _s.size()) == NATS_OK;
 			if (!ok)
@@ -233,16 +303,41 @@ namespace freeze::detail
 			return ok;
 		}
 
-		// caller should release this pointer
-		char* set_payload(fs::path const file)
+		bool set_cmd_ack(std::string const& reply, nats_cmd_ack const& ack)
 		{
-			auto len = fs::file_size(file);
+			_destroy();
+			auto _s = from_cmd_ack(ack);
+			auto ok = natsMsg_Create(&_msg, reply.c_str(), nullptr, _s.data(), _s.size()) == NATS_OK;
+			if (!ok)
+			{
+				return false;
+			}
+			ok = _clear_headers();
+			if (!ok)
+			{
+				return false;
+			}
+			ok = _add_header("type", "json");
+			return ok;
+		}
+
+		// caller should release this pointer
+		char* set_payload(fs::path const& folder, fs::path const& file)
+		{
+			auto full_path_file = (folder / file).lexically_normal();
+			if (!fs::exists(full_path_file))
+			{
+				return nullptr;
+			}
+
+			auto len = fs::file_size(full_path_file);
 			char* data = new char[len] {};
-			std::ifstream ifs(file, std::ios::binary);
+			std::ifstream ifs(full_path_file, std::ios::binary);
 			if (ifs.is_open())
 			{
 				ifs.read(data, len);
 				ifs.close();
+				_destroy();
 				auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, data, len) == NATS_OK;
 				if (!ok)
 				{
@@ -292,12 +387,18 @@ namespace freeze::detail
 			delete[] data;
 			return nullptr;
 		}
+
 	private:
-		bool _create(std::string const& reply = {})
+		bool _auto_ack()
+		{
+			return natsMsg_Ack(_msg, nullptr) == NATS_OK;
+		}
+
+		bool _create_empty(std::string const& reply = {})
 		{
 			_destroy();
 			auto rep = reply.empty() ? nullptr : reply.c_str();
-			natsMsg_Create(&_msg, _sub.c_str(), rep, nullptr, 0);
+			return natsMsg_Create(&_msg, _sub.c_str(), rep, nullptr, 0) == NATS_OK;
 		}
 
 		bool _create_text(std::string const& m)
@@ -353,7 +454,12 @@ namespace freeze::detail
 		{
 			const char** keys = nullptr;
 			int count = 0;
-			auto ok = natsMsgHeader_Keys(_msg, &keys, &count) == NATS_OK;
+			auto status = natsMsgHeader_Keys(_msg, &keys, &count);
+			if (status == NATS_NOT_FOUND)
+			{
+				return true;
+			}
+			auto ok = status == NATS_OK;
 			if (!ok)
 			{
 				return false;
@@ -497,11 +603,27 @@ namespace freeze::detail
 			return *this;
 		}
 
-	public:
-		bool publish_message(std::string const& msg)
+		bool ack_command(std::string const& reply, nats_cmd_ack const& ack)
 		{
-			auto _m = _nats_msg{ message_channel.data(), msg };
-			return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+			auto _m = _nats_msg{ command_channel.data() };
+			auto ok = _m.set_cmd_ack(reply, ack);
+			if (!ok)
+			{
+				return false;
+			}
+			ok = natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+			return ok;
+		}
+
+	public:
+		bool publish_message(std::string const& msg, std::string const& _type = std::string(text_type))
+		{
+			auto _m = _nats_msg{ message_channel.data() };
+			if (_m.set_msg(msg, _type))
+			{
+				return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+			}
+			return false;
 		}
 
 		bool publish_command(nats_cmd const& cmd)
@@ -511,24 +633,40 @@ namespace freeze::detail
 			return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
 		}
 
-		bool publish_payload(fs::path const& file)
+		bool publish_payload(fs::path const& folder, fs::path const& file)
 		{
 			_nats_msg m{ payload_channel.data() };
-			auto pdata = m.set_payload(file);
+			auto pdata = m.set_payload(folder, file);
 			if (!pdata)
 			{
 				return false;
 			}
 
-			//natsConnection_Publish(_nc, subj, data, len);
-			auto ok = natsConnection_PublishMsg(_nc, m) == NATS_OK;
+			_nats_sub _sub{ nullptr };
+			auto ok = natsConnection_Subscribe(_sub.put(), _nc, payload_channel.data(),
+				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
+				{
+					_nats_msg m{ msg };
+					auto self = reinterpret_cast<_nats_connect*>(closure);
+					auto str_msg = m.get_msg();
+					self->on_payload_response(str_msg);
+				}, this) == NATS_OK;
+			if (!ok)
+			{
+				goto theend;
+			}
+
+			//no head: natsConnection_Publish(_nc, subj, data, len);
+			ok = natsConnection_PublishMsg(_nc, m) == NATS_OK;
+
+		theend:
 			delete pdata;
 			return ok;
 		}
 
 		bool subject_message()
 		{
-			_nats_sub _sub{nullptr};
+			_nats_sub _sub{ nullptr };
 			auto status = natsConnection_Subscribe(_sub.put(), _nc, message_channel.data(),
 				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
@@ -548,10 +686,17 @@ namespace freeze::detail
 			auto status = natsConnection_Subscribe(_sub.put(), _nc, command_channel.data(),
 				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
+					//std::lock_guard<std::mutex> lock(command_mutex);
 					_nats_msg m{ msg };
+					//g_current_command_reply = m.get_reply();
 					auto self = reinterpret_cast<_nats_connect*>(closure);
 					auto cmd = m.get_cmd();
-					self->on_command(cmd);
+					detail::nats_cmd_ack _ack;
+					_ack.name = cmd.name;
+					_ack.action = cmd.action;
+					_ack.result = true;
+					self->ack_command(m.get_reply(), _ack);
+					self->on_command(/*g_current_command_reply,*/ cmd);
 				}, this);
 			return status == NATS_OK;
 		}
@@ -652,18 +797,20 @@ namespace freeze::detail
 			g_message_signal.notify();
 		}
 
-		void on_command(nats_cmd const& cmd)
+		void on_command(/*std::string const& reply,*/ nats_cmd const& cmd)
 		{
-			auto name = cmd.name;
-			auto action = cmd.action;
-			auto _a = std::format("name={}, action={}\n"sv, name, action);
+			g_current_command.name = cmd.name;
+			g_current_command.action = cmd.action;
+
+			auto _a = std::format("command: name={}, action={}\n"sv, g_current_command.name, g_current_command.action);
 			OutputDebugStringA(_a.c_str());
+
 			g_command_signal.notify();
 		}
 
-		// noop, unused.
-		void on_payload(std::string const& msg)
+		void on_payload_response(std::string const& msg)
 		{
+			g_payload_signal.notify();
 		}
 
 	private:
@@ -703,16 +850,13 @@ namespace freeze
 				while (true)
 				{
 					g_message_signal.wait();
-					if (!self)
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
 					{
 						break;
 					}
-					auto self_ptr = reinterpret_cast<nats_client*>(self);
-					if (self_ptr)
-					{
-						self_ptr->on_message();
-					}
-					if (!self_ptr->_msg_thread_running)
+					self_ptr->on_message();
+					if (!(self_ptr->_msg_thread_running))
 					{
 						break;
 					}
@@ -723,16 +867,30 @@ namespace freeze
 				while (true)
 				{
 					g_command_signal.wait();
-					if (!self)
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
 					{
 						break;
 					}
-					auto self_ptr = reinterpret_cast<nats_client*>(self);
-					if (self_ptr)
+					self_ptr->on_command();
+					if (!(self_ptr->_cmd_thread_running))
 					{
-						self_ptr->on_command();
+						break;
 					}
-					if (!self_ptr->_cmd_thread_running)
+				}
+			}, this);
+		_pal_thread = std::thread([](auto&& self)
+			{
+				while (true)
+				{
+					g_payload_signal.wait();
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
+					{
+						break;
+					}
+					self_ptr->on_payload_response();
+					if (!(self_ptr->_pal_thread_running))
 					{
 						break;
 					}
@@ -754,6 +912,13 @@ namespace freeze
 		if (_cmd_thread.joinable())
 		{
 			_cmd_thread.join();
+		}
+
+		_pal_thread_running = false;
+		g_payload_signal.notify();
+		if (_pal_thread.joinable())
+		{
+			_pal_thread.join();
 		}
 	}
 
@@ -808,17 +973,39 @@ namespace freeze
 
 	void nats_client::notify_command()
 	{
-
+		// response
 	}
 
-	void nats_client::notify_payload()
+	void nats_client::notify_payload(fs::path const& folder, std::vector<detail::notify_information_w> const& info)
 	{
+		auto _f = std::format(L"watcher: {}\n"sv, folder.c_str());
+		OutputDebugString(_f.c_str());
 
+		// TODO: async send image data step by step
+		// ...
+
+		for (auto& d : info)
+		{
+			auto _msg = std::format(L"action={}, name={}\n"sv, d.action, d.filename);
+			OutputDebugString(_msg.c_str());
+
+			// send to remote ...
+			// ...
+		}
 	}
 
 	void nats_client::on_command()
 	{
-		int cmd = 0;
+		// switch(known cmd)
+		// ...
+
+		//std::lock_guard<std::mutex> lock(command_mutex);
+		//// ack command: {name: cmdname, action: string, result: xxx}
+		//detail::nats_cmd_ack _cmd_ack;
+		//_cmd_ack.name = g_current_command.name;
+		//_cmd_ack.action = g_current_command.action;
+		//_cmd_ack.result = true;
+		//pimpl->ack_command(g_current_command_reply, _cmd_ack);
 	}
 
 	void nats_client::on_message()
@@ -826,8 +1013,8 @@ namespace freeze
 		int msg = 0;
 	}
 
-	void nats_client::on_payload()
+	void nats_client::on_payload_response()
 	{
-
+		// expect recv { name, size, result: true }
 	}
 }
