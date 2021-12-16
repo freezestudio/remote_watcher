@@ -1,22 +1,21 @@
-# 远程文件监控
+# A watcher for Remote file
 
 ![ui](./assets/home.png)
 
-## 以 Windows 服务方式运行
+## Run as a Windows service
 
-自动安装服务到指定的位置而后自动启动。
-或者可以查看服务的运行状态。
-卸载服务后, 服务会在本机彻底清除, 不会留下任何东西。
+Automatically install the service to the specified location and then automatically start.
+Or you can view the running status of the service.
+After uninstalling the service, the service will be completely removed on this machine, leaving nothing behind.
 
-## 监控指定的目录
+## Monitor the specified directory
 
-(可选的, 包含该目录的子目录)及其文件的变更。
-报告新增文件或目录的名字。
-报告删除文件或目录的名字, 删除目录时可选地报告该目录下的变更或者仅报告被删除的目录名。
-报告当前目录下被移动的文件或目录。
+* (Optional, including the subdirectories of the directory) and changes to its files.
+* Report the name of the newly added file or directory.
+* Report the name of the deleted file or directory. When deleting a directory, you can optionally report the changes in the directory or only report the name of the deleted directory.
+* Report the moved files or directories in the current directory.
 
-## 远程接收变量事件
+## Remotely receive change events
 
-监控目录的变更可以报告给指定的主机。
-可以自动上传新增的文件。
-
+Changes to the monitoring directory can be reported to the designated host.
+New files can be uploaded automatically.

@@ -6,31 +6,6 @@
 #include "service_dep.h"
 #include "service_utils.h"
 
-// ignore FILE_NOTIFY_CHANGE_SECURITY
-inline constexpr auto gNotifyFilter =
-FILE_NOTIFY_CHANGE_FILE_NAME |
-FILE_NOTIFY_CHANGE_DIR_NAME |
-FILE_NOTIFY_CHANGE_ATTRIBUTES |
-FILE_NOTIFY_CHANGE_SIZE |
-FILE_NOTIFY_CHANGE_LAST_WRITE |
-FILE_NOTIFY_CHANGE_LAST_ACCESS |
-FILE_NOTIFY_CHANGE_CREATION;
-
-// accept all actions
-inline constexpr auto gNotifyAction =
-FILE_ACTION_ADDED |
-FILE_ACTION_REMOVED |
-FILE_ACTION_MODIFIED |
-FILE_ACTION_RENAMED_OLD_NAME |
-FILE_ACTION_RENAMED_NEW_NAME;
-
-template<typename T>
-concept Stringify = requires (T t) {
-	t.c_str();
-} || requires(T t) {
-	t.data();
-};
-
 namespace freeze
 {
 	enum class response_type

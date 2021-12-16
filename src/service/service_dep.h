@@ -8,8 +8,13 @@
 #include <mutex>
 #include <atomic>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 #include <fstream>
-#include <filesystem>
+#include <memory>
+//#include <filesystem>
+//#include <ranges>
+#include <optional>
 
 // out namespaces
 using namespace std::literals;
@@ -20,6 +25,31 @@ namespace fs = std::filesystem;
 
 template<typename T>
 concept ServiceEnum = std::is_enum_v<T>;
+
+// ignore FILE_NOTIFY_CHANGE_SECURITY
+inline constexpr auto gNotifyFilter =
+FILE_NOTIFY_CHANGE_FILE_NAME |
+FILE_NOTIFY_CHANGE_DIR_NAME |
+FILE_NOTIFY_CHANGE_ATTRIBUTES |
+FILE_NOTIFY_CHANGE_SIZE |
+FILE_NOTIFY_CHANGE_LAST_WRITE |
+FILE_NOTIFY_CHANGE_LAST_ACCESS |
+FILE_NOTIFY_CHANGE_CREATION;
+
+// accept all actions
+inline constexpr auto gNotifyAction =
+FILE_ACTION_ADDED |
+FILE_ACTION_REMOVED |
+FILE_ACTION_MODIFIED |
+FILE_ACTION_RENAMED_OLD_NAME |
+FILE_ACTION_RENAMED_NEW_NAME;
+
+template<typename T>
+concept Stringify = requires (T t) {
+	t.c_str();
+} || requires(T t) {
+	t.data();
+};
 
 namespace freeze
 {
@@ -119,8 +149,15 @@ namespace freeze::detail
 
 	// test only! global data should used in golbal thread.
 	extern std::vector<notify_information_w> g_local_notify_info_w;
-
 	std::vector<notify_information_w>& get_changed_information();
+
+	struct simple_notify
+	{
+		std::wstring filename;
+		uint64_t size;
+		uint32_t action;
+		bool isfile;
+	};
 }
 
 constexpr auto sync_reason_none__reason = 0L;
