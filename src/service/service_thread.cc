@@ -20,9 +20,11 @@ HANDLE hh_sleep_thread = nullptr;
 // sleep thread state.
 bool bb_sleep_thread_exit = false;
 
-// local watchor folder.
+// local watch folder.
 fs::path g_work_folder;
-// remote address.
+// local ignore folders in watch folder.
+std::vector<fs::path> g_work_ignore_folders;
+// connect to remote address.
 freeze::nats_client g_nats_client{};
 // global signal for communicate-with-nats with reason.
 freeze::atomic_sync_reason global_reason_signal{};
@@ -30,15 +32,21 @@ freeze::atomic_sync_reason global_reason_signal{};
 // worker thread.
 DWORD __stdcall _WorkerThread(LPVOID)
 {
-	auto watcher = freeze::watchor{};
+	// auto watcher = freeze::watchor{};
+	auto underline_watch = freeze::folder_watchor_apc{};
+	auto watcher = freeze::watcher_win{underline_watch};
 #ifdef SERVICE_TEST
-	if (watcher.set_folder(freeze::detail::to_normal(g_work_folder)))
-	{
-		watcher.start();
-	}
+	//if (watcher.set_folder(freeze::detail::to_normal(g_work_folder)))
+	//{
+	//	watcher.start();
+	//}
+	watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
+	watcher.set_ignore_folders(g_work_ignore_folders);
+	watcher.start();
 #endif
 	while (!bb_worker_thread_exit)
 	{
+		// want wakeup from change folder command.
 		SleepEx(INFINITE, TRUE);
 #ifndef SERVICE_TEST
 		// maybe service paused.
@@ -51,10 +59,13 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		{
 			g_work_folder = freeze::detail::to_normal(g_work_folder);
 		}
-		if (watcher.set_folder(g_work_folder))
-		{
-			watcher.start();
-		}
+		//if (watcher.set_folder(g_work_folder))
+		//{
+		//	watcher.start();
+		//}
+		watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
+		watcher.set_ignore_folders(g_work_ignore_folders);
+		watcher.start();
 	}
 	return 0;
 }
@@ -199,6 +210,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			break;
 		case sync_reason_recv_command:
 			OutputDebugString(L"@rg wakeup reason: recv command.\n");
+			// switch command ...
 			break;
 		case sync_reason_recv_message:
 			break;

@@ -13,6 +13,7 @@ extern freeze::service_state ss_current_status;
 #endif
 extern std::wstring wcs_ip;
 extern fs::path g_work_folder;
+extern std::vector<fs::path> g_work_ignore_folders;
 
 bool init_service();
 void run_service();

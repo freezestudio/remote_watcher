@@ -42,26 +42,26 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		// stopped with error.
 		goto theend;
 	}
-	
-		if (freeze::detail::make_ip_address(wcs_ip) == 0)
+
+	if (freeze::detail::make_ip_address(wcs_ip) == 0)
+	{
+		OutputDebugString(L"@rg ServiceMain: ip is wrong.\n");
+		// stopped with error.
+		goto theend;
+	}
+
+	OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
+	if (init_service())
+	{
+		if (init_threadpool())
 		{
-			OutputDebugString(L"@rg ServiceMain: ip is wrong.\n");
-			// stopped with error.
-			goto theend;
+			run_service();
 		}
-		
-			OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
-			if(init_service())
-			{
-				if(init_threadpool())
-				{
-					run_service();
-				}
-			}
+	}
 
 	stop_threadpool();
 	stop_service();
-	
+
 theend:
 	OutputDebugString(L"@rg ServiceMain: rgmsvc stopped.\n");
 }
