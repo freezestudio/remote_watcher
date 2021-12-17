@@ -79,7 +79,7 @@ namespace freeze
 		return ignore_folders;
 	}
 
-	bool folder_watchor_base::watch(uint32_t size /*= large_buffer_size*/)
+	bool folder_watchor_base::watch()
 	{
 		return false;
 	}
@@ -93,24 +93,32 @@ namespace freeze
 		}
 	}
 
-	void folder_watchor_base::notify_information_handle()
+	void folder_watchor_base::notify_information_handle(DWORD dwNumberOfBytesTransfered)
 	{
-		if (!watch_tree_ptr)
+		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > read_buffer.size())
 		{
+			OutputDebugString(L"folder_watchor_base::on_data, maybe need more buffer.\n");
 			return;
 		}
-		watch_tree_ptr->clear();
 
-		auto data = read_buffer.get();
-		for (auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);;)
+		if (!watch_tree_ptr)
 		{
+			OutputDebugString(L"folder_watchor_base::on_data, watch tree pointer is null.\n");
+			return;
+		}
+
+		auto data = read_buffer.data();		
+		while (true)
+		{
+			auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);
 			parse_notify_information(info);
-			if (info->NextEntryOffset == 0)
+			if (info->NextEntryOffset == 0 || info->NextEntryOffset > dwNumberOfBytesTransfered)
 			{
 				break;
 			}
 			data += info->NextEntryOffset;
 		}
+		
 		watch_tree_ptr->notify();
 	}
 
@@ -178,8 +186,8 @@ namespace freeze
 
 	void folder_watchor_base::reset_buffer(uint32_t size /*= large_buffer_size*/)
 	{
-		read_buffer = std::make_unique<std::byte[]>(size);
-		write_buffer = std::make_unique<std::byte[]>(size);
+		read_buffer.resize(size);
+		write_buffer.resize(size);
 	}
 }
 
@@ -197,29 +205,37 @@ namespace freeze
 		unwatch();
 	}
 
-	bool folder_watchor_apc::watch(uint32_t size /*= large_buffer_size*/)
+	bool folder_watchor_apc::watch()
 	{
 		if (!running)
 		{
+			OutputDebugString(L"folder_watchor_apc::watch: running=false.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
+			OutputDebugString(L"folder_watchor_apc::watch: folder not exists.\n");
 			running = false;
 			return false;
 		}
 
 		auto result = ReadDirectoryChangesW(
 			folder_handle,
-			write_buffer.get(),
-			size,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
 			TRUE,
 			gNotifyFilter,
 			nullptr,
 			&overlapped,
 			folder_watchor_apc::completion_routine
 		) > 0;
+		if (!result)
+		{
+			auto error = GetLastError();
+			auto msg = std::format(L"folder_watchor_apc::watch error: {}\n"sv, error);
+			OutputDebugString(msg.c_str());
+		}
 		return result;
 	}
 
@@ -293,12 +309,14 @@ namespace freeze
 	{
 		if (!lpov)
 		{
+			OutputDebugString(L"folder_watchor_apc::completion_routine Error self-ptr is null.\n");
 			return;
 		}
 
 		auto self = reinterpret_cast<folder_watchor_apc*>(lpov->hEvent);
 		if (!self)
 		{
+			OutputDebugString(L"folder_watchor_apc::completion_routine Error self is null.\n");
 			return;
 		}
 
@@ -311,14 +329,15 @@ namespace freeze
 			else if (code == ERROR_INVALID_PARAMETER)
 			{
 				self->reset_buffer(network_max_buffer_size);
-				self->watch(network_max_buffer_size);
+				self->watch();
 			}
+			OutputDebugString(L"folder_watchor_apc::completion_routine Error: code != ERROR_SUCCESS.\n");
 			return;
 		}
 
 		self->write_buffer.swap(self->read_buffer);
 		self->watch();
-		self->notify_information_handle();
+		self->notify_information_handle(num);
 	}
 }
 
@@ -334,7 +353,7 @@ namespace freeze
 
 	}
 
-	bool folder_watchor_status::watch(uint32_t size /*= large_buffer_size*/)
+	bool folder_watchor_status::watch()
 	{
 		if (!running)
 		{
@@ -349,8 +368,8 @@ namespace freeze
 
 		auto result = ReadDirectoryChangesW(
 			folder_handle,
-			write_buffer.get(),
-			size,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
 			TRUE,
 			gNotifyFilter,
 			nullptr,
@@ -403,7 +422,7 @@ namespace freeze
 		unwatch();
 	}
 
-	bool folder_watchor_result::watch(uint32_t size /*= large_buffer_size*/)
+	bool folder_watchor_result::watch()
 	{
 		if (!running)
 		{
@@ -418,8 +437,8 @@ namespace freeze
 
 		auto result = ReadDirectoryChangesW(
 			folder_handle,
-			write_buffer.get(),
-			size,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
 			TRUE,
 			gNotifyFilter,
 			nullptr,

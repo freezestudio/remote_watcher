@@ -620,6 +620,7 @@ namespace freeze::detail
 	public:
 		bool publish_message(std::string const& msg, std::string const& _type = std::string(text_type))
 		{
+			std::lock_guard<std::mutex> lock(_mutex);
 			auto _m = _nats_msg{ message_channel.data() };
 			if (_m.set_msg(msg, _type))
 			{
@@ -630,6 +631,7 @@ namespace freeze::detail
 
 		bool publish_command(nats_cmd const& cmd)
 		{
+			std::lock_guard<std::mutex> lock(_mutex);
 			auto _m = _nats_msg{ command_channel.data() };
 			_m.set_cmd(cmd);
 			return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
@@ -637,6 +639,7 @@ namespace freeze::detail
 
 		bool publish_payload(fs::path const& folder, fs::path const& file)
 		{
+			std::lock_guard<std::mutex> lock(_mutex);
 			_nats_msg m{ payload_channel.data() };
 			auto pdata = m.set_payload(folder, file);
 			if (!pdata)
@@ -838,6 +841,7 @@ namespace freeze::detail
 	private:
 		natsConnection* _nc = nullptr;
 		_nats_options _opts;
+		std::mutex _mutex;
 	};
 }
 
@@ -988,10 +992,11 @@ namespace freeze
 		auto files = watch_tree_ptr->get_all();
 		for (auto file : files)
 		{
-			auto _f = std::format(L"nats client watcher: {}\n"sv, file.c_str());
-			OutputDebugString(_f.c_str());
+			auto msg = std::format(L"nats client watcher: {}\n"sv, file.c_str());
+			OutputDebugString(msg.c_str());
 			pimpl->publish_payload(root, file);
 		}
+		watch_tree_ptr->clear();
 	}
 
 	void nats_client::on_command()

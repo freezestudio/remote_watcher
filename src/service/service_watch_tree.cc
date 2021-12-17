@@ -46,16 +46,20 @@ namespace freeze
 
 	void watch_tree::notify()
 	{
-		global_reason_signal.notify_reason(sync_reason_send_payload);
+		std::lock_guard<std::mutex> lock(mutex);
+		if (files.size() > 0)
+		{
+			global_reason_signal.notify_reason(sync_reason_send_payload);
+		}
 	}
 
 	std::vector<fs::path> watch_tree::get_all()
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		std::vector<fs::path> vec_files;
-		std::copy_if(std::cbegin(files), std::cend(files), std::back_inserter(vec_files), [this](auto&& f) 
+		std::copy_if(std::cbegin(files), std::cend(files), std::back_inserter(vec_files), [this](auto&& f)
 			{
-				return fs::is_regular_file((folder/f));
+				return fs::is_regular_file((folder / f));
 			});
 		return vec_files;
 	}

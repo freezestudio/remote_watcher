@@ -30,7 +30,7 @@ namespace freeze
 		virtual std::vector<fs::path> get_watch_ignores() const = 0;
 
 	public:
-		virtual bool watch(uint32_t = 0) = 0;
+		virtual bool watch() = 0;
 		virtual void unwatch() = 0;
 
 	public:
@@ -62,7 +62,7 @@ namespace freeze
 		virtual std::vector<fs::path> get_watch_ignores() const override;
 
 	public:
-		virtual bool watch(uint32_t = large_buffer_size) override;
+		virtual bool watch() override;
 		virtual void unwatch() override;
 
 	public:
@@ -72,15 +72,15 @@ namespace freeze
 	public:
 		bool folder_exists() const;
 		void reset_buffer(uint32_t = large_buffer_size);
-		void notify_information_handle();
+		void notify_information_handle(DWORD);
 		void parse_notify_information(PFILE_NOTIFY_INFORMATION);
 
 	protected:
 		OVERLAPPED overlapped;
 		fs::path folder;
 		std::vector<fs::path> ignore_folders;
-		std::unique_ptr<std::byte[]> read_buffer;
-		std::unique_ptr<std::byte[]> write_buffer;
+		std::vector<std::byte> read_buffer;
+		std::vector<std::byte> write_buffer;
 
 		bool running = false;
 		HANDLE folder_handle{ nullptr };
@@ -94,7 +94,7 @@ namespace freeze
 		~folder_watchor_apc();
 
 	public:
-		virtual bool watch(uint32_t = large_buffer_size) override;
+		virtual bool watch() override;
 		virtual void unwatch() override;
 
 	public:
@@ -117,7 +117,7 @@ namespace freeze
 		~folder_watchor_status();
 
 	public:
-		virtual bool watch(uint32_t = large_buffer_size) override;
+		virtual bool watch() override;
 		virtual void unwatch() override;
 
 	public:
@@ -132,7 +132,7 @@ namespace freeze
 		~folder_watchor_result();
 
 	public:
-		virtual bool watch(uint32_t = large_buffer_size) override;
+		virtual bool watch() override;
 		virtual void unwatch() override;
 
 	public:
