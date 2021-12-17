@@ -33,7 +33,9 @@ freeze::atomic_sync_reason global_reason_signal{};
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	// auto watcher = freeze::watchor{};
-	auto underline_watch = freeze::folder_watchor_apc{};
+	// auto underline_watch = freeze::folder_watchor_apc{};
+	auto underline_watch = freeze::folder_watchor_status{};
+	// auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{underline_watch};
 #ifdef SERVICE_TEST
 	//if (watcher.set_folder(freeze::detail::to_normal(g_work_folder)))
@@ -58,14 +60,11 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		if (freeze::detail::check_exists(g_work_folder))
 		{
 			g_work_folder = freeze::detail::to_normal(g_work_folder);
+			watcher.stop();
+			watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
+			watcher.set_ignore_folders(g_work_ignore_folders);
+			watcher.start();
 		}
-		//if (watcher.set_folder(g_work_folder))
-		//{
-		//	watcher.start();
-		//}
-		watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
-		watcher.set_ignore_folders(g_work_ignore_folders);
-		watcher.start();
 	}
 	return 0;
 }

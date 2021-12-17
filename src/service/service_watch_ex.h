@@ -95,7 +95,6 @@ namespace freeze
 
 	public:
 		virtual bool watch() override;
-		virtual void unwatch() override;
 
 	public:
 		void start() override;
@@ -118,7 +117,6 @@ namespace freeze
 
 	public:
 		virtual bool watch() override;
-		virtual void unwatch() override;
 
 	public:
 		void start() override;
@@ -133,7 +131,6 @@ namespace freeze
 
 	public:
 		virtual bool watch() override;
-		virtual void unwatch() override;
 
 	public:
 		void start() override;

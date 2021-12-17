@@ -10,7 +10,7 @@ namespace freeze
 
 	folder_watchor_base::~folder_watchor_base()
 	{
-		unwatch();
+		stop();
 	}
 
 	bool folder_watchor_base::set_watch_folder(
@@ -205,7 +205,7 @@ namespace freeze
 
 	folder_watchor_apc::~folder_watchor_apc()
 	{
-		unwatch();
+		stop();
 	}
 
 	bool folder_watchor_apc::watch()
@@ -240,15 +240,6 @@ namespace freeze
 			OutputDebugString(msg.c_str());
 		}
 		return result;
-	}
-
-	void folder_watchor_apc::unwatch()
-	{
-		stop();
-		if (folder_handle)
-		{
-			CloseHandle(folder_handle);
-		}
 	}
 
 	void folder_watchor_apc::start()
@@ -358,7 +349,7 @@ namespace freeze
 
 	folder_watchor_status::~folder_watchor_status()
 	{
-
+		stop();
 	}
 
 	bool folder_watchor_status::watch()
@@ -404,25 +395,24 @@ namespace freeze
 			result = GetQueuedCompletionStatus(port, &bytes_transfer, &key, &lpov, INFINITE);
 			if(result)
 			{
+				write_buffer.swap(read_buffer);
 				this-> notify_information_handle(bytes_transfer);
 			}
 		}
 		return result;
 	}
 
-	void folder_watchor_status::unwatch()
-	{
-
-	}
-
 	void folder_watchor_status::start()
 	{
-
+		while(running)
+		{
+			watch();
+		}
 	}
 
 	void folder_watchor_status::stop()
 	{
-
+		running = false;
 	}
 }
 
@@ -435,7 +425,7 @@ namespace freeze
 
 	folder_watchor_result::~folder_watchor_result()
 	{
-		unwatch();
+		stop();
 	}
 
 	bool folder_watchor_result::watch()
@@ -476,28 +466,28 @@ namespace freeze
 			if (result)
 			{
 				ResetEvent(overlapped.hEvent);
+				write_buffer.swap(read_buffer);
 				this->notify_information_handle(bytes_transfer);
 			}
 		}
 		return result;
 	}
 
-	void folder_watchor_result::unwatch()
-	{
-		if (overlapped.hEvent)
-		{
-			CloseHandle(overlapped.hEvent);
-		}
-	}
-
 	void folder_watchor_result::start()
 	{
-
+		while (running)
+		{
+			watch();
+		}
 	}
 
 	void folder_watchor_result::stop()
 	{
-
+		running = false;
+		if (overlapped.hEvent)
+		{
+			CloseHandle(overlapped.hEvent);
+		}
 	}
 }
 
