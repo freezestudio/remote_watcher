@@ -49,7 +49,7 @@ namespace freeze
 		virtual std::vector<fs::path> get_watch_ignores() const = 0;
 
 	public:
-		virtual bool watch(uint32_t=0) = 0;
+		virtual bool watch(uint32_t = 0) = 0;
 		virtual void unwatch() = 0;
 
 	public:
@@ -60,6 +60,7 @@ namespace freeze
 	{
 	public:
 		virtual void start() = 0;
+		virtual void stop() = 0;
 
 	public:
 		virtual ~watcher_base() {}
@@ -110,6 +111,10 @@ namespace freeze
 		virtual void unwatch() override;
 
 	public:
+		virtual void start() {}
+		virtual void stop() {}
+
+	public:
 		bool folder_exists() const;
 		void reset_buffer(uint32_t = large_buffer_size);
 		void notify_information_handle();
@@ -138,7 +143,8 @@ namespace freeze
 		virtual void unwatch() override;
 
 	public:
-		void stop();
+		void start() override;
+		void stop() override;
 
 	private:
 		static void loop_thread(void*);
@@ -146,6 +152,7 @@ namespace freeze
 
 	private:
 		std::thread thread;
+		atomic_sync signal;
 	};
 
 	class folder_watchor_status : public folder_watchor_base
@@ -158,8 +165,9 @@ namespace freeze
 		virtual bool watch(uint32_t = large_buffer_size) override;
 		virtual void unwatch() override;
 
-	private:
-
+	public:
+		void start() override;
+		void stop() override;
 	};
 
 	class folder_watchor_result : public folder_watchor_base
@@ -171,27 +179,30 @@ namespace freeze
 	public:
 		virtual bool watch(uint32_t = large_buffer_size) override;
 		virtual void unwatch() override;
-	};
 
+	public:
+		void start() override;
+		void stop() override;
+	};
+}
+
+namespace freeze
+{
 	class watcher_win : public watcher_base
 	{
 	public:
-		watcher_win(watchable& underline);
+		watcher_win(folder_watchor_base&);
 
 	public:
 		virtual void start() override;
+		virtual void stop() override;
 
 	public:
-		void set_watch_folder(fs::path const& folder);
-		void set_ignore_folders(std::vector<fs::path> const& paths);
-
-	public:
-		//watcher_task fill_watch_tree();
+		void set_watch_folder(fs::path const&);
+		void set_ignore_folders(std::vector<fs::path> const&);
 
 	private:
-		watchable& watchor;
-		atomic_sync signal;
-		std::thread thread;
+		folder_watchor_base& watchor;
 		fs::path folder;
 		std::vector<fs::path> ignore_folders;
 	};

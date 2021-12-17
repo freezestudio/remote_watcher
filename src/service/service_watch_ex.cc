@@ -34,12 +34,7 @@ namespace freeze
 
 	void watch_tree::modify(fs::path const& file)
 	{
-		//auto _file = maybe_include(file);
-		//if (!_file.has_value() || _file.value().empty())
-		//{
-		//	return;
-		//}
-		//std::lock_guard<std::mutex> lock(mutex);
+		// if exists, replace.
 	}
 
 	std::optional<fs::path> watch_tree::maybe_include(fs::path const& file)
@@ -58,7 +53,7 @@ namespace freeze
 
 namespace freeze
 {
-	//
+	// global root folder trees.
 	static std::unordered_map<
 		fs::path,
 		std::weak_ptr<watch_tree>,
@@ -85,13 +80,12 @@ namespace freeze
 
 	folder_watchor_base::~folder_watchor_base()
 	{
-
+		unwatch();
 	}
 
-	/*virtual*/
 	bool folder_watchor_base::set_watch_folder(
-		fs::path const& folder, 
-		std::vector<fs::path> const& ignores /*= {}*/) /*override*/
+		fs::path const& folder,
+		std::vector<fs::path> const& ignores /*= {}*/)
 	{
 		if (folder.empty())
 		{
@@ -145,31 +139,29 @@ namespace freeze
 		return true;
 	}
 
-	/*virtual*/
-	fs::path folder_watchor_base::get_watch_folder() const /*override*/
+	fs::path folder_watchor_base::get_watch_folder() const
 	{
 		return folder;
 	}
 
-	/*virtual*/
-	std::vector<fs::path> folder_watchor_base::get_watch_ignores() const /*override*/
+	std::vector<fs::path> folder_watchor_base::get_watch_ignores() const
 	{
 		return ignore_folders;
 	}
 
-
-	/*virtual*/
-	bool folder_watchor_base::watch(uint32_t size /*= large_buffer_size*/) /*override*/
+	bool folder_watchor_base::watch(uint32_t size /*= large_buffer_size*/)
 	{
 		return false;
 	}
 
-	/*virtual*/
-	void folder_watchor_base::unwatch() /*override*/
+	void folder_watchor_base::unwatch()
 	{
-
+		if (folder_handle)
+		{
+			CloseHandle(folder_handle);
+			folder_handle = nullptr;
+		}
 	}
-
 
 	void folder_watchor_base::notify_information_handle()
 	{
@@ -257,7 +249,8 @@ namespace freeze
 namespace freeze
 {
 	folder_watchor_apc::folder_watchor_apc()
-		: thread(folder_watchor_apc::loop_thread, this)
+		//: thread(folder_watchor_apc::loop_thread, this)
+		: signal{}
 	{
 		overlapped.hEvent = this;
 	}
@@ -267,8 +260,7 @@ namespace freeze
 		unwatch();
 	}
 
-	/*virtual*/
-	bool folder_watchor_apc::watch(uint32_t size /*= large_buffer_size*/) /*override*/
+	bool folder_watchor_apc::watch(uint32_t size /*= large_buffer_size*/)
 	{
 		if (!running)
 		{
@@ -294,13 +286,30 @@ namespace freeze
 		return result;
 	}
 
-	/*virtual*/
-	void folder_watchor_apc::unwatch() /*override*/
+	void folder_watchor_apc::unwatch()
 	{
 		stop();
 		if (folder_handle)
 		{
 			CloseHandle(folder_handle);
+		}
+	}
+
+	void folder_watchor_apc::start()
+	{
+		thread = std::thread(folder_watchor_apc::loop_thread, this);
+		signal.wait();
+		QueueUserAPC([](ULONG_PTR instance)
+			{
+				auto self = reinterpret_cast<folder_watchor_apc*>(instance);
+				if (self)
+				{
+					self->watch();
+				}
+			}, thread.native_handle(), (ULONG_PTR)(this));
+		if (thread.joinable())
+		{
+			thread.join();
 		}
 	}
 
@@ -312,23 +321,27 @@ namespace freeze
 		{
 			thread.join();
 		}
+		else
+		{
+			thread.detach();
+		}
 	}
 
-	/*static*/
 	void folder_watchor_apc::loop_thread(void* instance)
 	{
 		while (true)
 		{
-			auto result = SleepEx(INFINITE, TRUE);
-			if (WAIT_IO_COMPLETION != result)
-			{
-				OutputDebugString(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
-				break;
-			}
 			auto self = reinterpret_cast<folder_watchor_apc*>(instance);
 			if (!self)
 			{
 				OutputDebugString(L"Error SleepEx result, Self is null.\n");
+				break;
+			}
+			self->signal.notify();
+			auto result = SleepEx(INFINITE, TRUE);
+			if (WAIT_IO_COMPLETION != result)
+			{
+				OutputDebugString(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
 				break;
 			}
 			if (!self->running)
@@ -339,7 +352,6 @@ namespace freeze
 		}
 	}
 
-	/*static*/
 	void folder_watchor_apc::completion_routine(DWORD code, DWORD num, LPOVERLAPPED lpov)
 	{
 		if (!lpov)
@@ -385,8 +397,7 @@ namespace freeze
 
 	}
 
-	/*virtual*/
-	bool folder_watchor_status::watch(uint32_t size /*= large_buffer_size*/) /*override*/
+	bool folder_watchor_status::watch(uint32_t size /*= large_buffer_size*/)
 	{
 		if (!running)
 		{
@@ -427,8 +438,17 @@ namespace freeze
 		return result;
 	}
 
-	/*virtual*/
-	void folder_watchor_status::unwatch() /*override*/
+	void folder_watchor_status::unwatch()
+	{
+
+	}
+
+	void folder_watchor_status::start()
+	{
+
+	}
+
+	void folder_watchor_status::stop()
 	{
 
 	}
@@ -443,14 +463,10 @@ namespace freeze
 
 	folder_watchor_result::~folder_watchor_result()
 	{
-		if (overlapped.hEvent)
-		{
-			CloseHandle(overlapped.hEvent);
-		}
+		unwatch();
 	}
 
-	/*virtual*/
-	bool folder_watchor_result::watch(uint32_t size /*= large_buffer_size*/) /*override*/
+	bool folder_watchor_result::watch(uint32_t size /*= large_buffer_size*/)
 	{
 		if (!running)
 		{
@@ -487,8 +503,20 @@ namespace freeze
 		return result;
 	}
 
-	/*virtual*/
-	void folder_watchor_result::unwatch() /*override*/
+	void folder_watchor_result::unwatch()
+	{
+		if (overlapped.hEvent)
+		{
+			CloseHandle(overlapped.hEvent);
+		}
+	}
+
+	void folder_watchor_result::start()
+	{
+
+	}
+
+	void folder_watchor_result::stop()
 	{
 
 	}
@@ -496,31 +524,24 @@ namespace freeze
 
 namespace freeze
 {
-	watcher_win::watcher_win(watchable& underline)
-		: watchor{ underline }
-		, signal{}
+	watcher_win::watcher_win(folder_watchor_base& watchor)
+		: watchor{ watchor }
 	{
 
 	}
 
-	/*virtual*/
-	void watcher_win::start() /*override*/
+	void watcher_win::start()
 	{
 		if (!watchor.set_watch_folder(folder, ignore_folders))
 		{
 			return;
 		}
+		watchor.start();
+	}
 
-		thread = std::thread([this]()
-			{
-				watchor.watch(large_buffer_size);
-				signal.notify();
-			});
-		signal.wait();
-		if (thread.joinable())
-		{
-			thread.join();
-		}
+	void watcher_win::stop()
+	{
+		watchor.stop();
 	}
 
 	void watcher_win::set_watch_folder(fs::path const& folder)
@@ -528,12 +549,8 @@ namespace freeze
 		this->folder = folder;
 	}
 
-	void watcher_win::set_ignore_folders(std::vector<fs::path> const& paths)
+	void watcher_win::set_ignore_folders(std::vector<fs::path> const& ignores)
 	{
-		this->ignore_folders = paths;
+		this->ignore_folders = ignores;
 	}
-
-	//watcher_task watcher_win::fill_watch_tree()
-	//{
-	//}
 }
