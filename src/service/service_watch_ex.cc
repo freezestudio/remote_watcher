@@ -88,6 +88,7 @@ namespace freeze
 	{
 		if (folder_handle)
 		{
+			CancelIo(folder_handle);
 			CloseHandle(folder_handle);
 			folder_handle = nullptr;
 		}
@@ -107,12 +108,14 @@ namespace freeze
 			return;
 		}
 
-		auto data = read_buffer.data();		
+		auto data = read_buffer.data();	
+		auto processed_number = 0;	
 		while (true)
 		{
 			auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);
 			parse_notify_information(info);
-			if (info->NextEntryOffset == 0 || info->NextEntryOffset > dwNumberOfBytesTransfered)
+			processed_number += info->NextEntryOffset;
+			if (info->NextEntryOffset == 0 || processed_number > dwNumberOfBytesTransfered)
 			{
 				break;
 			}
@@ -229,7 +232,7 @@ namespace freeze
 			nullptr,
 			&overlapped,
 			folder_watchor_apc::completion_routine
-		) > 0;
+		) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
@@ -260,10 +263,10 @@ namespace freeze
 					self->watch();
 				}
 			}, thread.native_handle(), (ULONG_PTR)(this));
-		if (thread.joinable())
-		{
-			thread.join();
-		}
+		// if (thread.joinable())
+		// {
+		// 	thread.join();
+		// }
 	}
 
 	void folder_watchor_apc::stop()
@@ -331,6 +334,11 @@ namespace freeze
 				self->reset_buffer(network_max_buffer_size);
 				self->watch();
 			}
+			else if(code == ERROR_NOTIFY_ENUM_DIR)
+			{
+				self->watch();
+			}
+			//ERROR_ACCESS_DENIED
 			OutputDebugString(L"folder_watchor_apc::completion_routine Error: code != ERROR_SUCCESS.\n");
 			return;
 		}
@@ -375,9 +383,14 @@ namespace freeze
 			nullptr,
 			&overlapped,
 			nullptr
-		) > 0;
-
-		// block until completion
+		) != FALSE;
+		if (!result)
+		{
+			auto error = GetLastError();
+			auto msg = std::format(L"folder_watchor_status::watch error: {}\n"sv, error);
+			OutputDebugString(msg.c_str());
+		}
+		// block until completion ...
 		if (result)
 		{
 			auto port = CreateIoCompletionPort(folder_handle, nullptr, 0, 0);
@@ -389,8 +402,11 @@ namespace freeze
 			ULONG_PTR key;
 			LPOVERLAPPED lpov = &overlapped;
 			result = GetQueuedCompletionStatus(port, &bytes_transfer, &key, &lpov, INFINITE);
+			if(result)
+			{
+				this-> notify_information_handle(bytes_transfer);
+			}
 		}
-
 		return result;
 	}
 
@@ -444,8 +460,15 @@ namespace freeze
 			nullptr,
 			&overlapped,
 			nullptr
-		) > 0;
+		) != FALSE;
+		if (!result)
+		{
+			auto error = GetLastError();
+			auto msg = std::format(L"folder_watchor_result::watch error: {}\n"sv, error);
+			OutputDebugString(msg.c_str());
+		}
 
+		// block waiting ...
 		if (result)
 		{
 			DWORD bytes_transfer = 0;
@@ -453,7 +476,7 @@ namespace freeze
 			if (result)
 			{
 				ResetEvent(overlapped.hEvent);
-				//this->notify_information_handle();
+				this->notify_information_handle(bytes_transfer);
 			}
 		}
 		return result;

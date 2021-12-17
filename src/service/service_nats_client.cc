@@ -918,13 +918,6 @@ namespace freeze
 		{
 			_cmd_thread.join();
 		}
-
-		//_pal_thread_running = false;
-		//g_payload_signal.notify();
-		//if (_pal_thread.joinable())
-		//{
-		//	_pal_thread.join();
-		//}
 	}
 
 	void nats_client::change_ip(DWORD ip, std::string const& token /*= {}*/)
@@ -994,7 +987,7 @@ namespace freeze
 		{
 			auto msg = std::format(L"nats client watcher: {}\n"sv, file.c_str());
 			OutputDebugString(msg.c_str());
-			pimpl->publish_payload(root, file);
+			// pimpl->publish_payload(root, file);
 		}
 		watch_tree_ptr->clear();
 	}
