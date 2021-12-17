@@ -149,9 +149,9 @@ namespace freeze
 		void listen_command();
 
 	public:
-		void notify_message();
-		void notify_command();
-		void notify_payload(fs::path const&, std::vector<detail::notify_information_w> const&);
+		void notify_message() const;
+		void notify_command() const;
+		void notify_payload(fs::path const&) const;
 
 	public:
 		void on_message();

@@ -11,6 +11,7 @@ if(SERVICE_EXEC_TYPE)
     set(SERVICE_EXE rgmsvc)
     add_executable(${SERVICE_EXE}
         ./service_utils.cc
+        ./service_watch_tree.cc
         ./service_watch.cc
         ./service_watch_ex.cc
         ./service_nats_client.cc
@@ -64,6 +65,7 @@ else()
     set(SERVICE_DLL rgmsvc)
     add_library(${SERVICE_DLL} SHARED
         ./service_utils.cc
+        ./service_watch_tree.cc
         ./service_watch.cc
         ./service_watch_ex.cc
         ./service_nats_client.cc

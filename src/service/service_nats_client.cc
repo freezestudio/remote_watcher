@@ -1,5 +1,6 @@
 #include "service_nats_client.h"
 #include "service_utils.h"
+#include "service_watch_tree.h"
 
 #include <atomic>
 
@@ -643,20 +644,6 @@ namespace freeze::detail
 				return false;
 			}
 
-			//_nats_sub _sub{ nullptr };
-			//auto ok = natsConnection_Subscribe(_sub.put(), _nc, payload_channel.data(),
-			//	[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
-			//	{
-			//		_nats_msg m{ msg };
-			//		auto self = reinterpret_cast<_nats_connect*>(closure);
-			//		auto str_msg = m.get_msg();
-			//		self->on_payload_response(str_msg);
-			//	}, this) == NATS_OK;
-			//if (!ok)
-			//{
-			//	goto theend;
-			//}
-
 			_nats_msg reply_msg{ nullptr };
 			auto status = natsConnection_RequestMsg(reply_msg.put(), _nc, m, 3 * 60 * 1000);
 			auto ok = status == NATS_OK;
@@ -980,59 +967,30 @@ namespace freeze
 		}
 	}
 
-	void nats_client::notify_message()
+	void nats_client::notify_message() const
 	{
 
 	}
 
-	void nats_client::notify_command()
+	void nats_client::notify_command() const
 	{
 		// response
 	}
 
-	void nats_client::notify_payload(fs::path const& folder, std::vector<detail::notify_information_w> const& info)
+	void nats_client::notify_payload(fs::path const& root) const
 	{
-		auto _f = std::format(L"nats client watcher: {}\n"sv, folder.c_str());
-		OutputDebugString(_f.c_str());
-
-		// TODO: async send image data step by step
-		// ...
-
-		for (auto& d : info)
+		auto watch_tree_ptr = watch_tree_instace(root);
+		if (!watch_tree_ptr)
 		{
-			auto _msg = std::format(L"action={}, name={}, isfile={}\n"sv, d.action, d.filename, d.isfile);
-			OutputDebugString(_msg.c_str());
+			return;
+		}
 
-			switch (d.action)
-			{
-			default:
-				break;
-			case FILE_ACTION_ADDED:
-				if (d.isfile)
-				{
-					pimpl->publish_payload(folder, d.filename);
-				}
-				break;
-			case FILE_ACTION_REMOVED:
-				break;
-			case FILE_ACTION_MODIFIED:
-				if (d.isfile)
-				{
-					pimpl->publish_payload(folder, d.filename);
-				}
-				break;
-			case FILE_ACTION_RENAMED_OLD_NAME:
-				break;
-			case FILE_ACTION_RENAMED_NEW_NAME:
-				if (d.isfile)
-				{
-					pimpl->publish_payload(folder, d.filename);
-				}
-				break;
-			}
-
-			// send to remote ...
-			// ...
+		auto files = watch_tree_ptr->get_all();
+		for (auto file : files)
+		{
+			auto _f = std::format(L"nats client watcher: {}\n"sv, file.c_str());
+			OutputDebugString(_f.c_str());
+			pimpl->publish_payload(root, file);
 		}
 	}
 

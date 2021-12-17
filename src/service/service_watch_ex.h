@@ -6,6 +6,7 @@
 #include "service_dep.h"
 #include "service_utils.h"
 #include "service_async.hpp"
+#include "service_watch_tree.h"
 
 constexpr auto network_max_buffer_size = 64 * 1024UL;
 constexpr auto large_buffer_size = 512 * 1024UL;
@@ -17,26 +18,6 @@ namespace freeze
 	class watcher_win;
 	class folder_watchor;
 	class folder_watchor_base;
-	class watch_tree;
-}
-
-namespace freeze
-{
-	struct path_hasher
-	{
-		[[nodiscard]] size_t operator()(fs::path const& rhs) const noexcept
-		{
-			return fs::hash_value(rhs);
-		}
-	};
-
-	struct path_equal_to
-	{
-		bool operator()(const fs::path& lhs, const fs::path& rhs) const noexcept
-		{
-			return lhs == rhs;
-		}
-	};
 }
 
 namespace freeze
@@ -64,32 +45,6 @@ namespace freeze
 
 	public:
 		virtual ~watcher_base() {}
-	};
-}
-
-namespace freeze
-{
-	class watch_tree
-	{
-	public:
-		watch_tree();
-		watch_tree(fs::path const& folder, std::vector<fs::path> const& ignore_folders = {});
-
-	public:
-		void add(fs::path const& file);
-		void remove(fs::path const& file);
-		void modify(fs::path const& file);
-
-	public:
-		fs::path folder;
-		std::vector<fs::path> ignore_folders;
-
-	private:
-		std::optional<fs::path> maybe_include(fs::path const& file);
-
-	private:
-		std::unordered_set<fs::path, path_hasher, path_equal_to> files;
-		std::mutex mutex;
 	};
 }
 

@@ -201,7 +201,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 
 	while (!bb_sleep_thread_exit)
 	{
-		//wait folder changed.
+		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		switch (reason)
 		{
@@ -220,7 +220,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			break;
 		case sync_reason_send_payload:
 			// if reason is folder changed.
-			freeze::maybe_send_data(g_work_folder, nats_client);
+			freeze::maybe_send_payload(nats_client, g_work_folder);
 			break;
 		}
 	}

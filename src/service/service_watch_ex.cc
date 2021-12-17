@@ -2,76 +2,6 @@
 
 namespace freeze
 {
-	watch_tree::watch_tree()
-	{
-
-	}
-
-	watch_tree::watch_tree(fs::path const& folder, std::vector<fs::path> const& ignore_folders)
-		: folder{ folder }
-		, ignore_folders{ ignore_folders }
-	{
-
-	}
-
-	void watch_tree::add(fs::path const& file)
-	{
-		std::lock_guard<std::mutex> lock(mutex);
-		files.emplace(file);
-	}
-
-	void watch_tree::remove(fs::path const& file)
-	{
-		auto _file = maybe_include(file);
-		if (!_file.has_value() || _file.value().empty())
-		{
-			return;
-		}
-
-		std::lock_guard<std::mutex> lock(mutex);
-		files.erase(file);
-	}
-
-	void watch_tree::modify(fs::path const& file)
-	{
-		// if exists, replace.
-	}
-
-	std::optional<fs::path> watch_tree::maybe_include(fs::path const& file)
-	{
-		std::lock_guard<std::mutex> lock(mutex);
-		for (auto& item : files)
-		{
-			if (item == file)
-			{
-				return item;
-			}
-		}
-		return std::nullopt;
-	}
-}
-
-namespace freeze
-{
-	// global root folder trees.
-	static std::unordered_map<
-		fs::path,
-		std::weak_ptr<watch_tree>,
-		path_hasher,
-		path_equal_to
-	> path_watch_trees;
-
-	static auto watch_tree_instace(fs::path const& folder, std::vector<fs::path>const& ignores = {})
-	{
-		auto generic_folder = folder.lexically_normal();
-		std::shared_ptr<watch_tree> tree = std::make_shared<watch_tree>(generic_folder, ignores);
-		auto pair = path_watch_trees.try_emplace(generic_folder, tree);
-		return pair.first->second.lock();
-	}
-}
-
-namespace freeze
-{
 	folder_watchor_base::folder_watchor_base()
 		: overlapped{}
 	{
@@ -165,6 +95,12 @@ namespace freeze
 
 	void folder_watchor_base::notify_information_handle()
 	{
+		if (!watch_tree_ptr)
+		{
+			return;
+		}
+		watch_tree_ptr->clear();
+
 		auto data = read_buffer.get();
 		for (auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);;)
 		{
@@ -173,8 +109,9 @@ namespace freeze
 			{
 				break;
 			}
-			info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data + info->NextEntryOffset);
+			data += info->NextEntryOffset;
 		}
+		watch_tree_ptr->notify();
 	}
 
 	void folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
@@ -329,15 +266,15 @@ namespace freeze
 
 	void folder_watchor_apc::loop_thread(void* instance)
 	{
+		auto self = reinterpret_cast<folder_watchor_apc*>(instance);
+		if (!self)
+		{
+			OutputDebugString(L"Error SleepEx result, Self is null.\n");
+			return;
+		}
+		self->signal.notify();
 		while (true)
 		{
-			auto self = reinterpret_cast<folder_watchor_apc*>(instance);
-			if (!self)
-			{
-				OutputDebugString(L"Error SleepEx result, Self is null.\n");
-				break;
-			}
-			self->signal.notify();
 			auto result = SleepEx(INFINITE, TRUE);
 			if (WAIT_IO_COMPLETION != result)
 			{
