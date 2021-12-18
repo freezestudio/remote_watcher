@@ -10,51 +10,68 @@
 #define CO_RETURN(type) type
 #define CO_AWAIT(type) type
 
-
-template<typename T>
-concept Awaitor = requires(T t) {
-	{t.await_ready()}->std::convertible_to<bool>;
-	t.await_suspend(std::coroutine_handle<void>{});
-	t.await_resume();
-};
-
-template<typename T>
-concept Awaitable = Awaitor<T> ||
-	requires(T t)
+namespace freeze
 {
-	t.operator co_await();
-} || operator co_await(T{});
+    template <typename T>
+    concept Awaitor = requires(T t)
+    {
+        {
+            t.await_ready()
+            } -> std::convertible_to<bool>;
+        t.await_suspend(std::coroutine_handle<void>{});
+        t.await_resume();
+    };
 
-template<Awaitable T>
-struct awaitor
+    template <typename T>
+    concept Awaitable =
+        requires(T t)
+    {
+        {
+            t.operator co_await()
+            } -> Awaitor;
+    }
+    || requires(T t)
+    {
+        {
+            operator co_await(t)
+            } -> Awaitor;
+    }
+    || Awaitor<T>;
+}
+
+namespace freeze
 {
-	T awaitable;
-	awaitor(T awaitable) noexcept
-		: awaitable{ awaitable }
+	template<Awaitable T>
+	struct awaitor
 	{
+		T awaitable;
+		awaitor(T awaitable) noexcept
+			: awaitable{ awaitable }
+		{
 
-	}
+		}
 
-	bool await_ready() noexcept
+		bool await_ready() noexcept
+		{
+			return awaitable.await_ready();
+		}
+
+		auto await_suspend(std::coroutine_handle<> h) noexcept
+		{
+			return awaitable.await_suspend(h);
+		}
+
+		auto await_resume() noexcept
+		{
+			return awaitable.await_resume();
+		}
+	};
+
+	template<Awaitable T>
+	auto operator co_await(T&& awaitable)
 	{
-		return awaitable.await_ready();
+		return static_cast<awaitor<T>&&>(awaitable);
 	}
-
-	auto await_suspend(std::coroutine_handle<> h) noexcept
-	{
-		return awaitable.await_suspend(h);
-	}
-
-	auto await_resume() noexcept
-	{
-		return awaitable.await_resume();
-	}
-};
-
-template<Awaitable T>
-auto operator co_await(T&& awaitable)
-{
-	return static_cast<awaitor<T>&&>(awaitable);
 }
 
 namespace freeze
