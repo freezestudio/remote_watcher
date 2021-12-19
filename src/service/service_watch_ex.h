@@ -121,6 +121,9 @@ namespace freeze
 	public:
 		void start() override;
 		void stop() override;
+
+	private:
+		HANDLE io_port_handle;
 	};
 
 	class folder_watchor_result : public folder_watchor_base

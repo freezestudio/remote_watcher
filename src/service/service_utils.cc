@@ -93,7 +93,6 @@ namespace freeze::detail
 		return std::format("{}.{}.{}.{}"sv, ip1, ip2, ip3, ip4).c_str();
 	}
 }
-
 namespace freeze::detail
 {
 	fs::path to_normal(fs::path const& path)
@@ -109,5 +108,43 @@ namespace freeze::detail
 	bool normal_check_exists(fs::path const& path)
 	{
 		return check_exists(to_normal(path));
+	}
+}
+
+namespace freeze::detail
+{
+	std::wstring to_str(response_type t)
+	{
+		std::wstring s;
+		switch (t)
+		{
+		case response_type::result: s = L"result"s; break;
+		case response_type::status: s = L"status"s; break;
+		case response_type::overlapped: s = L"overlapped"s; break;
+		default:
+			break;
+		}
+		return s;
+	}
+
+	std::wstring to_str(DWORD notify)
+	{
+		std::wstring s;
+		switch (notify)
+		{
+			//case FILE_ACTION_ADDED:s = L"add"s; break;
+			//case FILE_ACTION_REMOVED:s = L"remove"s; break;
+			//case FILE_ACTION_MODIFIED:s = L"modify"s; break;
+			//case FILE_ACTION_RENAMED_OLD_NAME:s = L"rename-old-name"s; break;
+			//case FILE_ACTION_RENAMED_NEW_NAME:s = L"rename-new-name"s; break;
+		case FILE_ACTION_ADDED: [[fallthrough]];
+		case FILE_ACTION_RENAMED_NEW_NAME:s = L"create"s; break;
+		case FILE_ACTION_REMOVED: [[fallthrough]];
+		case FILE_ACTION_RENAMED_OLD_NAME:s = L"remove"s; break;
+		case FILE_ACTION_MODIFIED:s = L"modify"s; break;
+		default:
+			break;
+		}
+		return s;
 	}
 }

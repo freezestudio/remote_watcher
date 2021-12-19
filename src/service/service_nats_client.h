@@ -163,9 +163,9 @@ namespace freeze
 	private:
 		std::thread _msg_thread;
 		std::thread _cmd_thread;
-		//std::thread _pal_thread;
 		bool _msg_thread_running{ true };
 		bool _cmd_thread_running{ true };
+		mutable std::mutex _mutex;
 	};
 }
 

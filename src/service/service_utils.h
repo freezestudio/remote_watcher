@@ -40,6 +40,19 @@ namespace freeze::detail
 	bool normal_check_exists(fs::path const& path);
 }
 
+namespace freeze::detail
+{
+	enum class response_type : int
+	{
+		result, // GetOverlappedResult
+		status, // GetQueuedCompletionStatus
+		overlapped,
+	};
+	std::wstring to_str(response_type t);
+	std::wstring to_str(DWORD notify);
+}
+
+
 #else
 #define debug_output(...)
 #endif

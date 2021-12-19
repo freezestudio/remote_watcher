@@ -316,78 +316,103 @@ namespace freeze::detail
 			return ok;
 		}
 
-		// caller should release this pointer
-		uint8_t* set_payload(fs::path const& folder, fs::path const& file)
+		/*
+		* @brief read image data to buffer.
+		* @return uint8_t buffer need count.
+		*/
+		uintmax_t set_payload(uint8_t* data, uintmax_t* len, fs::path const& folder, fs::path const& file)
 		{
 			auto full_path_file = (folder / file).lexically_normal();
 			if (!fs::exists(full_path_file))
 			{
-				return nullptr;
+				return 0;
 			}
 
-			auto len = fs::file_size(full_path_file);
-			uint8_t* data = new uint8_t[len] {};
-			std::ifstream ifs(full_path_file, std::ios::binary|std::ios::in);
-			if (ifs.is_open())
+			if (len == nullptr || *len == 0)
 			{
-				auto& _self = ifs.read(reinterpret_cast<char*>(data), len);
-				auto ok = !!_self;
-				if (!ok)
-				{
-					ifs.close();
-					goto fail;
-				}
-				ifs.close();
+				auto file_count = fs::file_size(full_path_file);
+				*len = file_count;
+				return file_count;
+			}
 
-				_destroy();
-				ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char*>(data), len) == NATS_OK;
-				if (!ok)
+			std::ifstream ifs;
+			do
+			{
+
+				ifs.clear();
+				ifs.open(full_path_file, std::ios::binary | std::ios::in);
+				if (ifs.is_open())
 				{
-					goto fail;
-				}
-				ok = _clear_headers();
-				if (!ok)
-				{
-					goto fail;
-				}
-				ok = _add_header("type", "data");
-				if (!ok)
-				{
-					goto fail;
-				}
-				std::wstring filename = file.c_str();
-				ok = _add_header("name", detail::to_utf8(filename.c_str(), filename.size()));
-				if (!ok)
-				{
-					goto fail;
-				}
-				ok = _add_header("size", std::to_string(len));
-				if (!ok)
-				{
-					goto fail;
-				}
-				auto prefix = "mime/"s;
-				auto suffix = file.extension();
-				auto str_suf = suffix.string();
-				if (str_suf.starts_with("."))
-				{
-					prefix += str_suf.substr(1);
+					auto& _self = ifs.read(reinterpret_cast<char*>(data), *len);
+					auto read_count = ifs.gcount();
+					auto ok = !!_self;
+					if (!ok)
+					{
+						ifs.close();
+						goto fail;
+					}
+					assert(read_count == *len);
+					if (read_count != *len)
+					{
+						ifs.close();
+						goto fail;
+					}
+					ifs.close();
+
+					_destroy();
+					ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char*>(data), *len) == NATS_OK;
+					if (!ok)
+					{
+						goto fail;
+					}
+					ok = _clear_headers();
+					if (!ok)
+					{
+						goto fail;
+					}
+					ok = _add_header("type", "data");
+					if (!ok)
+					{
+						goto fail;
+					}
+					std::wstring filename = file.c_str();
+					ok = _add_header("name", detail::to_utf8(filename.c_str(), filename.size()));
+					if (!ok)
+					{
+						goto fail;
+					}
+					ok = _add_header("size", std::to_string(*len));
+					if (!ok)
+					{
+						goto fail;
+					}
+					auto prefix = "mime/"s;
+					auto suffix = file.extension();
+					auto str_suf = suffix.string();
+					if (str_suf.starts_with("."))
+					{
+						prefix += str_suf.substr(1);
+					}
+					else
+					{
+						prefix += str_suf;
+					}
+					ok = _add_header("mime", prefix);
+					if (!ok)
+					{
+						goto fail;
+					}
+					return read_count;
 				}
 				else
 				{
-					prefix += str_suf;
+					DEBUG_STRING(L"_nats_msg::set_payload() error: open file {} failure, {}.\n", full_path_file.c_str(), ifs.rdstate());
 				}
-				ok = _add_header("mime", prefix);
-				if (!ok)
-				{
-					goto fail;
-				}
-				return data;
-			}
+				Sleep(300);
+			} while (!ifs.good());
 
 		fail:
-			delete[] data;
-			return nullptr;
+			return 0;
 		}
 
 	private:
@@ -530,6 +555,7 @@ namespace freeze::detail
 		{
 			natsSubscription_Destroy(_sub);
 		}
+
 	private:
 		natsSubscription* _sub;
 	};
@@ -641,8 +667,17 @@ namespace freeze::detail
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
 			_nats_msg m{ payload_channel.data() };
-			auto pdata = m.set_payload(folder, file);
-			if (!pdata)
+			uint8_t* buffer = nullptr;
+			uintmax_t buffer_size = 0;
+			auto ret_count = m.set_payload(buffer, &buffer_size, folder, file);
+			if (ret_count == 0)
+			{
+				DEBUG_STRING(L"_nats_client::publish_payload() error: zero data.\n");
+				return false;
+			}
+			buffer = new uint8_t[ret_count]{};
+			ret_count = m.set_payload(buffer, &buffer_size, folder, file);
+			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_client::publish_payload() error: data is null.\n");
 				return false;
@@ -654,27 +689,35 @@ namespace freeze::detail
 			if (!ok)
 			{
 				DEBUG_STRING(L"_nats_client::publish_payload() error: request-msg failure.\n");
-				delete[] pdata;
+				delete[] buffer;
 				return ok;
 			}
 
-			// response={ name, size, result: true }
-			auto _json_msg = reply_msg.get_msg();
-			using json = nlohmann::json;
-			auto j = json::parse(_json_msg);
-			std::string _reply_name = j["name"];
-			ok = fs::path{ _reply_name } == file;
-			if (ok)
+			try
 			{
-				DEBUG_STRING(L"_nats_client::publish_payload() response file: {}\n"sv, file.c_str());
+				// response={ name, size, result: true }
+				auto _json_msg = reply_msg.get_msg();
+				using json = nlohmann::json;
+				auto j = json::parse(_json_msg);
+				std::string _reply_name = j["name"];
+				ok = fs::path{ _reply_name } == file;
+				if (ok)
+				{
+					DEBUG_STRING(L"_nats_client::publish_payload() response file: {}\n"sv, file.c_str());
+				}
+				else
+				{
+					DEBUG_STRING(L"_nats_client::publish_payload() error: response-msg failure.\n");
+				}
 			}
-			else
+			catch (const std::exception& e)
 			{
-				DEBUG_STRING(L"_nats_client::publish_payload() error: response-msg failure.\n");
+				OutputDebugStringA(e.what());
+				goto theend;
 			}
 
 		theend:
-			delete[] pdata;
+			delete[] buffer;
 			return ok;
 		}
 
@@ -969,6 +1012,7 @@ namespace freeze
 
 	void nats_client::notify_payload(fs::path const& root) const
 	{
+		std::lock_guard<std::mutex> lock(_mutex);
 		auto watch_tree_ptr = watch_tree_instace(root);
 		if (!watch_tree_ptr)
 		{

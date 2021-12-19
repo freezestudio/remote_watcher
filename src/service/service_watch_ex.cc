@@ -28,6 +28,7 @@ namespace freeze
 			return false;
 		}
 
+		auto force_reset = false;
 		if (this->folder != generic_folder)
 		{
 			this->folder = generic_folder;
@@ -56,15 +57,17 @@ namespace freeze
 				running = false;
 				return false;
 			}
+			force_reset = true;
 		}
 
 		if (ignores.size() > 0)
 		{
 			ignore_folders.clear();
 			ignore_folders = ignores;
+			force_reset = true;
 		}
 
-		watch_tree_ptr = watch_tree_instace(this->folder, ignores);
+		watch_tree_ptr = watch_tree_instace(this->folder, ignores, force_reset);
 
 		running = true;
 		return true;
@@ -130,7 +133,7 @@ namespace freeze
 	{
 		if (info->Action < FILE_ACTION_ADDED || info->Action > FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() failure: action{}.\n", info->Action);
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() failure: action{}.\n", detail::to_str(info->Action));
 			return;
 		}
 
@@ -148,7 +151,7 @@ namespace freeze
 
 		if (!fs::exists(full_filename))
 		{
-			DEBUG_STRING(L"ignore: parse notify {}, name={}, not exists.\n"sv, info->Action, filename);
+			DEBUG_STRING(L"ignore: parse notify {}, name={}, not exists.\n"sv, detail::to_str(info->Action), filename);
 			return;
 		}
 
@@ -160,7 +163,7 @@ namespace freeze
 
 		if (info->Action == FILE_ACTION_ADDED || info->Action == FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			DEBUG_STRING(L"update: parse notify {}, name={}\n"sv, info->Action, filename.c_str());
+			DEBUG_STRING(L"update: parse notify {}, name={}\n"sv, detail::to_str(info->Action), filename.c_str());
 
 			if (fs::is_regular_file(full_filename))
 			{
@@ -345,6 +348,7 @@ namespace freeze
 namespace freeze
 {
 	folder_watchor_status::folder_watchor_status()
+		: io_port_handle{nullptr}
 	{
 
 	}
@@ -385,20 +389,28 @@ namespace freeze
 		// block until completion ...
 		if (result)
 		{
-			auto port = CreateIoCompletionPort(folder_handle, nullptr, 0, 0);
-			if (!port)
+			if (!io_port_handle)
 			{
-				return false;
+				io_port_handle = CreateIoCompletionPort(folder_handle, nullptr, 0, 0);
+				if (!io_port_handle)
+				{
+					running = false;
+					return false;
+				}
 			}
 			DWORD bytes_transfer = 0;
 			ULONG_PTR key;
 			LPOVERLAPPED lpov = &overlapped;
-			result = GetQueuedCompletionStatus(port, &bytes_transfer, &key, &lpov, INFINITE);
+			result = GetQueuedCompletionStatus(io_port_handle, &bytes_transfer, &key, &lpov, INFINITE);
 			if (result)
 			{
 				write_buffer.swap(read_buffer);
 				this->notify_information_handle(bytes_transfer);
 			}
+		}
+		if (!result)
+		{
+			running = false;
 		}
 		return result;
 	}
@@ -414,6 +426,11 @@ namespace freeze
 	void folder_watchor_status::stop()
 	{
 		running = false;
+		if (io_port_handle)
+		{
+			CloseHandle(io_port_handle);
+			io_port_handle = nullptr;
+		}
 	}
 }
 
@@ -470,6 +487,10 @@ namespace freeze
 				this->notify_information_handle(bytes_transfer);
 			}
 		}
+		if (!result)
+		{
+			running = false;
+		}
 		return result;
 	}
 
@@ -503,6 +524,7 @@ namespace freeze
 	{
 		if (!watchor.set_watch_folder(folder, ignore_folders))
 		{
+			DEBUG_STRING(L"watcher_win::start() error: underline watchor set watch folder failure.\n");
 			return;
 		}
 		watchor.start();
