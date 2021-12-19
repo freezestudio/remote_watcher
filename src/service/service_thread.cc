@@ -33,8 +33,8 @@ freeze::atomic_sync_reason global_reason_signal{};
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	// auto watcher = freeze::watchor{};
-	// auto underline_watch = freeze::folder_watchor_apc{};
-	auto underline_watch = freeze::folder_watchor_status{};
+	 auto underline_watch = freeze::folder_watchor_apc{};
+	//auto underline_watch = freeze::folder_watchor_status{};
 	// auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{underline_watch};
 #ifdef SERVICE_TEST
@@ -97,15 +97,14 @@ DWORD __stdcall _TimerThread(LPVOID)
 			}
 			else
 			{
-				auto _msg = std::format(L"@rg service create timer thread error: {}\n"sv, err);
-				OutputDebugString(_msg.c_str());
+				DEBUG_STRING(L"@rg service create timer thread error: {}\n"sv, err);
 			}
 		}
 	} while (!hh_timer);
 
 	if (!hh_timer)
 	{
-		OutputDebugString(L"@rg service create timer failure.\n");
+		DEBUG_STRING(L"@rg service create timer failure.\n");
 		return 0;
 	}
 
@@ -123,8 +122,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	if (!ok)
 	{
 		auto err = GetLastError();
-		auto _msg = std::format(L"@rg service set timer error: {}\n"sv, err);
-		OutputDebugString(_msg.c_str());
+		DEBUG_STRING(L"@rg service set timer error: {}\n"sv, err);
 		return 0;
 	}
 
@@ -134,29 +132,28 @@ DWORD __stdcall _TimerThread(LPVOID)
 		auto ret = SleepEx(INFINITE, TRUE);
 		if (ret == WAIT_ABANDONED)
 		{
-			OutputDebugString(L"@rg timer thread waitable handle signed: WAIT_ABANDONED\n");
+			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_ABANDONED\n");
 		}
 		else if (ret == WAIT_IO_COMPLETION) // _TimerCallback
 		{
-			OutputDebugString(L"@rg timer thread waitable handle signed: WAIT_IO_COMPLETION\n");
+			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_IO_COMPLETION\n");
 		}
 		else if (ret == WAIT_OBJECT_0) // SetWaitableTimerEx
 		{
-			OutputDebugString(L"@rg timer thread waitable handle signed: WAIT_OBJECT_0\n");
+			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_OBJECT_0\n");
 		}
 		else if (ret == WAIT_TIMEOUT)
 		{
-			OutputDebugString(L"@rg timer thread waitable handle signed: WAIT_TIMEOUT\n");
+			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_TIMEOUT\n");
 		}
 		else if (ret == WAIT_FAILED)
 		{
-			OutputDebugString(L"@rg timer thread waitable handle signed: WAIT_FAILED\n");
+			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_FAILED\n");
 		}
 		else
 		{
 			auto err = ::GetLastError();
-			auto _msg = std::format(L"@rg SleepEx: timer thread waitable handle occuse an error: {}\n"sv, err);
-			OutputDebugString(_msg.c_str());
+			DEBUG_STRING(L"@rg SleepEx: timer thread waitable handle occuse an error: {}\n"sv, err);
 		}
 	}
 
@@ -186,14 +183,14 @@ DWORD __stdcall _SleepThread(LPVOID)
 		}
 		else
 		{
-			OutputDebugString(L"@rg SleepThread: error invalid ip.\n");
+			DEBUG_STRING(L"@rg SleepThread: error invalid ip.\n");
 			// notify other thread and service stop.
 			return 0;
 		}
 	}
 	else
 	{
-		OutputDebugString(L"@rg SleepThread: error remote ip is null.\n");
+		DEBUG_STRING(L"@rg SleepThread: error remote ip is null.\n");
 		// notify other thread and service stop.
 		return 0;
 	}
@@ -208,7 +205,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		case sync_reason_none__reason:
 			break;
 		case sync_reason_recv_command:
-			OutputDebugString(L"@rg wakeup reason: recv command.\n");
+			DEBUG_STRING(L"@rg wakeup reason: recv command.\n");
 			// switch command ...
 			break;
 		case sync_reason_recv_message:
@@ -234,7 +231,7 @@ bool init_threadpool()
 		hh_worker_thread = ::CreateThread(nullptr, 0, _WorkerThread, nullptr, 0, nullptr);
 		if (!hh_worker_thread)
 		{
-			OutputDebugString(L"@rg service create worker thread failure.\n");
+			DEBUG_STRING(L"@rg service create worker thread failure.\n");
 			bb_worker_thread_exit = true;
 			return false;
 		}
@@ -247,7 +244,7 @@ bool init_threadpool()
 		if (!hh_timer_thread)
 		{
 			bb_timer_thread_exit = true;
-			OutputDebugString(L"@rg service create timer thread failure.\n");
+			DEBUG_STRING(L"@rg service create timer thread failure.\n");
 			return false;
 		}
 	}
@@ -259,7 +256,7 @@ bool init_threadpool()
 		if (!hh_sleep_thread)
 		{
 			bb_sleep_thread_exit = true;
-			OutputDebugString(L"@rg service create sleep thread failure.\n");
+			DEBUG_STRING(L"@rg service create sleep thread failure.\n");
 			return false;
 		}
 	}

@@ -12,26 +12,26 @@ bool init_service()
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
-		OutputDebugString(L"@rg register service control handler failure, exit.\n");
+		DEBUG_STRING(L"@rg register service control handler failure, exit.\n");
 		return false;
 	}
-	OutputDebugString(L"@rg service control handler registered.\n");
+	DEBUG_STRING(L"@rg service control handler registered.\n");
 
 	// first init sevice status
 	// state=[SERVICE_START_PENDING]: dwControlsAcceptd=0
 	// state=[SERVICE_RUNNING|SERVICE_STOPPED]: dwCheckPoint=0
 	// 
 	update_status(ss_handle, SERVICE_START_PENDING);
-	OutputDebugString(L"@rg service start pending 3s.\n");
+	DEBUG_STRING(L"@rg service start pending 3s.\n");
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable_event)
 	{
-		OutputDebugString(L"@rg create waitable handle failure, exit.\n");
+		DEBUG_STRING(L"@rg create waitable handle failure, exit.\n");
 
 		update_status(ss_handle, SERVICE_STOP_PENDING);
-		OutputDebugString(L"@rg service CreateEvent Failure. stop pending.\n");
+		DEBUG_STRING(L"@rg service CreateEvent Failure. stop pending.\n");
 		return false;
 	}
     return true;
@@ -42,7 +42,7 @@ void run_service()
 #ifndef SERVICE_TEST
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
-	OutputDebugString(L"@rg service starting ...\n");
+	DEBUG_STRING(L"@rg service starting ...\n");
 #endif
 
 	// loop here
@@ -62,32 +62,30 @@ void run_service()
 		// ignore WAIT_TIMEOUT
 		if (res == WAIT_OBJECT_0)
 		{
-			OutputDebugString(L"@rg waitable handle signed: WAIT_OBJECT_0\n");
+			DEBUG_STRING(L"@rg waitable handle signed: WAIT_OBJECT_0\n");
 
 			// stop service
 			// ...
 		}
 		else if (res == WAIT_IO_COMPLETION)
 		{
-			OutputDebugString(L"@rg i/o completion routine: WAIT_IO_COMPLETION\n");
+			DEBUG_STRING(L"@rg i/o completion routine: WAIT_IO_COMPLETION\n");
 			// continue...
 		}
 		else if (res == WAIT_ABANDONED)
 		{
 			// error, a thread terminated. but not release mutex object.
-			OutputDebugString(L"@rg mutex object not released: WAIT_ABANDONED\n");
+			DEBUG_STRING(L"@rg mutex object not released: WAIT_ABANDONED\n");
 		}
 		else if (res == WAIT_FAILED)
 		{
 			auto err = ::GetLastError();
-			auto _msg = std::format(L"@rg WaitForSingleObject: WAIT_FAILED: {}\n"sv, err);
-			OutputDebugString(_msg.c_str());
+			DEBUG_STRING(L"@rg WaitForSingleObject: WAIT_FAILED: {}\n"sv, err);
 		}
 		else
 		{
 			auto err = ::GetLastError();
-			auto _msg = std::format(L"@rg WaitForSingleObject: occuse an error: {}\n"sv, err);
-			OutputDebugString(_msg.c_str());
+			DEBUG_STRING(L"@rg WaitForSingleObject: occuse an error: {}\n"sv, err);
 		}
 
 		// here, all break?
@@ -109,7 +107,7 @@ void stop_service()
 		hh_waitable_event = nullptr;
 	}
 
-	OutputDebugString(L"@rg service:rgmsvc stopped.\n");
+	DEBUG_STRING(L"@rg service:rgmsvc stopped.\n");
 }
 
 
@@ -123,23 +121,23 @@ DWORD __stdcall handler_proc_ex(
 	{
 	case SERVICE_CONTROL_PAUSE:
 		// pause service
-		OutputDebugString(L"@rg Recv [pause] control code.\n");
+		DEBUG_STRING(L"@rg Recv [pause] control code.\n");
 		update_status(ss_handle, SERVICE_PAUSE_PENDING);
 		ss_current_status = freeze::service_state::pause_pending;
-		OutputDebugString(L"@rg Recv [pause] control code: dosomething ...\n");
+		DEBUG_STRING(L"@rg Recv [pause] control code: dosomething ...\n");
 		update_status(ss_handle, SERVICE_PAUSED);
 		ss_current_status = freeze::service_state::paused;
-		OutputDebugString(L"@rg Recv [pause] control code: Service Paused.\n");
+		DEBUG_STRING(L"@rg Recv [pause] control code: Service Paused.\n");
 		break;
 	case SERVICE_CONTROL_CONTINUE:
 		// resume service
-		OutputDebugString(L"@rg Recv [resume] control code.\n");
+		DEBUG_STRING(L"@rg Recv [resume] control code.\n");
 		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
 		ss_current_status = freeze::service_state::continue_pending;
-		OutputDebugString(L"@rg Recv [resume] control code: dosomething...\n");
+		DEBUG_STRING(L"@rg Recv [resume] control code: dosomething...\n");
 		update_status(ss_handle, SERVICE_RUNNING);
 		ss_current_status = freeze::service_state::running;
-		OutputDebugString(L"@rg Recv [resume] control code: Service Running.\n");
+		DEBUG_STRING(L"@rg Recv [resume] control code: Service Running.\n");
 		break;
 	case SERVICE_CONTROL_INTERROGATE:
 		// report current status, should simply return NO_ERROR
@@ -156,7 +154,7 @@ DWORD __stdcall handler_proc_ex(
 	case SERVICE_CONTROL_STOP:
 		// stop service, eturn NO_ERROR;
 		SetEvent(hh_waitable_event);
-		OutputDebugString(L"@rg Recv [stop] control code.\n");
+		DEBUG_STRING(L"@rg Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);
 		ss_current_status = freeze::service_state::stop_pending;
 		// SERVICE_STOPPED in init_service()

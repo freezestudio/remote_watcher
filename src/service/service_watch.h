@@ -96,7 +96,7 @@ namespace freeze
 		if (!(detail::check_exists(newFolder) && fs::is_directory(newFolder)))
 		{
 			mbRunning = false;
-			OutputDebugString(L"Error, not a folder.\n");
+			DEBUG_STRING(L"Error, not a folder.\n");
 			return false;
 		}
 
@@ -131,8 +131,7 @@ namespace freeze
 
 			// error
 			auto err = GetLastError();
-			auto _msg = std::format(L"CreateFile Error: {}.\n"sv, err);
-			OutputDebugString(_msg.c_str());
+			DEBUG_STRING(L"CreateFile Error: {}.\n"sv, err);
 
 			return false;
 		}

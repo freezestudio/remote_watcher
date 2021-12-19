@@ -6,11 +6,10 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	auto ncp = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
 	if (!ncp)
 	{
-		OutputDebugString(L"@rg TimerCallback: args is null.\n");
+		DEBUG_STRING(L"@rg TimerCallback: args is null.\n");
 		return;
 	}
 
-	auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
-	auto _msg = std::format(L"@rg TimerCallback: ETA: {}\n."sv, dwTimerLowValue);
-	OutputDebugString(_msg.c_str());
+	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
+	DEBUG_STRING(L"@rg TimerCallback: ETA: {}\n."sv, dwTimerLowValue);
 }

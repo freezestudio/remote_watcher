@@ -4,21 +4,15 @@
 
 #include <atomic>
 
+#define MAX_IP4_SIZE 16
+
 freeze::atomic_sync g_message_signal{};
 freeze::atomic_sync g_command_signal{};
-//freeze::atomic_sync g_payload_signal{};
 
-//std::mutex command_mutex;
-//std::string g_current_command_reply;
 freeze::detail::nats_cmd g_current_command;
 
 namespace freeze::detail
 {
-	//constexpr void verify_status(natsStatus status)
-	//{
-	//	assert(status == natsStatus::NATS_OK);
-	//}
-
 	struct _nats_options
 	{
 	public:
@@ -323,7 +317,7 @@ namespace freeze::detail
 		}
 
 		// caller should release this pointer
-		char* set_payload(fs::path const& folder, fs::path const& file)
+		uint8_t* set_payload(fs::path const& folder, fs::path const& file)
 		{
 			auto full_path_file = (folder / file).lexically_normal();
 			if (!fs::exists(full_path_file))
@@ -332,15 +326,21 @@ namespace freeze::detail
 			}
 
 			auto len = fs::file_size(full_path_file);
-			char* data = new char[len] {};
-			std::ifstream ifs(full_path_file, std::ios::binary);
+			uint8_t* data = new uint8_t[len] {};
+			std::ifstream ifs(full_path_file, std::ios::binary|std::ios::in);
 			if (ifs.is_open())
 			{
-				ifs.read(data, len);
+				auto& _self = ifs.read(reinterpret_cast<char*>(data), len);
+				auto ok = !!_self;
+				if (!ok)
+				{
+					ifs.close();
+					goto fail;
+				}
 				ifs.close();
 
 				_destroy();
-				auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, data, len) == NATS_OK;
+				ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char*>(data), len) == NATS_OK;
 				if (!ok)
 				{
 					goto fail;
@@ -644,6 +644,7 @@ namespace freeze::detail
 			auto pdata = m.set_payload(folder, file);
 			if (!pdata)
 			{
+				DEBUG_STRING(L"_nats_client::publish_payload() error: data is null.\n");
 				return false;
 			}
 
@@ -652,19 +653,28 @@ namespace freeze::detail
 			auto ok = status == NATS_OK;
 			if (!ok)
 			{
-				delete pdata;
+				DEBUG_STRING(L"_nats_client::publish_payload() error: request-msg failure.\n");
+				delete[] pdata;
 				return ok;
 			}
 
-			// { name, size, result: true }
+			// response={ name, size, result: true }
 			auto _json_msg = reply_msg.get_msg();
 			using json = nlohmann::json;
 			auto j = json::parse(_json_msg);
 			std::string _reply_name = j["name"];
 			ok = fs::path{ _reply_name } == file;
+			if (ok)
+			{
+				DEBUG_STRING(L"_nats_client::publish_payload() response file: {}\n"sv, file.c_str());
+			}
+			else
+			{
+				DEBUG_STRING(L"_nats_client::publish_payload() error: response-msg failure.\n");
+			}
 
 		theend:
-			delete pdata;
+			delete[] pdata;
 			return ok;
 		}
 
@@ -690,17 +700,22 @@ namespace freeze::detail
 			auto status = natsConnection_Subscribe(_sub.put(), _nc, command_channel.data(),
 				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
-					//std::lock_guard<std::mutex> lock(command_mutex);
-					_nats_msg m{ msg };
-					//g_current_command_reply = m.get_reply();
 					auto self = reinterpret_cast<_nats_connect*>(closure);
+					if (!self)
+					{
+						DEBUG_STRING(L"_nats_connect::subject_command()::lambda error: self instance is null.\n");
+						return;
+					}
+
+					_nats_msg m{ msg };
 					auto cmd = m.get_cmd();
 					detail::nats_cmd_ack _ack;
 					_ack.name = cmd.name;
 					_ack.action = cmd.action;
 					_ack.result = true;
+
 					self->ack_command(m.get_reply(), _ack);
-					self->on_command(/*g_current_command_reply,*/ cmd);
+					self->on_command(cmd);
 				}, this);
 			return status == NATS_OK;
 		}
@@ -713,8 +728,8 @@ namespace freeze::detail
 	public:
 		std::string remote_ip()
 		{
-			char ip[16]{};
-			auto status = natsConnection_GetConnectedServerId(_nc, ip, 16);
+			char ip[MAX_IP4_SIZE]{};
+			auto status = natsConnection_GetConnectedServerId(_nc, ip, MAX_IP4_SIZE);
 			if (status == NATS_OK)
 			{
 				return ip;
@@ -797,7 +812,7 @@ namespace freeze::detail
 		void on_message(std::string const& msg)
 		{
 			auto wstr = detail::to_utf16(msg);
-			OutputDebugString(wstr.c_str());
+			DEBUG_STRING(wstr.c_str());
 			g_message_signal.notify();
 		}
 
@@ -811,11 +826,6 @@ namespace freeze::detail
 
 			g_command_signal.notify();
 		}
-
-		//void on_payload_response(std::string const& msg)
-		//{
-		//	g_payload_signal.notify();
-		//}
 
 	private:
 		bool _connect()
@@ -884,23 +894,6 @@ namespace freeze
 					}
 				}
 			}, this);
-		//_pal_thread = std::thread([](auto&& self)
-		//	{
-		//		while (true)
-		//		{
-		//			g_payload_signal.wait();
-		//			auto self_ptr = reinterpret_cast<nats_client*>(self);
-		//			if (!self_ptr)
-		//			{
-		//				break;
-		//			}
-		//			self_ptr->on_payload_response();
-		//			if (!(self_ptr->_pal_thread_running))
-		//			{
-		//				break;
-		//			}
-		//		}
-		//	}, this);
 	}
 
 	nats_client::~nats_client()
@@ -979,17 +972,17 @@ namespace freeze
 		auto watch_tree_ptr = watch_tree_instace(root);
 		if (!watch_tree_ptr)
 		{
+			DEBUG_STRING(L"nats_client::notify_payload(): watch-tree is null.\n");
 			return;
 		}
 
-		auto files = watch_tree_ptr->get_all();
+		auto files = std::move(watch_tree_ptr->get_all());
+		watch_tree_ptr->clear();
 		for (auto file : files)
 		{
-			auto msg = std::format(L"nats client watcher: {}\n"sv, file.c_str());
-			OutputDebugString(msg.c_str());
-			// pimpl->publish_payload(root, file);
+			DEBUG_STRING(L"nats client watcher: {}\n"sv, file.c_str());
+			pimpl->publish_payload(root, file);
 		}
-		watch_tree_ptr->clear();
 	}
 
 	void nats_client::on_command()
@@ -1004,8 +997,4 @@ namespace freeze
 	{
 		int msg = 0;
 	}
-
-	//void nats_client::on_payload_response()
-	//{
-	//}
 }

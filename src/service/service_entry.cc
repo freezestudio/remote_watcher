@@ -42,7 +42,7 @@ extern "C" DLL_API void __stdcall ServiceMain(DWORD argc, LPWSTR * argv)
 	{
 		auto _str_ip = argv[0];
 		auto _msg = std::format(L"@rg remote ip is: {}\n", _str_ip);
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(_msg.data());
 	}
 	OutputDebugStringA("@rg rgmsvc starting ...\n");
 	register_handler();

@@ -253,8 +253,10 @@ namespace freeze
 
 		long reset()
 		{
-			return _reason.exchange(sync_reason_none__reason);
+			auto old = _reason.exchange(sync_reason_none__reason);
+			return old;
 		}
+
 	private:
 		std::atomic_long _reason;
 	};

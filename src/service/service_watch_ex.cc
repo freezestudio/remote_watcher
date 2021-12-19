@@ -51,6 +51,7 @@ namespace freeze
 			);
 			if (INVALID_HANDLE_VALUE == folder_handle)
 			{
+				DEBUG_STRING(L"folder_watchor_base::set_weatch_folder() error: open folder handle failure.\n");
 				folder_handle = nullptr;
 				running = false;
 				return false;
@@ -98,18 +99,18 @@ namespace freeze
 	{
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > read_buffer.size())
 		{
-			OutputDebugString(L"folder_watchor_base::on_data, maybe need more buffer.\n");
+			DEBUG_STRING(L"folder_watchor_base::on_data, maybe need more buffer.\n");
 			return;
 		}
 
 		if (!watch_tree_ptr)
 		{
-			OutputDebugString(L"folder_watchor_base::on_data, watch tree pointer is null.\n");
+			DEBUG_STRING(L"folder_watchor_base::on_data, watch tree pointer is null.\n");
 			return;
 		}
 
-		auto data = read_buffer.data();	
-		auto processed_number = 0;	
+		auto data = read_buffer.data();
+		auto processed_number = 0;
 		while (true)
 		{
 			auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);
@@ -121,14 +122,15 @@ namespace freeze
 			}
 			data += info->NextEntryOffset;
 		}
-		
+
 		watch_tree_ptr->notify();
 	}
 
 	void folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
 	{
-		if (info->Action<FILE_ACTION_ADDED || info->Action>FILE_ACTION_RENAMED_NEW_NAME)
+		if (info->Action < FILE_ACTION_ADDED || info->Action > FILE_ACTION_RENAMED_NEW_NAME)
 		{
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() failure: action{}.\n", info->Action);
 			return;
 		}
 
@@ -137,8 +139,7 @@ namespace freeze
 
 		if (info->Action == FILE_ACTION_REMOVED || info->Action == FILE_ACTION_RENAMED_OLD_NAME)
 		{
-			auto msg = std::format(L"ignore: parse notify {}, name={}\n"sv, info->Action, filename);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"ignore: parse notify {}, name={}\n"sv, info->Action, filename);
 
 			auto file_path = fs::path{ filename }.lexically_normal();
 			watch_tree_ptr->remove(file_path);
@@ -147,22 +148,19 @@ namespace freeze
 
 		if (!fs::exists(full_filename))
 		{
-			auto msg = std::format(L"ignore: parse notify {}, name={}, not exists.\n"sv, info->Action, filename);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"ignore: parse notify {}, name={}, not exists.\n"sv, info->Action, filename);
 			return;
 		}
 
 		if (info->Action == FILE_ACTION_MODIFIED)
 		{
-			auto msg = std::format(L"ignore: parse notify FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"ignore: parse notify FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
 			return;
 		}
 
 		if (info->Action == FILE_ACTION_ADDED || info->Action == FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			auto msg = std::format(L"update: parse notify {}, name={}\n"sv, info->Action, filename.c_str());
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"update: parse notify {}, name={}\n"sv, info->Action, filename.c_str());
 
 			if (fs::is_regular_file(full_filename))
 			{
@@ -212,13 +210,13 @@ namespace freeze
 	{
 		if (!running)
 		{
-			OutputDebugString(L"folder_watchor_apc::watch: running=false.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch: running=false.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
-			OutputDebugString(L"folder_watchor_apc::watch: folder not exists.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch: folder not exists.\n");
 			running = false;
 			return false;
 		}
@@ -236,8 +234,7 @@ namespace freeze
 		if (!result)
 		{
 			auto error = GetLastError();
-			auto msg = std::format(L"folder_watchor_apc::watch error: {}\n"sv, error);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"folder_watchor_apc::watch error: {}\n"sv, error);
 		}
 		return result;
 	}
@@ -245,6 +242,7 @@ namespace freeze
 	void folder_watchor_apc::start()
 	{
 		thread = std::thread(folder_watchor_apc::loop_thread, this);
+
 		signal.wait();
 		QueueUserAPC([](ULONG_PTR instance)
 			{
@@ -253,11 +251,11 @@ namespace freeze
 				{
 					self->watch();
 				}
+				else
+				{
+					DEBUG_STRING(L"folder_watchor_apc::start() error: install is null.\n");
+				}
 			}, thread.native_handle(), (ULONG_PTR)(this));
-		// if (thread.joinable())
-		// {
-		// 	thread.join();
-		// }
 	}
 
 	void folder_watchor_apc::stop()
@@ -279,21 +277,22 @@ namespace freeze
 		auto self = reinterpret_cast<folder_watchor_apc*>(instance);
 		if (!self)
 		{
-			OutputDebugString(L"Error SleepEx result, Self is null.\n");
+			DEBUG_STRING(L"Error SleepEx result, Self is null.\n");
 			return;
 		}
 		self->signal.notify();
+
 		while (true)
 		{
 			auto result = SleepEx(INFINITE, TRUE);
 			if (WAIT_IO_COMPLETION != result)
 			{
-				OutputDebugString(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
+				DEBUG_STRING(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
 				break;
 			}
 			if (!self->running)
 			{
-				OutputDebugString(L"Error SleepEx result, Self::running is false.\n");
+				DEBUG_STRING(L"Error SleepEx result, Self::running is false.\n");
 				break;
 			}
 		}
@@ -303,14 +302,14 @@ namespace freeze
 	{
 		if (!lpov)
 		{
-			OutputDebugString(L"folder_watchor_apc::completion_routine Error self-ptr is null.\n");
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error self-ptr is null.\n");
 			return;
 		}
 
 		auto self = reinterpret_cast<folder_watchor_apc*>(lpov->hEvent);
 		if (!self)
 		{
-			OutputDebugString(L"folder_watchor_apc::completion_routine Error self is null.\n");
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error self is null.\n");
 			return;
 		}
 
@@ -318,19 +317,22 @@ namespace freeze
 		{
 			if (ERROR_INVALID_FUNCTION)
 			{
+				DEBUG_STRING(L"folder_watchor_apc::completion_routine(): ERROR_INVALID_FUNCTION.\n");
 				self->stop();
 			}
 			else if (code == ERROR_INVALID_PARAMETER)
 			{
+				DEBUG_STRING(L"folder_watchor_apc::completion_routine(): ERROR_INVALID_PARAMETER.\n");
 				self->reset_buffer(network_max_buffer_size);
 				self->watch();
 			}
-			else if(code == ERROR_NOTIFY_ENUM_DIR)
+			else if (code == ERROR_NOTIFY_ENUM_DIR)
 			{
+				DEBUG_STRING(L"folder_watchor_apc::completion_routine(): ERROR_NOTIFY_ENUM_DIR.\n");
 				self->watch();
 			}
 			//ERROR_ACCESS_DENIED
-			OutputDebugString(L"folder_watchor_apc::completion_routine Error: code != ERROR_SUCCESS.\n");
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error: code != ERROR_SUCCESS.\n");
 			return;
 		}
 
@@ -378,8 +380,7 @@ namespace freeze
 		if (!result)
 		{
 			auto error = GetLastError();
-			auto msg = std::format(L"folder_watchor_status::watch error: {}\n"sv, error);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"folder_watchor_status::watch error: {}\n"sv, error);
 		}
 		// block until completion ...
 		if (result)
@@ -393,10 +394,10 @@ namespace freeze
 			ULONG_PTR key;
 			LPOVERLAPPED lpov = &overlapped;
 			result = GetQueuedCompletionStatus(port, &bytes_transfer, &key, &lpov, INFINITE);
-			if(result)
+			if (result)
 			{
 				write_buffer.swap(read_buffer);
-				this-> notify_information_handle(bytes_transfer);
+				this->notify_information_handle(bytes_transfer);
 			}
 		}
 		return result;
@@ -404,7 +405,7 @@ namespace freeze
 
 	void folder_watchor_status::start()
 	{
-		while(running)
+		while (running)
 		{
 			watch();
 		}
@@ -454,8 +455,7 @@ namespace freeze
 		if (!result)
 		{
 			auto error = GetLastError();
-			auto msg = std::format(L"folder_watchor_result::watch error: {}\n"sv, error);
-			OutputDebugString(msg.c_str());
+			DEBUG_STRING(L"folder_watchor_result::watch error: {}\n"sv, error);
 		}
 
 		// block waiting ...

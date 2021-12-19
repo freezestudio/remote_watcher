@@ -407,7 +407,7 @@ namespace freeze
             auto pNotify = reinterpret_cast<LPSERVICE_NOTIFY_2>(pParameter);
             if(!pNotify)
             {
-                OutputDebugString(L"Notify Error: Notify is null.\n");
+                DEBUG_STRING(L"Notify Error: Notify is null.\n");
             }
 
             // test pNotify->dwNotificationStatus == ERROR_SUCCESS
@@ -505,7 +505,7 @@ namespace freeze
             auto pservice = reinterpret_cast<service*>(parameter);
             if(!pservice)
             {
-                OutputDebugString(L"APC: parameter is null.\n");
+                DEBUG_STRING(L"APC: parameter is null.\n");
                 return;
             }
         }

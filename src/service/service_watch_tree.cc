@@ -59,7 +59,9 @@ namespace freeze
 		std::vector<fs::path> vec_files;
 		std::copy_if(std::cbegin(files), std::cend(files), std::back_inserter(vec_files), [this](auto&& f)
 			{
-				return fs::is_regular_file((folder / f));
+				auto _file = folder / f;
+				auto _is_file =  fs::is_regular_file(_file);
+				return _is_file;
 			});
 		return vec_files;
 	}

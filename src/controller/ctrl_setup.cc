@@ -17,7 +17,7 @@ static bool read_resource(void** data, int* len)
 	if (!_loaded)
 	{
 		auto _msg = std::format(L"@rg Failed to load resource: {}", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(_msg.data());
 		return false;
 	}
 	*len = _resource.GetSize();
@@ -133,7 +133,7 @@ bool install_service()
 		}
 	}
 #endif
-	OutputDebugString(L"@rg Install Service: Select service path.\n");
+	DEBUG_STRING(L"@rg Install Service: Select service path.\n");
 
 	// decompress blob
 	auto _resource = WTL::CResource();
@@ -141,23 +141,23 @@ bool install_service()
 	int _len = 0;
 	if (!read_resource(&_data, &_len))
 	{
-		OutputDebugString(L"Read Service Resource Failure.\n");
+		DEBUG_STRING(L"Read Service Resource Failure.\n");
 		return false;
 	}
 	if (!decompress_blobs(_data, _len, _install_path.string().data()))
 	{
 		_resource.Release();
-		OutputDebugString(L"@rg decompress blob failure.\n");
+		DEBUG_STRING(L"@rg decompress blob failure.\n");
 		return false;
 	}
 	_resource.Release();
-	OutputDebugString(L"@rg Install Service: Expand service to path.\n");
+	DEBUG_STRING(L"@rg Install Service: Expand service to path.\n");
 
 	// open service control manager
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{
-		OutputDebugString(L"@rg Install Service: OpenSCManager Failure.\n");
+		DEBUG_STRING(L"@rg Install Service: OpenSCManager Failure.\n");
 		return false;
 	}
 
@@ -194,10 +194,8 @@ bool install_service()
 	{
 		//ERROR_INVALID_PARAMETER; // 87
 		auto _err = GetLastError();
-		auto _msg = std::format(
-			L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
+		DEBUG_STRING(L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
 			_err, SERVICE_NAME, _binary_path);
-		OutputDebugString(_msg.data());
 		CloseServiceHandle(hscm);
 		return false;
 	}
@@ -205,7 +203,7 @@ bool install_service()
 #ifdef SERVICE_PATH
 	if (!set_description(hsc))
 	{
-		OutputDebugString(L"@rg Install Service Set Description Failure.\n");
+		DEBUG_STRING(L"@rg Install Service Set Description Failure.\n");
 	}
 #endif
 	CloseServiceHandle(hsc);
@@ -226,7 +224,7 @@ bool install_service()
 	}
 #endif
 
-	OutputDebugString(L"@rg Install Service Successfully.\n");
+	DEBUG_STRING(L"@rg Install Service Successfully.\n");
 	return true;
 }
 
@@ -235,13 +233,13 @@ bool uninstall_service()
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{
-		OutputDebugString(L"@rg Uninstall Service: OpenSCManager Failure.\n");
+		DEBUG_STRING(L"@rg Uninstall Service: OpenSCManager Failure.\n");
 		return false;
 	}
 
 	if (!service_exists(hscm, SERVICE_NAME))
 	{
-		OutputDebugString(L"@rg Uninstall Service: Service not exists.\n");
+		DEBUG_STRING(L"@rg Uninstall Service: Service not exists.\n");
 		return true;
 	}
 
@@ -249,8 +247,7 @@ bool uninstall_service()
 	if (!hsc)
 	{
 		auto _err = GetLastError();
-		auto _msg = std::format(L"@rg Uninstall Service: OpenService Failure: {}. name[{}]\n"sv, _err, SERVICE_NAME);
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Uninstall Service: OpenService Failure: {}. name[{}]\n"sv, _err, SERVICE_NAME);
 		CloseServiceHandle(hscm);
 		return false;
 	}
@@ -259,12 +256,11 @@ bool uninstall_service()
 	if (!_deleted)
 	{
 		auto _err = GetLastError();
-		auto _msg = std::format(L"@rg Uninstall Service: DeleteService Failure: {}\n"sv, _err);
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(std::format(L"@rg Uninstall Service: DeleteService Failure: {}\n"sv, _err));
 		CloseServiceHandle(hsc);
 		CloseServiceHandle(hscm);
 	}
-	OutputDebugString(L"@rg Uninstall Service: DeleteService Successfully.\n");
+	DEBUG_STRING(L"@rg Uninstall Service: DeleteService Successfully.\n");
 
 // for dll
 #ifndef SERVICE_PATH
@@ -305,7 +301,7 @@ bool uninstall_service()
 		}
 		else
 		{
-			OutputDebugString(L"@rg Uninstall Service: Delete path file Successfully.\n");
+			DEBUG_STRING(L"@rg Uninstall Service: Delete path file Successfully.\n");
 		}
 	}
 #else
@@ -338,8 +334,7 @@ bool start_service(LPCWSTR ip)
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{
-		auto _msg = std::format(L"@rg Start Service: OpenSCManager failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: OpenSCManager failed {}\n", GetLastError());
 		return false;
 	}
 
@@ -348,15 +343,13 @@ bool start_service(LPCWSTR ip)
 	if (!hsc)
 	{
 		//ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
-		auto _msg = std::format(L"@rg Start Service: OpenService failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: OpenService failed {}\n", GetLastError());
 		::CloseServiceHandle(hscm);
 		return false;
 	}
 
 	do {
-		auto _msg = std::format(L"@rg Start Service: {} opened.\n"sv, SERVICE_NAME);
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: {} opened.\n"sv, SERVICE_NAME);
 	} while (false);
 
 	// service state:
@@ -374,8 +367,7 @@ bool start_service(LPCWSTR ip)
 		// ERROR_INVALID_PARAMETER
 		// ERROR_INVALID_LEVEL
 		// ERROR_SHUTDOWN_IN_PROGRESS
-		auto _msg = std::format(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
@@ -392,18 +384,17 @@ bool start_service(LPCWSTR ip)
 		//SERVICE_CONTINUE_PENDING               0x00000005
 		//SERVICE_PAUSE_PENDING                  0x00000006
 		//SERVICE_PAUSED                         0x00000007
-		auto _msg = std::format(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
 	} while (false);
 
 	// service state: not stop
 	if ((current_state != SERVICE_STOPPED) && (current_state != SERVICE_STOP_PENDING))
 	{
-		OutputDebugString(L"@rg Start Service: try stop service.\n");
+		DEBUG_STRING(L"@rg Start Service: try stop service.\n");
 		auto stopped = stop_service(hscm, hsc);
 		if (!stopped)
 		{
-			OutputDebugString(L"@rg Start Service: service not-stop, try stop service failure.\n");
+			DEBUG_STRING(L"@rg Start Service: service not-stop, try stop service failure.\n");
 			::CloseServiceHandle(hsc);
 			::CloseServiceHandle(hscm);
 			return false;
@@ -416,8 +407,7 @@ bool start_service(LPCWSTR ip)
 			// ERROR_INVALID_PARAMETER
 			// ERROR_INVALID_LEVEL
 			// ERROR_SHUTDOWN_IN_PROGRESS
-			auto _msg = std::format(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
 			::CloseServiceHandle(hsc);
 			::CloseServiceHandle(hscm);
 			return false;
@@ -427,7 +417,7 @@ bool start_service(LPCWSTR ip)
 	assert(current_state == SERVICE_STOPPED);
 	if(current_state != SERVICE_STOPPED)
 	{
-		OutputDebugString(L"@rg Start Service: Stop Service Failure.\n");
+		DEBUG_STRING(L"@rg Start Service: Stop Service Failure.\n");
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
@@ -446,19 +436,17 @@ bool start_service(LPCWSTR ip)
 	if (!::StartService(hsc, 1, args))
 	{
 		// ERROR_SERVICE_REQUEST_TIMEOUT (<=30s)
-		auto _msg = std::format(L"@rg Start Service: service start failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: service start failed {}\n", GetLastError());
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
 	}
-	OutputDebugString(L"@rg Start Service: Try StartService() ...\n");
+	DEBUG_STRING(L"@rg Start Service: Try StartService() ...\n");
 
 	// re-query status
 	if (!query_status(hsc, sstatus))
 	{
-		auto _msg = std::format(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
@@ -475,8 +463,7 @@ bool start_service(LPCWSTR ip)
 		//SERVICE_CONTINUE_PENDING               0x00000005
 		//SERVICE_PAUSE_PENDING                  0x00000006
 		//SERVICE_PAUSED                         0x00000007
-		auto _msg = std::format(L"@rg Start Service: Current service status: {}\n"sv, _service_state(current_state));
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Start Service: Current service status: {}\n"sv, _service_state(current_state));
 	} while (false);
 
 	auto check_point = sstatus.dwCheckPoint;
@@ -501,8 +488,7 @@ bool start_service(LPCWSTR ip)
 		// check state again.
 		if (!query_status(hsc, sstatus))
 		{
-			auto _msg = std::format(L"@rg Start Service: after StartService() QueryServiceStatusEx failed {}\n", GetLastError());
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Start Service: after StartService() QueryServiceStatusEx failed {}\n", GetLastError());
 			::CloseServiceHandle(hsc);
 			::CloseServiceHandle(hscm);
 			break;
@@ -510,8 +496,7 @@ bool start_service(LPCWSTR ip)
 		current_state = sstatus.dwCurrentState;
 		do
 		{
-			auto _msg = std::format(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _service_state(current_state));
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _service_state(current_state));
 		} while (false);
 
 		// service check point maybe changed.
@@ -525,7 +510,7 @@ bool start_service(LPCWSTR ip)
 			auto duration = GetTickCount64() - wait_tick;
 			if (duration > sstatus.dwWaitHint)
 			{
-				OutputDebugString(L"@rg Start Service: Wait Service Start Pending Timeout.\n");
+				DEBUG_STRING(L"@rg Start Service: Wait Service Start Pending Timeout.\n");
 				break;
 			}
 		}
@@ -534,12 +519,12 @@ bool start_service(LPCWSTR ip)
 	// service started
 	if (current_state == SERVICE_RUNNING)
 	{
-		OutputDebugString(L"@rg Start Service[rgmsvc] Successfully.\n");
+		DEBUG_STRING(L"@rg Start Service[rgmsvc] Successfully.\n");
 	}
 	else
 	{
 		// failure
-		OutputDebugString(L"@rg Start Service[rgmsvc] Failure.\n");
+		DEBUG_STRING(L"@rg Start Service[rgmsvc] Failure.\n");
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
@@ -559,8 +544,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	}
 	if (!scmanager)
 	{
-		auto _msg = std::format(L"@rg Stop Service: OpenSCManager failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Stop Service: OpenSCManager failed {}\n", GetLastError());
 		return false;
 	}
 
@@ -571,7 +555,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 	if (!service)
 	{
-		OutputDebugString(L"@rg Stop Service: open service failure.\n");
+		DEBUG_STRING(L"@rg Stop Service: open service failure.\n");
 		if (!is_outer)
 		{
 			::CloseServiceHandle(scmanager);
@@ -589,8 +573,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		// ERROR_INVALID_PARAMETER
 		// ERROR_INVALID_LEVEL
 		// ERROR_SHUTDOWN_IN_PROGRESS
-		auto _msg = std::format(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
 		if (!is_outer)
 		{
 			::CloseServiceHandle(service);
@@ -601,7 +584,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 	if (sstatus.dwCurrentState == SERVICE_STOPPED)
 	{
-		OutputDebugString(L"@rg Stop Service: Service is Stopped.\n");
+		DEBUG_STRING(L"@rg Stop Service: Service is Stopped.\n");
 		if (!is_outer)
 		{
 			::CloseServiceHandle(service);
@@ -613,8 +596,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	auto current_state = sstatus.dwCurrentState;
 	do
 	{
-		auto _msg = std::format(L"@rg Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
 	} while (false);
 
 	auto wait_tick = GetTickCount64();
@@ -635,8 +617,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 		if (!query_status(service, sstatus))
 		{
-			auto _msg = std::format(L"@rg Stop Service: QueryServiceStatusEx failed {}.\n", GetLastError());
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx failed {}.\n", GetLastError());
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
@@ -647,19 +628,18 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		current_state = sstatus.dwCurrentState;
 		if (current_state == SERVICE_STOPPED)
 		{
-			OutputDebugString(L"@rg Stop Service: Service stopped.\n");
+			DEBUG_STRING(L"@rg Stop Service: Service stopped.\n");
 			return true;
 		}
 		do
 		{
-			auto _msg = std::format(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
 		} while (false);
 
 		auto duration = GetTickCount64() - wait_tick;
 		if (duration > sstatus.dwWaitHint)
 		{
-			OutputDebugString(L"@rg Stop Service: failure, timeout!\n");
+			DEBUG_STRING(L"@rg Stop Service: failure, timeout!\n");
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
@@ -679,7 +659,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		}
 		return false;
 	}
-	OutputDebugString(L"@rg Stop Service: send [stop] control code.\n");
+	DEBUG_STRING(L"@rg Stop Service: send [stop] control code.\n");
 
 	current_state = sstatus.dwCurrentState;
 	wait_tick = GetTickCount64();
@@ -691,8 +671,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 		if (!query_status(service, sstatus))
 		{
-			auto _msg = std::format(L"@rg Stop Service: after ControlService() QueryServiceStatusEx failed {}\n", GetLastError());
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"@rg Stop Service: after ControlService() QueryServiceStatusEx failed {}\n", GetLastError());
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
@@ -703,13 +682,13 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		current_state = sstatus.dwCurrentState;
 		if (current_state == SERVICE_STOPPED)
 		{
-			OutputDebugString(L"@rg Stop Service: Service Stopped.\n");
+			DEBUG_STRING(L"@rg Stop Service: Service Stopped.\n");
 			break;
 		}
 		auto duration = GetTickCount64() - wait_tick;
 		if (duration > 30000)
 		{
-			OutputDebugString(L"@rg Stop Service: failure, wait 30s timeout!\n");
+			DEBUG_STRING(L"@rg Stop Service: failure, wait 30s timeout!\n");
 			break;
 		}
 
@@ -720,7 +699,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		::CloseServiceHandle(service);
 		::CloseServiceHandle(scmanager);
 	}
-	OutputDebugString(L"@rg Stop Service Successfully.\n");
+	DEBUG_STRING(L"@rg Stop Service Successfully.\n");
 	return true;
 }
 
@@ -743,7 +722,7 @@ bool is_service_installed(LPDWORD state)
 	auto _path = fs::path{ _expath };
 	if (!fs::exists(_path))
 	{
-		OutputDebugString(L"@rg Check Service: Not Exists.\n");
+		DEBUG_STRING(L"@rg Check Service: Not Exists.\n");
 		return false;
 	}
 
@@ -751,15 +730,14 @@ bool is_service_installed(LPDWORD state)
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{
-		OutputDebugString(L"@rg Check Service: OpenSCManager Failure.\n");
+		DEBUG_STRING(L"@rg Check Service: OpenSCManager Failure.\n");
 		return false;
 	}
 
 	auto hsc = OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
-		auto _msg = std::format(L"@rg Check Service: OpenService Result={}\n"sv, GetLastError());
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg Check Service: OpenService Result={}\n"sv, GetLastError());
 		::CloseServiceHandle(hscm);
 		return false;
 	}

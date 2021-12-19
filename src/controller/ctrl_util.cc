@@ -163,9 +163,9 @@ bool append_host_value(
 	}
 	else
 	{
-		OutputDebugString(L"@rg Key-Value exists.\n");
+		DEBUG_STRING(L"@rg Key-Value exists.\n");
 	}
-	OutputDebugString(L"@rg Append to Host Done.\n");
+	DEBUG_STRING(L"@rg Append to Host Done.\n");
 	return true;
 }
 
@@ -211,7 +211,7 @@ bool remove_host_value(
 		return false;
 	}
 
-	OutputDebugString(L"@rg Remove from Host Done.\n");
+	DEBUG_STRING(L"@rg Remove from Host Done.\n");
 	return true;
 }
 #endif
@@ -330,7 +330,7 @@ bool add_svc_keyvalue(
 	}
 #endif
 
-	OutputDebugString(L"@rg Add Svc Key-Values Done.\n");
+	DEBUG_STRING(L"@rg Add Svc Key-Values Done.\n");
 	return true;
 }
 
@@ -346,7 +346,7 @@ bool remove_svc_keyvalue(
 		auto status = _svc.Open(HKEY_LOCAL_MACHINE, maybe_delete.c_str());
 		if (ERROR_SUCCESS != status)
 		{
-			OutputDebugString(L"@rg RemoveKey: not exists.\n");
+			DEBUG_STRING(L"@rg RemoveKey: not exists.\n");
 			return true;
 		}
 	}
@@ -356,11 +356,11 @@ bool remove_svc_keyvalue(
 	auto ok = _verify_status(L"Delete Svc Keys", status);
 	if (ok)
 	{
-		OutputDebugString(L"@rg Remove Svc Key Done.\n");
+		DEBUG_STRING(L"@rg Remove Svc Key Done.\n");
 	}
 	else
 	{
-		OutputDebugString(L"@rg Remove Svc Key Error.\n");
+		DEBUG_STRING(L"@rg Remove Svc Key Error.\n");
 	}
 	return ok;
 }
@@ -398,7 +398,7 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	);
 	if (_htmp == INVALID_HANDLE_VALUE)
 	{
-		OutputDebugString(L"@rg before pick tgz, create temp file failure.\n");
+		DEBUG_STRING(L"@rg before pick tgz, create temp file failure.\n");
 		return false;
 	}
 
@@ -409,7 +409,7 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	CloseHandle(_htmp);
 	if (!writted)
 	{
-		OutputDebugString(L"@rg write tgz to temp file failured.\n");
+		DEBUG_STRING(L"@rg write tgz to temp file failured.\n");
 		return false;
 	}
 
@@ -428,7 +428,7 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	auto ok = tar(_tgz, out_path) == 0;
 	if (!ok)
 	{
-		OutputDebugString(L"@rg decompress tgz failure.\n");
+		DEBUG_STRING(L"@rg decompress tgz failure.\n");
 	}
 
 #ifdef SERVICE_PATH
@@ -437,8 +437,8 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	auto removed = fs::remove_all(_temp_tgz, ec);
 	if (!removed || ec)
 	{
+		DEBUG_STRING(L"@rg remove temp path to tgz file failure.\n");
 		auto _msg = ec.message();
-		OutputDebugString(L"@rg remove temp path to tgz file failure.\n");
 		OutputDebugStringA(_msg.data());
 		return false;
 	}
@@ -448,8 +448,8 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	auto removed = fs::remove(_temp_tgz, ec);
 	if (!removed || ec)
 	{
+		DEBUG_STRING(L"@rg remove temp tgz file failure.\n");
 		auto _msg = ec.message();
-		OutputDebugString(L"@rg remove temp tgz file failure.\n");
 		OutputDebugStringA(_msg.data());
 		return false;
 	}

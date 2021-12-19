@@ -278,7 +278,7 @@ namespace freeze
 	{
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > mReadBuffer.size())
 		{
-			OutputDebugString(L"watchor::on_data, maybe need more buffer.\n");
+			DEBUG_STRING(L"watchor::on_data, maybe need more buffer.\n");
 			return;
 		}
 
@@ -292,7 +292,7 @@ namespace freeze
 		if (!info_ptr)
 		{
 			// error
-			OutputDebugString(L"watchor::on_data, notify info is null.\n");
+			DEBUG_STRING(L"watchor::on_data, notify info is null.\n");
 			return;
 		}
 
@@ -312,8 +312,7 @@ namespace freeze
 		auto _idx = 1;
 		for (auto x : detail::g_local_notify_info_w)
 		{
-			auto _mm = std::format(L"{}: watch: action={}, name={}, isfile={}\n"sv, _idx++, x.action, x.filename, x.isfile);
-			OutputDebugString(_mm.c_str());
+			DEBUG_STRING(L"{}: watch: action={}, name={}, isfile={}\n"sv, _idx++, x.action, x.filename, x.isfile);
 		}
 
 		auto ret = QueueUserAPC(
@@ -334,8 +333,7 @@ namespace freeze
 				return;
 			}
 
-			auto _msg = std::format(L"watchor::on_data Error: {}.\n"sv, err);
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"watchor::on_data Error: {}.\n"sv, err);
 
 			stop();
 		}
@@ -345,8 +343,7 @@ namespace freeze
 	{
 		if (info->Action < 1 || info->Action > 5)
 		{
-			auto _msg = std::format(L"when parse notify information, recv an bad action: {}\n"sv, info->Action);
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"when parse notify information, recv an bad action: {}\n"sv, info->Action);
 			return;
 		}
 
@@ -364,7 +361,7 @@ namespace freeze
 		auto pData = reinterpret_cast<std::vector<detail::notify_information_w>*>(Parameter);
 		if (!pData)
 		{
-			OutputDebugString(L"ApcCallback: notify-information is null.\n");
+			DEBUG_STRING(L"ApcCallback: notify-information is null.\n");
 			// error
 			return;
 		}
@@ -388,7 +385,7 @@ namespace freeze
 		if (!pWatchor)
 		{
 			// error
-			OutputDebugString(L"Overlapped Completion Routine: Watchor Pointer is nullptr.\n");
+			DEBUG_STRING(L"Overlapped Completion Routine: Watchor Pointer is nullptr.\n");
 			return;
 		}
 
@@ -404,7 +401,7 @@ namespace freeze
 			if (err == ERROR_OPERATION_ABORTED)
 			{
 				// operation abort
-				OutputDebugString(L"Overlapped Completion Routine: Error{ERROR_OPERATION_ABORTED}.\n");
+				DEBUG_STRING(L"Overlapped Completion Routine: Error{ERROR_OPERATION_ABORTED}.\n");
 				return;
 			}
 			else if (err == ERROR_INVALID_PARAMETER)
@@ -413,7 +410,7 @@ namespace freeze
 				// TODO: shrink buffer size
 				pWatchor->reset_buffer(64 * 1024);
 				// resize buffer
-				OutputDebugString(L"Overlapped Completion Routine: Error{ERROR_INVALID_PARAMETER}.\n");
+				DEBUG_STRING(L"Overlapped Completion Routine: Error{ERROR_INVALID_PARAMETER}.\n");
 			}
 			else if (err == ERROR_NOACCESS)
 			{
@@ -422,10 +419,9 @@ namespace freeze
 			}
 			else
 			{
-				OutputDebugString(L"Overlapped Completion Routine: Error{Unknown}.\n");
+				DEBUG_STRING(L"Overlapped Completion Routine: Error{Unknown}.\n");
 			}
-			auto _msg = std::format(L"Overlapped Completion Routine Error: {}.\n"sv, err);
-			OutputDebugString(_msg.c_str());
+			DEBUG_STRING(L"Overlapped Completion Routine Error: {}.\n"sv, err);
 			return;
 		}
 

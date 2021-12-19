@@ -138,7 +138,7 @@ public:
 				auto started = start_service(ip);
 
 				auto _msg = std::format(L"Start Service Result: {}"sv, started);
-				OutputDebugString(_msg.data());
+				DEBUG_STRING(_msg.data());
 				if (started)
 				{
 					mEnableInstall = FALSE;
@@ -162,7 +162,7 @@ public:
 		}
 		else
 		{
-			OutputDebugString(L"Install Service Failure.\n");
+			DEBUG_STRING(L"Install Service Failure.\n");
 			SetDlgItemText(IDC_STATUS, L"install failure!");
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
@@ -176,8 +176,7 @@ public:
 		{
 			SetDlgItemText(IDC_STATUS, L"stopped!");
 			auto uninstalled = uninstall_service();
-			auto _msg = std::format(L"Uninstall Service Result: {}"sv, uninstalled);
-			OutputDebugString(_msg.data());
+			DEBUG_STRING(L"Uninstall Service Result: {}"sv, uninstalled);
 			if (uninstalled)
 			{
 				mEnableInstall = TRUE;

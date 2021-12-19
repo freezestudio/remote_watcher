@@ -24,13 +24,11 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	if (argc > 1)
 	{
 		wcs_ip = argv[1];
-		auto _msg = std::format(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, wcs_ip);
-		OutputDebugString(_msg.data());
+		DEBUG_STRING(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, wcs_ip);
 	}
 	for (auto i = 0; i < argc; ++i)
 	{
-		auto _msg = std::format(L"@rg ServiceMain: argc[{}], {}\n"sv, i, argv[i]);
-		OutputDebugString(_msg.c_str());
+		DEBUG_STRING(L"@rg ServiceMain: argc[{}], {}\n"sv, i, argv[i]);
 	}
 
 	// TODO: read (ip,token) from .ini
@@ -38,19 +36,19 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 
 	if (wcs_ip.empty())
 	{
-		OutputDebugString(L"@rg ServiceMain: ip is null.\n");
+		DEBUG_STRING(L"@rg ServiceMain: ip is null.\n");
 		// stopped with error.
 		goto theend;
 	}
 
 	if (freeze::detail::make_ip_address(wcs_ip) == 0)
 	{
-		OutputDebugString(L"@rg ServiceMain: ip is wrong.\n");
+		DEBUG_STRING(L"@rg ServiceMain: ip is wrong.\n");
 		// stopped with error.
 		goto theend;
 	}
 
-	OutputDebugString(L"@rg ServiceMain: rgmsvc starting ...\n");
+	DEBUG_STRING(L"@rg ServiceMain: rgmsvc starting ...\n");
 	if (init_service())
 	{
 		if (init_threadpool())
@@ -63,14 +61,14 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	stop_service();
 
 theend:
-	OutputDebugString(L"@rg ServiceMain: rgmsvc stopped.\n");
+	DEBUG_STRING(L"@rg ServiceMain: rgmsvc stopped.\n");
 }
 
 int __stdcall wmain()
 {
 #ifdef SERVICE_TEST
 	g_work_folder = fs::path{ L"f:/templ/abc"s };
-	OutputDebugString(L"@rg Warning: current mock watch f:/templ/abc, shoud change it from remote.\n");
+	DEBUG_STRING(L"@rg Warning: current mock watch f:/templ/abc, shoud change it from remote.\n");
 
 	wchar_t arg1[] = L"rgmsvc";
 	wchar_t arg2[] = L"192.168.2.95";
@@ -87,12 +85,12 @@ int __stdcall wmain()
 	};
 	if (StartServiceCtrlDispatcher(_dispatch_table))
 	{
-		OutputDebugString(L"@rg main: Dispatch Service Successfully.\n");
+		DEBUG_STRING(L"@rg main: Dispatch Service Successfully.\n");
 	}
 	else
 	{
-		OutputDebugString(L"@rg main: Dispatch Service Failure.\n");
+		DEBUG_STRING(L"@rg main: Dispatch Service Failure.\n");
 	}
 #endif
-	OutputDebugString(L"@rg main: Done.\n");
+	DEBUG_STRING(L"@rg main: Done.\n");
 }
