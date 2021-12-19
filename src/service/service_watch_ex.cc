@@ -348,7 +348,7 @@ namespace freeze
 namespace freeze
 {
 	folder_watchor_status::folder_watchor_status()
-		: io_port_handle{nullptr}
+		: io_port_handle{ nullptr }
 	{
 
 	}

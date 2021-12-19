@@ -1,6 +1,5 @@
 #include "service_watch_tree.h"
 
-
 namespace freeze
 {
 	watch_tree::watch_tree()
@@ -78,7 +77,6 @@ namespace freeze
 		}
 		return std::nullopt;
 	}
-
 }
 
 namespace freeze

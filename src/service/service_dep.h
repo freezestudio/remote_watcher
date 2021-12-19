@@ -23,6 +23,9 @@ namespace fs = std::filesystem;
 #define SERVICE_CONTROL_NETWORK_CONNECT    129
 #define SERVICE_CONTROL_NETWORK_DISCONNECT 130
 
+constexpr auto network_max_buffer_size = 64 * 1024UL;
+constexpr auto large_buffer_size = 512 * 1024UL;
+
 template<typename T>
 concept ServiceEnum = std::is_enum_v<T>;
 

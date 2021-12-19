@@ -8,9 +8,6 @@
 #include "service_async.hpp"
 #include "service_watch_tree.h"
 
-constexpr auto network_max_buffer_size = 64 * 1024UL;
-constexpr auto large_buffer_size = 512 * 1024UL;
-
 namespace freeze
 {
 	class watchable;

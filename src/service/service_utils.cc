@@ -1,13 +1,6 @@
 #include "common_dep.h"
 #include "service_utils.h"
 
-// template<typename... Args>
-// void debug_output(std::wstring_view const& fmt, Args&&... args)
-// {
-//     auto msg = std::format(fmt, args...);
-//     OutputDebugString(msg.data());
-// }
-
 namespace freeze::detail
 {
 	
@@ -37,7 +30,6 @@ namespace freeze::detail
 		return res;
 	}
 }
-
 namespace freeze::detail
 {	
 	DWORD make_ip_address(std::wstring const& ip)
@@ -93,6 +85,7 @@ namespace freeze::detail
 		return std::format("{}.{}.{}.{}"sv, ip1, ip2, ip3, ip4).c_str();
 	}
 }
+
 namespace freeze::detail
 {
 	fs::path to_normal(fs::path const& path)
@@ -132,11 +125,6 @@ namespace freeze::detail
 		std::wstring s;
 		switch (notify)
 		{
-			//case FILE_ACTION_ADDED:s = L"add"s; break;
-			//case FILE_ACTION_REMOVED:s = L"remove"s; break;
-			//case FILE_ACTION_MODIFIED:s = L"modify"s; break;
-			//case FILE_ACTION_RENAMED_OLD_NAME:s = L"rename-old-name"s; break;
-			//case FILE_ACTION_RENAMED_NEW_NAME:s = L"rename-new-name"s; break;
 		case FILE_ACTION_ADDED: [[fallthrough]];
 		case FILE_ACTION_RENAMED_NEW_NAME:s = L"create"s; break;
 		case FILE_ACTION_REMOVED: [[fallthrough]];

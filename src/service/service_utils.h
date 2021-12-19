@@ -1,7 +1,7 @@
 #ifndef SERVICE_UTILS_H
 #define SERVICE_UTILS_H
 
-#ifdef _DEBUG
+#if defined(_DEBUG) || defined(DEBUG)
 
 #include <string>
 #include <filesystem>
@@ -44,14 +44,13 @@ namespace freeze::detail
 {
 	enum class response_type : int
 	{
-		result, // GetOverlappedResult
-		status, // GetQueuedCompletionStatus
+		result,
+		status,
 		overlapped,
 	};
 	std::wstring to_str(response_type t);
 	std::wstring to_str(DWORD notify);
 }
-
 
 #else
 #define debug_output(...)
