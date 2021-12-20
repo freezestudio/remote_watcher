@@ -1,7 +1,4 @@
 #include "service.h"
-#include "service_thread_worker.h"
-#include "service_thread_nats.h"
-#include "service_thread_timer.h"
 
 // file time: 100 nanosecond.
 constexpr auto time_second = 10000000L;
@@ -20,9 +17,9 @@ HANDLE hh_sleep_thread = nullptr;
 // sleep thread state.
 bool bb_sleep_thread_exit = false;
 
-// local watch folder.
+/* extern */
 fs::path g_work_folder;
-// local ignore folders in watch folder.
+/* extern */
 std::vector<fs::path> g_work_ignore_folders;
 // connect to remote address.
 freeze::nats_client g_nats_client{};
@@ -129,7 +126,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 		{
 			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_ABANDONED\n");
 		}
-		else if (ret == WAIT_IO_COMPLETION) // _TimerCallback
+		else if (ret == WAIT_IO_COMPLETION) // _TimerCallback returned.
 		{
 			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_IO_COMPLETION\n");
 		}
@@ -163,18 +160,18 @@ DWORD __stdcall _TimerThread(LPVOID)
 }
 
 DWORD __stdcall _SleepThread(LPVOID)
-{
-	freeze::nats_client nats_client;
-	if (!wcs_ip.empty())
+{	
+	if (!g_wcs_ip.empty())
 	{
-		auto ip = freeze::detail::make_ip_address(wcs_ip);
+		auto ip = freeze::detail::make_ip_address(g_wcs_ip);
 		if (ip > 0)
 		{
-			// TODO: read (ip, token) from .ini
-			//nats_client.change_ip(ip/*, token*/);
-			auto connected = nats_client.connect(ip);
-			nats_client.listen_message();
-			nats_client.listen_command();
+			auto connected = g_nats_client.connect(ip);
+			if (connected)
+			{
+				g_nats_client.listen_message();
+				g_nats_client.listen_command();
+			}
 		}
 		else
 		{
@@ -211,7 +208,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			break;
 		case sync_reason_send_payload:
 			// if reason is folder changed.
-			freeze::maybe_send_payload(nats_client, g_work_folder);
+			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
 	}
@@ -281,5 +278,151 @@ void stop_threadpool()
 	{
 		CloseHandle(hh_sleep_thread);
 		hh_sleep_thread = nullptr;
+	}
+}
+
+namespace freeze
+{
+	rgm_service::rgm_service()
+		: _service_status_handle{ nullptr }
+		, _service_status{}
+		, _check_point{ 0 }
+		, _signal{}
+	{
+		_service_status.dwServiceType = SERVICE_WIN32;
+		_service_status.dwServiceSpecificExitCode = 0;
+
+		_rgm_worker = service_object_instance<rgm_worker>();
+		_rgm_timer = service_object_instance<rgm_timer>();
+		_rgm_nats = service_object_instance<rgm_nats>();
+	}
+
+	rgm_service::~rgm_service()
+	{
+
+	}
+
+	bool rgm_service::initial()
+	{
+		_service_status_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, rgm_service::control_code_handle_ex, (LPVOID)(this));
+		if (!_service_status_handle)
+		{
+			return false;
+		}
+
+		return update_status(service_state::start_pending);
+	}
+
+	void rgm_service::start()
+	{
+		_rgm_worker->start();
+		_rgm_timer->start();
+		_rgm_nats->start();
+
+		update_status(service_state::running);
+
+		// main thread waiting ...
+		_signal.wait();
+	}
+
+	void rgm_service::stop()
+	{
+		_signal.notify();
+		update_status(service_state::stopped);
+
+		_rgm_worker->stop();
+		_rgm_timer->stop();
+		_rgm_nats->stop();
+	}
+
+	void rgm_service::pause()
+	{
+		_rgm_worker->pause();
+		_rgm_timer->pause();
+		_rgm_nats->pause();
+
+		update_status(service_state::paused);
+	}
+
+	void rgm_service::resume()
+	{
+		_rgm_worker->resume();
+		_rgm_timer->resume();
+		_rgm_nats->resume();
+
+		update_status(service_state::running);
+	}
+
+	bool rgm_service::update_status(service_state state, DWORD error_code)
+	{
+		if (!_service_status_handle)
+		{
+			return false;
+		}
+
+		_service_status.dwCurrentState = to_dword(state);
+		_service_status.dwWin32ExitCode = error_code;
+
+		if (state == service_state::start_pending or state == service_state::stopped)
+		{
+			_service_status.dwControlsAccepted = 0;
+		}
+		else
+		{
+			_service_status.dwControlsAccepted = service_accept::param_change |
+				service_accept::pause_continue |
+				service_accept::shutdown |
+				service_accept::stop;
+		}
+
+		if (state == service_state::running or state == service_state::stopped)
+		{
+			_service_status.dwCheckPoint = 0;
+			_service_status.dwWaitHint = 0;
+		}
+		else
+		{
+			_service_status.dwCheckPoint = _check_point++;
+			_service_status.dwWaitHint = 3000;
+		}
+
+		return ::SetServiceStatus(_service_status_handle, &_service_status) ? true : false;
+	}
+
+	DWORD __stdcall rgm_service::control_code_handle_ex(DWORD code, DWORD event_type, LPVOID lpevdata, LPVOID lpcontext)
+	{
+		auto self = reinterpret_cast<rgm_service*>(lpcontext);
+		if (!self)
+		{
+			return ERROR_INVALID_HANDLE;
+		}
+
+		service_control control_code = static_cast<service_control>(code);
+		switch (control_code)
+		{
+		case freeze::service_control::shutdown:
+			[[fallthrough]];
+		case freeze::service_control::stop:
+			self->update_status(service_state::stop_pending);
+			self->stop();
+			break;
+		case freeze::service_control::pause:
+			self->update_status(service_state::pause_pending);
+			self->pause();
+			break;
+		case freeze::service_control::_continue:
+			self->update_status(service_state::continue_pending);
+			self->resume();
+			break;
+		case freeze::service_control::param_change:
+			break;
+		case freeze::service_control::network_connect:
+			break;
+		case freeze::service_control::network_disconnect:
+			break;
+		default:
+			break;
+		}
+		return NO_ERROR;
 	}
 }

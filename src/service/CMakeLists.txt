@@ -10,16 +10,17 @@ if(SERVICE_EXEC_TYPE)
     #
     set(SERVICE_EXE rgmsvc)
     add_executable(${SERVICE_EXE}
+        ./service_utils_ex.cc
         ./service_utils.cc
         ./service_watch_tree.cc
-        ./service_watch.cc
         ./service_watch_ex.cc
+        ./service_watch.cc
         ./service_nats_client.cc
-        ./service_impl.cc
-        ./service_thread.cc
         ./service_thread_worker.cc
         ./service_thread_nats.cc
         ./service_thread_timer.cc
+        ./service_thread.cc
+        ./service_impl.cc
         ./service_main.cc
     )
     target_include_directories(${SERVICE_EXE}
@@ -64,16 +65,17 @@ else()
 
     set(SERVICE_DLL rgmsvc)
     add_library(${SERVICE_DLL} SHARED
+        ./service_utils_ex.cc
         ./service_utils.cc
         ./service_watch_tree.cc
-        ./service_watch.cc
         ./service_watch_ex.cc
+        ./service_watch.cc
         ./service_nats_client.cc
-        ./service_impl.cc
-        ./service_thread.cc
         ./service_thread_worker.cc
         ./service_thread_nats.cc
         ./service_thread_timer.cc
+        ./service_thread.cc
+        ./service_impl.cc
         ./service_entry.cc
     )
     target_compile_definitions(${SERVICE_DLL} PUBLIC RGMSVC_EXPORTS)

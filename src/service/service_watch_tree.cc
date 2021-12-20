@@ -2,7 +2,7 @@
 
 namespace freeze
 {
-	watch_tree::watch_tree()
+	watch_tree::watch_tree() noexcept
 	{
 
 	}

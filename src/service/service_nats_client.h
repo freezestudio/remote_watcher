@@ -158,6 +158,10 @@ namespace freeze
 		void on_command();
 
 	private:
+		void init_threads();
+		void stop_threads();
+
+	private:
 		std::unique_ptr<detail::_nats_connect> pimpl;
 
 	private:

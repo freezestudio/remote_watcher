@@ -31,7 +31,14 @@ namespace freeze
 		auto force_reset = false;
 		if (this->folder != generic_folder)
 		{
-			this->folder = generic_folder;
+			auto path_str = generic_folder.c_str();
+			this->folder = fs::path{path_str};
+			if (!detail::save_latest_folder(path_str))
+			{
+				DEBUG_STRING(
+					L"folder_watchor_base::set_weatch_folder() error: save latest folder: {}.\n"sv,
+					generic_folder.c_str());
+			}
 			if (folder_handle)
 			{
 				CloseHandle(folder_handle);
@@ -137,8 +144,10 @@ namespace freeze
 			return;
 		}
 
-		auto filename = std::wstring(info->FileName, info->FileNameLength / sizeof(wchar_t));
-		auto full_filename = (folder / filename).lexically_normal();
+		auto s_filename = detail::to_utf8(info->FileName, info->FileNameLength / sizeof(wchar_t));
+		auto filename = detail::to_utf16(s_filename);
+		fs::path path_filename = this->folder / filename;
+		auto full_filename = path_filename.lexically_normal();
 
 		if (info->Action == FILE_ACTION_REMOVED || info->Action == FILE_ACTION_RENAMED_OLD_NAME)
 		{
@@ -291,7 +300,7 @@ namespace freeze
 			if (WAIT_IO_COMPLETION != result)
 			{
 				DEBUG_STRING(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
-				break;
+				//break;
 			}
 			if (!self->running)
 			{

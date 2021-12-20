@@ -52,6 +52,16 @@ namespace freeze::detail
 	std::wstring to_str(DWORD notify);
 }
 
+namespace freeze::detail
+{
+    bool save_ip(DWORD);
+    DWORD read_ip();
+    bool save_latest_folder(std::wstring const&);
+    std::wstring read_latest_folder();
+	bool save_token(std::wstring const&);
+	std::string read_token();
+}
+
 #else
 #define debug_output(...)
 #endif

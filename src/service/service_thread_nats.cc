@@ -2,14 +2,47 @@
 
 namespace freeze
 {
-    void maybe_send_message(nats_client const& nc)
-    {
+	void maybe_send_message(nats_client const& nc)
+	{
 
-    }
+	}
 
-    void maybe_send_payload(nats_client const& nc, fs::path const& root)
-    {
-        DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_send_payload() ...\n");
+	void maybe_send_payload(nats_client const& nc, fs::path const& root)
+	{
+		DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_send_payload() ...\n");
 		nc.notify_payload(root);
-    }
+	}
+}
+
+namespace freeze
+{
+	rgm_nats::rgm_nats()
+	{
+
+	}
+
+	rgm_nats::~rgm_nats()
+	{
+
+	}
+
+	void rgm_nats::start()
+	{
+
+	}
+
+	void rgm_nats::stop()
+	{
+
+	}
+
+	void rgm_nats::pause()
+	{
+
+	}
+
+	void rgm_nats::resume()
+	{
+
+	}
 }

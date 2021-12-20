@@ -15,6 +15,7 @@
 //#include <filesystem>
 //#include <ranges>
 #include <optional>
+#include <type_traits>
 
 // out namespaces
 using namespace std::literals;
@@ -27,7 +28,7 @@ constexpr auto network_max_buffer_size = 64 * 1024UL;
 constexpr auto large_buffer_size = 512 * 1024UL;
 
 template<typename T>
-concept ServiceEnum = std::is_enum_v<T>;
+concept ServiceEnum = requires { std::is_enum_v<T>; };
 
 // ignore FILE_NOTIFY_CHANGE_SECURITY
 inline constexpr auto gNotifyFilter =
@@ -112,28 +113,7 @@ template<typename B, typename E>
 	requires ServiceEnum<B> || ServiceEnum<E> || std::same_as<DWORD, B> || std::same_as<DWORD, E>
 constexpr DWORD operator|(B && t1, E && t2)
 {
-	if constexpr (std::is_enum_v<B>)
-	{
-		if constexpr (std::is_enum_v<E>)
-		{
-			return to_dword(t1) | to_dword(t2);
-		}
-		else
-		{
-			return to_dword(t1) | t2;
-		}
-	}
-	else
-	{
-		if constexpr (std::is_enum_v<E>)
-		{
-			return t1 | to_dword(t2);
-		}
-		else
-		{
-			return t1 | t2;
-		}
-	}
+	return static_cast<DWORD>(t1) | static_cast<DWORD>(t2);
 }
 
 constexpr auto sync_reason_none__reason = 0L;

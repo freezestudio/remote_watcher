@@ -28,7 +28,7 @@ namespace freeze
 	class watch_tree
 	{
 	public:
-		watch_tree();
+		watch_tree() noexcept;
 		watch_tree(fs::path const& folder, std::vector<fs::path> const& ignore_folders = {});
 
 	public:

@@ -9,7 +9,8 @@
 // com: INetworkConnection::get_IsConnected
 //
 
-std::wstring wcs_ip{};
+/* extern */
+std::wstring g_wcs_ip{};
 
 /**
  * @brief 服务入口
@@ -23,25 +24,49 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 
 	if (argc > 1)
 	{
-		wcs_ip = argv[1];
-		DEBUG_STRING(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, wcs_ip);
+		g_wcs_ip = argv[1];
+		DEBUG_STRING(L"@rg ServiceMain: argc={}, RemoteIP is: {}\n"sv, argc, g_wcs_ip);
 	}
 	for (auto i = 0; i < argc; ++i)
 	{
 		DEBUG_STRING(L"@rg ServiceMain: argc[{}], {}\n"sv, i, argv[i]);
 	}
 
-	// TODO: read (ip,token) from .ini
-	// ...
+	if (!g_wcs_ip.empty())
+	{
+		DWORD ip = freeze::detail::make_ip_address(g_wcs_ip);
+		if (ip == 0)
+		{
+			DEBUG_STRING(L"@rg ServiceMain: ip is wrong.\n");
+			goto theend;
+		}
 
-	if (wcs_ip.empty())
+		if (!freeze::detail::save_ip(ip))
+		{
+			DEBUG_STRING(L"@rg ServiceMain: save ip failure.\n");
+			goto theend;
+		}
+	}
+	else
+	{
+		DWORD ip = freeze::detail::read_ip();
+		if (ip == 0)
+		{
+			DEBUG_STRING(L"@rg ServiceMain: read ip is wrong.\n");
+			goto theend;
+		}
+		auto mcs_ip = freeze::detail::parse_ip_address(ip);
+		g_wcs_ip = freeze::detail::to_utf16(mcs_ip);
+	}
+
+	if (g_wcs_ip.empty())
 	{
 		DEBUG_STRING(L"@rg ServiceMain: ip is null.\n");
 		// stopped with error.
 		goto theend;
 	}
 
-	if (freeze::detail::make_ip_address(wcs_ip) == 0)
+	if (freeze::detail::make_ip_address(g_wcs_ip) == 0)
 	{
 		DEBUG_STRING(L"@rg ServiceMain: ip is wrong.\n");
 		// stopped with error.
@@ -67,16 +92,25 @@ theend:
 int __stdcall wmain()
 {
 #ifdef SERVICE_TEST
-	g_work_folder = fs::path{ L"f:/templ/abc"s };
-	DEBUG_STRING(L"@rg Warning: current mock watch f:/templ/abc, shoud change it from remote.\n");
+	g_work_folder = freeze::detail::read_latest_folder();
+	if (g_work_folder.empty() || !fs::exists(g_work_folder))
+	{
+		g_work_folder = fs::path{ L"f:/templ/abc"s };
+	}
 
-	wchar_t arg1[] = L"rgmsvc";
-	wchar_t arg2[] = L"192.168.2.95";
-	wchar_t* argv[] = {
-		arg1,
-		arg2,
-	};
-	ServiceMain(2, argv);
+	DEBUG_STRING(
+		L"@rg Warning: current mock watch {}, shoud change it from remote.\n"sv,
+		g_work_folder.c_str());
+
+	//wchar_t arg1[] = L"rgmsvc";
+	//wchar_t arg2[] = L"192.168.2.95";
+	//wchar_t* argv[] = {
+	//	arg1,
+	//	arg2,
+	//};
+	//ServiceMain(2, argv);
+
+	ServiceMain(0, nullptr);
 #else
 	wchar_t _service_name[] = SERVICE_NAME;
 	SERVICE_TABLE_ENTRY _dispatch_table[] = {

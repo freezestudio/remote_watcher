@@ -4,6 +4,7 @@
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable_event = nullptr;
 DWORD cp_check_point = 0;
+/* extern */
 freeze::service_state ss_current_status = freeze::service_state::stopped;
 
 bool init_service()

@@ -1,15 +1,14 @@
 #include "common_dep.h"
 #include "service_utils.h"
+#include "service_utils_ex.h"
 
 namespace freeze::detail
 {
-	
 	std::string to_utf8(const wchar_t* wcs, int length)
 	{
-		auto len = WideCharToMultiByte(CP_UTF8, 0, wcs, length, NULL, 0, NULL, NULL);
-		char* pstr = new char[len + 1];
-		WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr, len, NULL, NULL);
-		pstr[len] = '\0';
+		auto len = WideCharToMultiByte(CP_UTF8, 0, wcs, length, nullptr, 0, nullptr, nullptr);
+		char* pstr = new char[len + 1]{};
+		WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr, len, nullptr, nullptr);
 		std::string str(pstr);
 		delete[] pstr;
 		return str;
@@ -20,18 +19,18 @@ namespace freeze::detail
 		return to_utf8(wstr.c_str(), wstr.size());
 	}
 
-	std::wstring to_utf16(std::string const& ncs)
+	std::wstring to_utf16(std::string const& mbs)
 	{
-		auto len = MultiByteToWideChar(CP_UTF8, 0, ncs.c_str(), -1, NULL, 0);
-		wchar_t* pwstr = new wchar_t[len];
-		MultiByteToWideChar(CP_UTF8, 0, ncs.c_str(), -1, pwstr, len);
+		auto len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, nullptr, 0);
+		wchar_t* pwstr = new wchar_t[len + 1]{};
+		MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr, len);
 		std::wstring res(pwstr);
 		delete[] pwstr;
 		return res;
 	}
 }
 namespace freeze::detail
-{	
+{
 	DWORD make_ip_address(std::wstring const& ip)
 	{
 		auto ip4len = ip.size();
@@ -66,7 +65,7 @@ namespace freeze::detail
 		int b[4]{};
 		for (int i = 0; i < 4; ++i)
 		{
-			b[i]=_wtoi(cb[i]);
+			b[i] = _wtoi(cb[i]);
 			if (b[i] < 0 || b[i]>255)
 			{
 				return 0;
@@ -134,5 +133,124 @@ namespace freeze::detail
 			break;
 		}
 		return s;
+	}
+}
+
+namespace freeze::detail
+{
+	static bool regkey_status(DWORD status)
+	{
+		if (ERROR_SUCCESS == status)
+		{
+			return true;
+		}
+
+		if (LPWSTR pBuffer = nullptr;
+			FormatMessage(
+				FORMAT_MESSAGE_FROM_SYSTEM |    //
+				FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
+				FORMAT_MESSAGE_ALLOCATE_BUFFER, //
+				nullptr,                        // lpSource
+				status,                         // dwMessageId
+				0,                              // dwLanguageId
+				(LPWSTR)&pBuffer,               // lpBuffer
+				0,                              // nSize
+				nullptr                         // Arguments
+			) > 0)
+		{
+			DEBUG_STRING(L"Error: {}\n"sv, pBuffer);
+			LocalFree(pBuffer);
+		}
+		return false;
+	}
+
+	bool save_ip(DWORD ip)
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return false;
+		}
+		status = regkey.SetDWORDValue(L"remote", ip);
+		return regkey_status(status);
+	}
+
+	DWORD read_ip()
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return 0;
+		}
+		DWORD value;
+		status = regkey.QueryDWORDValue(L"remote", value);
+		if (!regkey_status(status))
+		{
+			return 0;
+		}
+		return value;
+	}
+
+	bool save_latest_folder(std::wstring const& folder)
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return false;
+		}
+		status = regkey.SetStringValue(L"latest", folder.c_str());
+		return regkey_status(status);
+	}
+
+	std::wstring read_latest_folder()
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		wchar_t value[MAX_PATH]{};
+		ULONG value_len = MAX_PATH;
+		status = regkey.QueryStringValue(L"latest", value, &value_len);
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		return std::wstring(value, value_len);
+	}
+
+	bool save_token(std::wstring const& token)
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return false;
+		}
+		status = regkey.SetStringValue(L"token", token.c_str());
+		return regkey_status(status);
+	}
+
+	std::string read_token()
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		wchar_t value[11]{};
+		ULONG value_len = 11;
+		status = regkey.QueryStringValue(L"token", value, &value_len);
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		std::string mcs_value = to_utf8(value, value_len);
+		return mcs_value;
 	}
 }

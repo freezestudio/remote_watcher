@@ -6,7 +6,25 @@
 
 namespace freeze
 {
-    
+    class rgm_worker
+    {
+    public:
+        rgm_worker();
+        ~rgm_worker();
+
+    public:
+        void start();
+        void stop();
+        void pause();
+        void resume();
+
+    private:
+        std::thread _thread;
+
+    private:
+        bool _running;
+        bool _paused;
+    };
 }
 
 #endif

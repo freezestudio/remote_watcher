@@ -72,14 +72,14 @@ namespace freeze::detail
 		_nats_options& reset(std::string const& url, std::string const& token, std::string const& name = {})
 		{
 			_destroy();
-			_create();
+			auto ok = _create();
 			if (!name.empty())
 			{
 				_name(name);
 			}
-			_buffer_size(64 * 1024);
-			_url(url);
-			_token(token);
+			ok = _buffer_size(64 * 1024);
+			ok = _url(url);
+			ok = _token(token);
 			return *this;
 		}
 
@@ -132,7 +132,18 @@ namespace freeze::detail
 
 		bool _token(std::string const& token)
 		{
-			return natsOptions_SetToken(_options, token.c_str()) == natsStatus::NATS_OK;
+			auto _token = token;
+			if (token.empty())
+			{
+				_token = detail::read_token();
+				if (_token.empty())
+				{
+					_token = "aH7g8Rxq0q"s;
+					detail::save_token(detail::to_utf16(_token));
+				}
+			}
+
+			return natsOptions_SetToken(_options, _token.c_str()) == natsStatus::NATS_OK;
 		}
 
 		bool _url(std::string const& url)
@@ -597,6 +608,16 @@ namespace freeze::detail
 			_destroy();
 		}
 
+		explicit operator bool() noexcept
+		{
+			return _nc != nullptr;
+		}
+
+		explicit operator bool() const noexcept
+		{
+			return _nc != nullptr;
+		}
+
 	public:
 		void close()
 		{
@@ -617,16 +638,9 @@ namespace freeze::detail
 		}
 
 		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
-		{
-			auto _token = token;
-			if (token.empty())
-			{
-				// TODO: read from .ini
-				_token = "aH7g8Rxq0q"s;
-			}
-
+		{			
 			_destroy();
-			_opts.reset(url, _token, name);
+			_opts.reset(url, token, name);
 			_connect();
 			return *this;
 		}
@@ -723,6 +737,11 @@ namespace freeze::detail
 
 		bool subject_message()
 		{
+			if (!_nc)
+			{
+				return false;
+			}
+
 			_nats_sub _sub{ nullptr };
 			auto status = natsConnection_Subscribe(_sub.put(), _nc, message_channel.data(),
 				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
@@ -738,6 +757,11 @@ namespace freeze::detail
 		// TODO: use coroutine
 		bool subject_command()
 		{
+			if (!_nc)
+			{
+				return false;
+			}
+
 			_nats_sub _sub{ nullptr };
 			// cb(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
 			auto status = natsConnection_Subscribe(_sub.put(), _nc, command_channel.data(),
@@ -785,9 +809,8 @@ namespace freeze::detail
 
 		_nats_connect& connect(std::string const& url, std::string const& token, std::string const& name = {})
 		{
-			auto _token = "aH7g8Rxq0q"s;
-			_opts.reset(url, _token, name);
-			_connect();
+			_opts.reset(url, token, name);
+			auto ok = _connect();
 			return *this;
 		}
 
@@ -873,7 +896,8 @@ namespace freeze::detail
 	private:
 		bool _connect()
 		{
-			return natsConnection_Connect(&_nc, _opts) == NATS_OK;
+			auto status = natsConnection_Connect(&_nc, _opts);
+			return status == NATS_OK;
 		}
 
 		void _disconnect()
@@ -903,57 +927,11 @@ namespace freeze
 	nats_client::nats_client()
 		: pimpl{ std::make_unique<detail::_nats_connect>() }
 	{
-		_msg_thread = std::thread([](auto&& self)
-			{
-				while (true)
-				{
-					g_message_signal.wait();
-					auto self_ptr = reinterpret_cast<nats_client*>(self);
-					if (!self_ptr)
-					{
-						break;
-					}
-					self_ptr->on_message();
-					if (!(self_ptr->_msg_thread_running))
-					{
-						break;
-					}
-				}
-			}, this);
-		_cmd_thread = std::thread([](auto&& self)
-			{
-				while (true)
-				{
-					g_command_signal.wait();
-					auto self_ptr = reinterpret_cast<nats_client*>(self);
-					if (!self_ptr)
-					{
-						break;
-					}
-					self_ptr->on_command();
-					if (!(self_ptr->_cmd_thread_running))
-					{
-						break;
-					}
-				}
-			}, this);
 	}
 
 	nats_client::~nats_client()
 	{
-		_msg_thread_running = false;
-		g_message_signal.notify();
-		if (_msg_thread.joinable())
-		{
-			_msg_thread.join();
-		}
-
-		_cmd_thread_running = false;
-		g_message_signal.notify();
-		if (_cmd_thread.joinable())
-		{
-			_cmd_thread.join();
-		}
+		stop_threads();
 	}
 
 	void nats_client::change_ip(DWORD ip, std::string const& token /*= {}*/)
@@ -966,12 +944,19 @@ namespace freeze
 		auto url = detail::parse_ip_address(ip);
 		//pimpl.swap(detail::_nats_connect(url, token));
 		pimpl->connect(url, token);
-		return pimpl->is_connected();
+		assert(pimpl != nullptr && (bool)(*pimpl.get()));
+		auto _is_cnned = pimpl->is_connected();
+		if (_is_cnned)
+		{
+			init_threads();
+		}
+		return _is_cnned;
 	}
 
 	void nats_client::close()
 	{
 		pimpl->close();
+		stop_threads();
 	}
 
 	void nats_client::listen_message()
@@ -1012,7 +997,7 @@ namespace freeze
 
 	void nats_client::notify_payload(fs::path const& root) const
 	{
-		std::lock_guard<std::mutex> lock(_mutex);
+		std::unique_lock<std::mutex> lock(_mutex);
 		auto watch_tree_ptr = watch_tree_instace(root);
 		if (!watch_tree_ptr)
 		{
@@ -1022,10 +1007,14 @@ namespace freeze
 
 		auto files = std::move(watch_tree_ptr->get_all());
 		watch_tree_ptr->clear();
+
+		lock.unlock();
+
+		auto root_str = root.c_str();
 		for (auto file : files)
 		{
 			DEBUG_STRING(L"nats client watcher: {}\n"sv, file.c_str());
-			pimpl->publish_payload(root, file);
+			pimpl->publish_payload(root_str, file);
 		}
 	}
 
@@ -1040,5 +1029,60 @@ namespace freeze
 	void nats_client::on_message()
 	{
 		int msg = 0;
+	}
+
+	void nats_client::init_threads()
+	{
+		_msg_thread = std::thread([](auto&& self)
+			{
+				while (true)
+				{
+					g_message_signal.wait();
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
+					{
+						break;
+					}
+					self_ptr->on_message();
+					if (!(self_ptr->_msg_thread_running))
+					{
+						break;
+					}
+				}
+			}, this);
+		_cmd_thread = std::thread([](auto&& self)
+			{
+				while (true)
+				{
+					g_command_signal.wait();
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
+					{
+						break;
+					}
+					self_ptr->on_command();
+					if (!(self_ptr->_cmd_thread_running))
+					{
+						break;
+					}
+				}
+			}, this);
+	}
+
+	void nats_client::stop_threads()
+	{
+		_msg_thread_running = false;
+		g_message_signal.notify();
+		if (_msg_thread.joinable())
+		{
+			_msg_thread.join();
+		}
+
+		_cmd_thread_running = false;
+		g_message_signal.notify();
+		if (_cmd_thread.joinable())
+		{
+			_cmd_thread.join();
+		}
 	}
 }

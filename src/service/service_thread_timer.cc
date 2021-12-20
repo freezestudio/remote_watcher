@@ -13,3 +13,36 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
 	DEBUG_STRING(L"@rg TimerCallback: ETA: {}\n."sv, dwTimerLowValue);
 }
+
+namespace freeze
+{
+	rgm_timer::rgm_timer()
+	{
+
+	}
+
+	rgm_timer::~rgm_timer()
+	{
+
+	}
+
+	void rgm_timer::start()
+	{
+
+	}
+
+	void rgm_timer::stop()
+	{
+
+	}
+
+	void rgm_timer::pause()
+	{
+
+	}
+
+	void rgm_timer::resume()
+	{
+
+	}
+}
