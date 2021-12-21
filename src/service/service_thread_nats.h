@@ -7,6 +7,7 @@ namespace freeze
 {
     void maybe_send_message(nats_client const&);
     void maybe_send_payload(nats_client const&, fs::path const&);
+    void maybe_response_command(nats_client const&);
 }
 
 namespace freeze

@@ -4,13 +4,20 @@ namespace freeze
 {
 	void maybe_send_message(nats_client const& nc)
 	{
-
+		DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_send_message() ...\n");
+		nc.notify_message();
 	}
 
 	void maybe_send_payload(nats_client const& nc, fs::path const& root)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_send_payload() ...\n");
 		nc.notify_payload(root);
+	}
+
+	void maybe_response_command(nats_client const& nc)
+	{
+		DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_response_command() ...\n");
+		nc.notify_command();
 	}
 }
 

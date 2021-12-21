@@ -1,3 +1,6 @@
+//
+// parallel threads
+//
 #include "service.h"
 
 // file time: 100 nanosecond.
@@ -17,14 +20,26 @@ HANDLE hh_sleep_thread = nullptr;
 // sleep thread state.
 bool bb_sleep_thread_exit = false;
 
-/* extern */
-fs::path g_work_folder;
-/* extern */
+/* extern maybe noused */
 std::vector<fs::path> g_work_ignore_folders;
 // connect to remote address.
 freeze::nats_client g_nats_client{};
 // global signal for communicate-with-nats with reason.
 freeze::atomic_sync_reason global_reason_signal{};
+
+/*extern*/
+fs::path g_work_folder;
+void reset_work_folder(bool notify/* = false */)
+{
+	auto wcs_folder = freeze::detail::read_latest_folder();
+	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
+	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
+	g_work_folder = fs::path{ latest_folder };
+	if (notify)
+	{
+		QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+	}
+}
 
 // worker thread.
 DWORD __stdcall _WorkerThread(LPVOID)
@@ -34,13 +49,13 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	//auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{ underline_watch };
 #ifdef SERVICE_TEST
-	watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
+	watcher.set_watch_folder(g_work_folder);
 	watcher.set_ignore_folders(g_work_ignore_folders);
 	watcher.start();
 #endif
 	while (!bb_worker_thread_exit)
 	{
-		// want wakeup from change folder command.
+		// want wakeup from modify-folder command.
 		SleepEx(INFINITE, TRUE);
 #ifndef SERVICE_TEST
 		// maybe service paused.
@@ -51,9 +66,8 @@ DWORD __stdcall _WorkerThread(LPVOID)
 #endif
 		if (freeze::detail::check_exists(g_work_folder))
 		{
-			g_work_folder = freeze::detail::to_normal(g_work_folder);
 			watcher.stop();
-			watcher.set_watch_folder(freeze::detail::to_normal(g_work_folder));
+			watcher.set_watch_folder(g_work_folder);
 			watcher.set_ignore_folders(g_work_ignore_folders);
 			watcher.start();
 		}
@@ -102,14 +116,14 @@ DWORD __stdcall _TimerThread(LPVOID)
 
 	LARGE_INTEGER due_time{}; // 100 nanosecond
 	due_time.QuadPart = static_cast<ULONGLONG>(-30 * time_second);
-	LONG period = 30000; // millisecond
+	LONG period = 30 * 1000; // millisecond
 	wchar_t reason_string[] = L"heart-beat";
 	REASON_CONTEXT reason{
 		POWER_REQUEST_CONTEXT_VERSION,
 		POWER_REQUEST_CONTEXT_SIMPLE_STRING,
 	};
 	reason.Reason.SimpleReasonString = reason_string;
-	ULONG delay = 5000; // tolerable delay
+	ULONG delay = 0; // tolerable delay 5000
 	auto ok = ::SetWaitableTimerEx(hh_timer, &due_time, period, _TimerCallback, (LPVOID)(&g_nats_client), &reason, delay);
 	if (!ok)
 	{
@@ -121,32 +135,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	while (!bb_timer_thread_exit)
 	{
 		// Alertable Thread;
-		auto ret = SleepEx(INFINITE, TRUE);
-		if (ret == WAIT_ABANDONED)
-		{
-			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_ABANDONED\n");
-		}
-		else if (ret == WAIT_IO_COMPLETION) // _TimerCallback returned.
-		{
-			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_IO_COMPLETION\n");
-		}
-		else if (ret == WAIT_OBJECT_0) // SetWaitableTimerEx
-		{
-			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_OBJECT_0\n");
-		}
-		else if (ret == WAIT_TIMEOUT)
-		{
-			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_TIMEOUT\n");
-		}
-		else if (ret == WAIT_FAILED)
-		{
-			DEBUG_STRING(L"@rg timer thread waitable handle signed: WAIT_FAILED\n");
-		}
-		else
-		{
-			auto err = ::GetLastError();
-			DEBUG_STRING(L"@rg SleepEx: timer thread waitable handle occuse an error: {}\n"sv, err);
-		}
+		SleepEx(INFINITE, TRUE);
 	}
 
 	if (hh_timer)
@@ -197,10 +186,11 @@ DWORD __stdcall _SleepThread(LPVOID)
 		case sync_reason_none__reason:
 			break;
 		case sync_reason_recv_command:
-			DEBUG_STRING(L"@rg wakeup reason: recv command.\n");
-			// switch command ...
+			freeze::maybe_response_command(g_nats_client);
+			reset_work_folder();
 			break;
 		case sync_reason_recv_message:
+			freeze::maybe_send_message(g_nats_client);
 			break;
 		case sync_reason_send_command:
 			break;

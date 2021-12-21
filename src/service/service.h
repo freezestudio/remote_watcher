@@ -33,6 +33,9 @@ DWORD __stdcall _WorkerThread(LPVOID);
 DWORD __stdcall _TimerThread(LPVOID);
 DWORD __stdcall _SleepThread(LPVOID);
 
+
+void reset_work_folder(bool notify = false);
+
 namespace freeze
 {
 	class rgm_service

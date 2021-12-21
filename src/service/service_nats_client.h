@@ -32,9 +32,54 @@ namespace freeze::detail
 		uintmax_t size;
 	};
 
-	constexpr nats_cmd make_cmd(std::string const& name, std::string const& action)
+	struct interactive_message
+	{
+		std::string name;
+	};
+
+	struct nats_recv_message : interactive_message
+	{
+		std::string folder;
+		// std::vector<std::string> ignores;
+	};
+
+	struct nats_send_message : interactive_message
+	{
+		std::vector<std::string> folders;
+	};
+
+	inline nats_recv_message parse_recv_message(std::string const& msg)
+	{
+		// response={ name, folder? }
+		using json = nlohmann::json;
+		auto j = json::parse(msg);
+		std::string name = j["name"];
+		std::string folder;
+		auto iter = j.find("folder");
+		if (iter != j.end())
+		{
+			folder = j["folder"];
+		}
+		return nats_recv_message{name, folder};
+	}
+
+	inline constexpr nats_send_message make_send_message(std::string const& name, std::vector<std::string> const& folders)
+	{
+		return { name, folders };
+	}
+
+	inline constexpr nats_cmd make_cmd(std::string const& name, std::string const& action)
 	{
 		return { name, action };
+	}
+
+	inline std::string from_send_message(nats_send_message const& msg)
+	{
+		using json = nlohmann::json;
+		json j;
+		j["name"] = msg.name;
+		j["folders"] = msg.folders;
+		return j.dump();
 	}
 
 	inline nats_cmd to_cmd(char const* str, std::size_t len)
@@ -156,6 +201,9 @@ namespace freeze
 	public:
 		void on_message();
 		void on_command();
+
+	public:
+		bool _maybe_heartbeat();
 
 	private:
 		void init_threads();

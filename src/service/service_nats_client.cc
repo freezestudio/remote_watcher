@@ -1,15 +1,25 @@
-#include "service_nats_client.h"
+//
+// service-nats-client
+//
+#include <atomic>
+
 #include "service_utils.h"
 #include "service_watch_tree.h"
+#include "service_nats_client.h"
 
-#include <atomic>
 
 #define MAX_IP4_SIZE 16
 
 freeze::atomic_sync g_message_signal{};
 freeze::atomic_sync g_command_signal{};
 
+// current: only one command{name="modify-folder", action="path/to/folder"}
 freeze::detail::nats_cmd g_current_command;
+
+// current:
+// 1. {name:"list-disk"}
+// 2. {name:"select-directory", folder:"path/to/directory"}
+std::string g_current_message;
 
 namespace freeze::detail
 {
@@ -102,7 +112,8 @@ namespace freeze::detail
 	private:
 		bool _create()
 		{
-			return natsOptions_Create(&_options) == natsStatus::NATS_OK;
+			auto status = natsOptions_Create(&_options);
+			return status == natsStatus::NATS_OK;
 		}
 
 		void _destroy()
@@ -207,6 +218,16 @@ namespace freeze::detail
 		natsMsg** put()
 		{
 			return &_msg;
+		}
+
+		operator bool() const
+		{
+			return _msg != nullptr;
+		}
+
+		operator bool()
+		{
+			return _msg != nullptr;
 		}
 
 	public:
@@ -338,8 +359,11 @@ namespace freeze::detail
 			{
 				return 0;
 			}
-
-			if (len == nullptr || *len == 0)
+			if (nullptr == len)
+			{
+				return 0;
+			}
+			if (*len == 0)
 			{
 				auto file_count = fs::file_size(full_path_file);
 				*len = file_count;
@@ -536,7 +560,6 @@ namespace freeze::detail
 		_nats_sub(natsSubscription* sub)
 			: _sub{ sub }
 		{
-
 		}
 
 		natsSubscription** put()
@@ -624,7 +647,7 @@ namespace freeze::detail
 			_destroy();
 		}
 
-		void change_ip(DWORD ip, std::string const& token /*= {}*/)
+		void change_ip(uint32_t ip, std::string const& token /*= {}*/)
 		{
 			auto str_ip = detail::parse_ip_address(ip);
 			if (is_connected())
@@ -638,10 +661,10 @@ namespace freeze::detail
 		}
 
 		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
-		{			
+		{
 			_destroy();
 			_opts.reset(url, token, name);
-			_connect();
+			auto ok = _connect();
 			return *this;
 		}
 
@@ -657,16 +680,26 @@ namespace freeze::detail
 			return ok;
 		}
 
+		bool _maybe_heartbeat()
+		{
+			auto _m = _nats_msg{ message_channel.data(), true };
+			_nats_msg _reply_msg{ nullptr };
+			auto status = natsConnection_RequestMsg(_reply_msg.put(), _nc, _m, 3000);
+			return status == NATS_OK && !!_reply_msg;
+		}
+
 	public:
 		bool publish_message(std::string const& msg, std::string const& _type = std::string(text_type))
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
 			auto _m = _nats_msg{ message_channel.data() };
-			if (_m.set_msg(msg, _type))
+			auto ok = _m.set_msg(msg, _type);
+			if (ok)
 			{
-				return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+				auto status = natsConnection_PublishMsg(_nc, _m);
+				ok = status == NATS_OK;
 			}
-			return false;
+			return ok;
 		}
 
 		bool publish_command(nats_cmd const& cmd)
@@ -726,7 +759,9 @@ namespace freeze::detail
 			}
 			catch (const std::exception& e)
 			{
-				OutputDebugStringA(e.what());
+				// OutputDebugStringA(e.what());
+				auto wcs = detail::to_utf16(std::string(e.what()));
+				DEBUG_STRING(wcs.c_str());
 				goto theend;
 			}
 
@@ -748,8 +783,8 @@ namespace freeze::detail
 				{
 					_nats_msg m{ msg };
 					auto self = reinterpret_cast<_nats_connect*>(closure);
-					auto str_msg = m.get_msg();
-					self->on_message(str_msg);
+					g_current_message = m.get_msg();
+					self->on_message(g_current_message);
 				}, this);
 			return status == NATS_OK;
 		}
@@ -816,7 +851,8 @@ namespace freeze::detail
 
 		bool is_connected()
 		{
-			return natsConnection_Status(_nc) == NATS_CONN_STATUS_CONNECTED;
+			auto status = natsConnection_Status(_nc);
+			return status == NATS_CONN_STATUS_CONNECTED;
 		}
 
 	public:
@@ -887,8 +923,9 @@ namespace freeze::detail
 			g_current_command.name = cmd.name;
 			g_current_command.action = cmd.action;
 
-			auto _a = std::format("command: name={}, action={}\n"sv, g_current_command.name, g_current_command.action);
-			OutputDebugStringA(_a.c_str());
+			auto wcs_name = detail::to_utf16(cmd.name);
+			auto wcs_action = detail::to_utf16(cmd.action);
+			DEBUG_STRING(L"command: name={}, action={}\n"sv, wcs_name, wcs_action);
 
 			g_command_signal.notify();
 		}
@@ -897,7 +934,12 @@ namespace freeze::detail
 		bool _connect()
 		{
 			auto status = natsConnection_Connect(&_nc, _opts);
-			return status == NATS_OK;
+			auto ok = status == NATS_OK;
+			if (ok)
+			{
+				ok = _want_header_support();
+			}
+			return ok;
 		}
 
 		void _disconnect()
@@ -913,6 +955,13 @@ namespace freeze::detail
 			_disconnect();
 			natsConnection_Destroy(_nc);
 			_nc = nullptr;
+		}
+
+		bool _want_header_support()
+		{
+			//NATS_NO_SERVER_SUPPORT;
+			auto status = natsConnection_HasHeaderSupport(_nc);
+			return status == NATS_OK;
 		}
 
 	private:
@@ -987,12 +1036,33 @@ namespace freeze
 
 	void nats_client::notify_message() const
 	{
+		std::unique_lock<std::mutex> lock(_mutex);
 
+		auto _recv_msg = detail::parse_recv_message(g_current_message);
+		// 1. {name:"list-disk"}
+		// 2. {name:"select-directory", folder:"path/to/directory"}
+		if (_recv_msg.name == "list-disk")
+		{
+			auto disk_names = detail::get_harddisks();
+			std::string _send_msg;
+			pimpl->publish_message(_send_msg, json_type.data());
+		}
 	}
 
 	void nats_client::notify_command() const
 	{
-		// response
+		std::unique_lock<std::mutex> lock(_mutex);
+		if (g_current_command.name == "modify-folder")
+		{
+			auto folder = detail::to_utf16(g_current_command.action);
+			if (!folder.empty())
+			{
+				if (fs::exists(fs::path{ folder }))
+				{
+					detail::save_latest_folder(folder);
+				}
+			}
+		}
 	}
 
 	void nats_client::notify_payload(fs::path const& root) const
@@ -1020,15 +1090,12 @@ namespace freeze
 
 	void nats_client::on_command()
 	{
-		// switch(known cmd)
-		// ...
-
 		global_reason_signal.notify_reason(sync_reason_recv_command);
 	}
 
 	void nats_client::on_message()
 	{
-		int msg = 0;
+		global_reason_signal.notify_reason(sync_reason_recv_message);
 	}
 
 	void nats_client::init_threads()
@@ -1084,5 +1151,10 @@ namespace freeze
 		{
 			_cmd_thread.join();
 		}
+	}
+
+	bool nats_client::_maybe_heartbeat()
+	{
+		return pimpl->_maybe_heartbeat();
 	}
 }
