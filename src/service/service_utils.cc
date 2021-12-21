@@ -220,6 +220,7 @@ namespace freeze::detail
 		{
 			return {};
 		}
+		// with null-terminated string.
 		return std::wstring(value, value_len);
 	}
 

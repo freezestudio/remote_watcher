@@ -500,7 +500,7 @@ namespace freeze
 		{
 			if (lRes != ERROR_FILE_NOT_FOUND && lRes != ERROR_PATH_NOT_FOUND)
 			{
-				//ATLTRACE(atlTraceCOM, 0, _T("reg_key::RecurseDeleteKey : Failed to Open Key %Ts(Error = %d)\n"), lpszKey, lRes);
+				//TRACE(reg_key, 0, _T("reg_key::RecurseDeleteKey : Failed to Open Key %Ts(Error = %d)\n"), lpszKey, lRes);
 			}
 			return lRes;
 		}

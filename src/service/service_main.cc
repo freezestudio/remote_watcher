@@ -92,7 +92,10 @@ theend:
 int __stdcall wmain()
 {
 #ifdef SERVICE_TEST
-	g_work_folder = freeze::detail::read_latest_folder();
+	auto wcs_folder = freeze::detail::read_latest_folder();
+	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
+	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
+	g_work_folder = fs::path{ latest_folder };
 	if (g_work_folder.empty() || !fs::exists(g_work_folder))
 	{
 		g_work_folder = fs::path{ L"f:/templ/abc"s };
