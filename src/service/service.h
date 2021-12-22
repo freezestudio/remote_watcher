@@ -11,10 +11,12 @@
 #include "service_thread_nats.h"
 #include "service_thread_timer.h"
 
-#define SERVICE_TEST
+// #define SERVICE_TEST
+
 #ifndef SERVICE_TEST
 extern freeze::service_state ss_current_status;
 #endif
+
 extern std::wstring g_wcs_ip;
 extern fs::path g_work_folder;
 extern std::vector<fs::path> g_work_ignore_folders;

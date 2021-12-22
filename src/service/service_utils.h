@@ -1,8 +1,6 @@
 #ifndef SERVICE_UTILS_H
 #define SERVICE_UTILS_H
 
-#if defined(_DEBUG) || defined(DEBUG)
-
 #include <bit>
 #include <bitset>
 #include <string>
@@ -17,6 +15,7 @@ namespace fs = std::filesystem;
 using namespace std::literals;
 using volume_type = std::tuple<std::string, std::string, std::string>;
 
+#if defined(_DEBUG) || defined(DEBUG)
 template <typename... Args>
 void debug_output(std::wstring_view const &fmt, Args &&...args)
 {
@@ -27,6 +26,9 @@ void debug_output(std::wstring_view const &fmt, Args &&...args)
 
     OutputDebugString(msg.data());
 }
+#else
+#define debug_output(...)
+#endif
 
 namespace freeze::detail
 {	
@@ -77,9 +79,5 @@ namespace freeze::detail
 	std::vector<volume_type> get_volume_names();
 	std::vector<std::string> get_directories_without_subdir(fs::path const& root);
 }
-
-#else
-#define debug_output(...)
-#endif
 
 #endif

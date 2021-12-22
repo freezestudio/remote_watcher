@@ -132,13 +132,13 @@ public:
 		wcscpy_s(ip, str_ip.c_str());
 		if (install_service())
 		{
+			save_ip(_ipfields);
 			if (mAutoStart)
 			{
 				Sleep(1000);
 				auto started = start_service(ip);
 
-				auto _msg = std::format(L"Start Service Result: {}"sv, started);
-				DEBUG_STRING(_msg.data());
+				DEBUG_STRING(L"Start Service Result: {}"sv, started);
 				if (started)
 				{
 					mEnableInstall = FALSE;
@@ -288,8 +288,8 @@ private:
 
 	void _SetButtonEnabled()
 	{
-		//mInstallButton.EnableWindow(mEnableInstall);
-		//mUninstallButton.EnableWindow(mEnableUninstall);
+		mInstallButton.EnableWindow(mEnableInstall);
+		mUninstallButton.EnableWindow(mEnableUninstall);
 	}
 
 	void _SetIcon(bool _small = false)

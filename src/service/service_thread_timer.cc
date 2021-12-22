@@ -4,6 +4,13 @@
 DWORD _g_latest_time = 0;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
+#ifndef SERVICE_TEST
+	//if (ss_current_status != freeze::service_state::running)
+	//{
+	//	return;
+	//}
+#endif
+
 	auto nc_ptr = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
 	if (!nc_ptr)
 	{

@@ -2,8 +2,8 @@
 #include "common_assets.h"
 
 #include "ctrl_win32_dep.h"
-#include "ctrl_setup.h"
 #include "ctrl_utils.h"
+#include "ctrl_setup.h"
 
 #include <cassert>
 
@@ -185,7 +185,7 @@ bool install_service()
 		_display_name,        // dll, manual regkey
 		SERVICE_ALL_ACCESS,
 		_service_type,
-		SERVICE_DEMAND_START, // change to SERVICE_AUTO_START,
+		SERVICE_AUTO_START, // SERVICE_AUTO_START, SERVICE_DEMAND_START
 		SERVICE_ERROR_NORMAL,
 		_binary_path,
 		nullptr, nullptr, nullptr, nullptr, nullptr
@@ -209,7 +209,7 @@ bool install_service()
 	CloseServiceHandle(hsc);
 	CloseServiceHandle(hscm);
 
-// for dll
+	// for dll
 #ifndef SERVICE_PATH
 	// add service key
 	if (!add_svc_keyvalue())
@@ -262,7 +262,7 @@ bool uninstall_service()
 	}
 	DEBUG_STRING(L"@rg Uninstall Service: DeleteService Successfully.\n");
 
-// for dll
+	// for dll
 #ifndef SERVICE_PATH
 	if (!remove_host_value())
 	{
@@ -415,7 +415,7 @@ bool start_service(LPCWSTR ip)
 	}
 
 	assert(current_state == SERVICE_STOPPED);
-	if(current_state != SERVICE_STOPPED)
+	if (current_state != SERVICE_STOPPED)
 	{
 		DEBUG_STRING(L"@rg Start Service: Stop Service Failure.\n");
 		::CloseServiceHandle(hsc);
@@ -567,12 +567,6 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	SERVICE_STATUS sstatus;
 	if (!query_status(service, sstatus))
 	{
-		// ERROR_INVALID_HANDLE
-		// ERROR_ACCESS_DENIED
-		// ERROR_INSUFFICIENT_BUFFER
-		// ERROR_INVALID_PARAMETER
-		// ERROR_INVALID_LEVEL
-		// ERROR_SHUTDOWN_IN_PROGRESS
 		DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
 		if (!is_outer)
 		{
@@ -593,16 +587,11 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		return true;
 	}
 
-	auto current_state = sstatus.dwCurrentState;
-	do
-	{
-		DEBUG_STRING(L"@rg Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
-	} while (false);
-
+	// wait maybe service status is SERVICE_STOP_PENDING
+	auto current_state = sstatus.dwCurrentState;	
+	DEBUG_STRING(L"@rg before Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
 	auto wait_tick = GetTickCount64();
-
-	// wait SERVICE_STOP_PENDING
-	do
+	while (current_state == SERVICE_STOP_PENDING)
 	{
 		auto wait = sstatus.dwWaitHint / 10;
 		if (wait < 1000)
@@ -625,29 +614,28 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 			}
 			break;
 		}
+
 		current_state = sstatus.dwCurrentState;
 		if (current_state == SERVICE_STOPPED)
 		{
-			DEBUG_STRING(L"@rg Stop Service: Service stopped.\n");
-			return true;
-		}
-		do
-		{
-			DEBUG_STRING(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
-		} while (false);
-
-		auto duration = GetTickCount64() - wait_tick;
-		if (duration > sstatus.dwWaitHint)
-		{
-			DEBUG_STRING(L"@rg Stop Service: failure, timeout!\n");
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
 				::CloseServiceHandle(scmanager);
 			}
-			return false;
+			DEBUG_STRING(L"@rg Stop Service: Service stopped.\n");
+			return true;
 		}
-	} while (current_state == SERVICE_STOP_PENDING);
+		DEBUG_STRING(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
+
+		auto duration = GetTickCount64() - wait_tick;
+		if (duration > sstatus.dwWaitHint)
+		{
+			wait_tick = GetTickCount64();
+			DEBUG_STRING(L"@rg Stop Service: failure, timeout!\n");
+			//break;
+		}
+	};
 
 	// send control code: stop
 	if (!::ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&sstatus))
@@ -661,17 +649,29 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	}
 	DEBUG_STRING(L"@rg Stop Service: send [stop] control code.\n");
 
-	current_state = sstatus.dwCurrentState;
-	wait_tick = GetTickCount64();
+	if (!query_status(service, sstatus))
+	{
+		DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
+		if (!is_outer)
+		{
+			::CloseServiceHandle(service);
+			::CloseServiceHandle(scmanager);
+		}
+		return false;
+	}
+
 	// wait service stopped.
-	do
+	current_state = sstatus.dwCurrentState;
+	DEBUG_STRING(L"@rg after Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
+	wait_tick = GetTickCount64();
+	while (current_state != SERVICE_STOPPED)
 	{
 		// default 30s, set 3s.
 		Sleep(sstatus.dwWaitHint);
 
 		if (!query_status(service, sstatus))
 		{
-			DEBUG_STRING(L"@rg Stop Service: after ControlService() QueryServiceStatusEx failed {}\n", GetLastError());
+			DEBUG_STRING(L"@rg Stop Service: after QueryServiceStatusEx failed {}\n", GetLastError());
 			if (!is_outer)
 			{
 				::CloseServiceHandle(service);
@@ -691,8 +691,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 			DEBUG_STRING(L"@rg Stop Service: failure, wait 30s timeout!\n");
 			break;
 		}
-
-	} while (current_state != SERVICE_STOPPED);
+	}
 
 	if (!is_outer)
 	{

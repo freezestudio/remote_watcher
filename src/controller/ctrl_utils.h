@@ -31,4 +31,6 @@ bool decompress_blobs(void* blob, int len, const char* out_path);
 
 // decompress *.tgz
 int tar(const char*, const char*);
+
+bool save_ip(DWORD);
 #endif

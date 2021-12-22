@@ -1,7 +1,6 @@
 #include "common_dep.h"
-#include "ctrl_utils.h"
 #include "ctrl_win32_dep.h"
-
+#include "ctrl_utils.h"
 #include <cassert>
 
 // out namespaces
@@ -455,4 +454,16 @@ bool decompress_blobs(void* blob, int len, const char* out_path)
 	}
 #endif
 	return true;
+}
+
+bool save_ip(DWORD ip)
+{
+	ATL::CRegKey regkey;
+	auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+	if (!_verify_status(L"SaveIp", status))
+	{
+		return false;
+	}
+	status = regkey.SetDWORDValue(L"remote", ip);
+	return _verify_status(L"SaveIp", status);
 }

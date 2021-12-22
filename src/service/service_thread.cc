@@ -54,15 +54,18 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	//auto underline_watch = freeze::folder_watchor_status{};
 	//auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{ underline_watch };
+
 #ifdef SERVICE_TEST
 	watcher.set_watch_folder(g_work_folder);
 	watcher.set_ignore_folders(g_work_ignore_folders);
 	watcher.start();
 #endif
+
 	while (!bb_worker_thread_exit)
 	{
 		// want wakeup from modify-folder command.
 		SleepEx(INFINITE, TRUE);
+
 #ifndef SERVICE_TEST
 		// maybe service paused.
 		if (ss_current_status != freeze::service_state::running)
@@ -70,6 +73,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
+
 		DEBUG_STRING(L"@rg WorkerThread: Wakeup ...\n");
 		if (freeze::detail::check_exists(g_work_folder))
 		{
