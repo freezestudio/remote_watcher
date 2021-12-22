@@ -109,6 +109,10 @@ namespace freeze::detail
 			return _token(token);
 		}
 
+		bool set_cnn_name(std::string const& name = {})
+		{
+			return _name(name);
+		}
 	private:
 		bool _create()
 		{
@@ -127,7 +131,20 @@ namespace freeze::detail
 
 		bool _name(std::string const& name)
 		{
-			return natsOptions_SetName(_options, name.c_str()) == natsStatus::NATS_OK;
+			std::string _cnn_name = name;
+			if (name.empty())
+			{
+				wchar_t name[MAX_COMPUTERNAME_LENGTH]{};
+				DWORD name_length = MAX_COMPUTERNAME_LENGTH;
+				auto ok = GetComputerName(name, &name_length);
+				if (ok)
+				{
+					auto id = GetCurrentProcessId();
+					auto _mbs_name = detail::to_utf8(name, name_length);
+					_cnn_name = std::format("c-{}-{}"sv, _mbs_name, id);
+				}
+			}
+			return natsOptions_SetName(_options, _cnn_name.c_str()) == natsStatus::NATS_OK;
 		}
 
 		bool _buffer_size(int size = 0)
@@ -680,19 +697,24 @@ namespace freeze::detail
 			return ok;
 		}
 
-		bool _maybe_heartbeat()
+		DWORD _maybe_heartbeat()
 		{
-			auto _m = _nats_msg{ message_channel.data(), true };
+			auto _m = _nats_msg{ message_send_channel.data(), true };
 			_nats_msg _reply_msg{ nullptr };
 			auto status = natsConnection_RequestMsg(_reply_msg.put(), _nc, _m, 3000);
-			return status == NATS_OK && !!_reply_msg;
+			if (!_reply_msg)
+			{
+				return NATS_NO_RESPONDERS;
+			}
+			//NATS_TIMEOUT = 26
+			return status;
 		}
 
 	public:
 		bool publish_message(std::string const& msg, std::string const& _type = std::string(text_type))
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
-			auto _m = _nats_msg{ message_channel.data() };
+			auto _m = _nats_msg{ message_send_channel.data() };
 			auto ok = _m.set_msg(msg, _type);
 			if (ok)
 			{
@@ -744,10 +766,13 @@ namespace freeze::detail
 			{
 				// response={ name, size, result: true }
 				auto _json_msg = reply_msg.get_msg();
-				using json = nlohmann::json;
-				auto j = json::parse(_json_msg);
-				std::string _reply_name = j["name"];
-				ok = fs::path{ _reply_name } == file;
+				if (!_json_msg.empty())
+				{
+					using json = nlohmann::json;
+					auto j = json::parse(_json_msg);
+					std::string _reply_name = j["name"];
+					ok = fs::path{ _reply_name } == file;
+				}
 				if (ok)
 				{
 					DEBUG_STRING(L"_nats_client::publish_payload() response file: {}\n"sv, file.c_str());
@@ -770,7 +795,7 @@ namespace freeze::detail
 			return ok;
 		}
 
-		bool subject_message()
+		bool subject_recv_message()
 		{
 			if (!_nc)
 			{
@@ -778,13 +803,16 @@ namespace freeze::detail
 			}
 
 			_nats_sub _sub{ nullptr };
-			auto status = natsConnection_Subscribe(_sub.put(), _nc, message_channel.data(),
+			auto status = natsConnection_Subscribe(_sub.put(), _nc, message_recv_channel.data(),
 				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
 					_nats_msg m{ msg };
 					auto self = reinterpret_cast<_nats_connect*>(closure);
 					g_current_message = m.get_msg();
-					self->on_message(g_current_message);
+					if (!g_current_message.empty())
+					{
+						self->on_recv_message(g_current_message);
+					}
 				}, this);
 			return status == NATS_OK;
 		}
@@ -808,10 +836,21 @@ namespace freeze::detail
 						DEBUG_STRING(L"_nats_connect::subject_command()::lambda error: self instance is null.\n");
 						return;
 					}
+					if (!msg)
+					{
+						DEBUG_STRING(L"_nats_connect::subject_command(): message is null.\n");
+						return;
+					}
 
 					_nats_msg m{ msg };
 					auto cmd = m.get_cmd();
 					detail::nats_cmd_ack _ack;
+					if (cmd.name.empty())
+					{
+						self->ack_command(m.get_reply(), _ack);
+						return;
+					}
+
 					_ack.name = cmd.name;
 					_ack.action = cmd.action;
 					_ack.result = true;
@@ -911,10 +950,17 @@ namespace freeze::detail
 		}
 
 	public:
-		void on_message(std::string const& msg)
+		void on_recv_message(std::string const& msg)
 		{
+			if (msg.empty())
+			{
+				return;
+			}
+
 			auto wstr = detail::to_utf16(msg);
-			DEBUG_STRING(wstr.c_str());
+			DEBUG_STRING(L"on-message: {}\n"sv, wstr.c_str());
+
+			// wakup msg-thread
 			g_message_signal.notify();
 		}
 
@@ -925,7 +971,7 @@ namespace freeze::detail
 
 			auto wcs_name = detail::to_utf16(cmd.name);
 			auto wcs_action = detail::to_utf16(cmd.action);
-			DEBUG_STRING(L"command: name={}, action={}\n"sv, wcs_name, wcs_action);
+			DEBUG_STRING(L"on-command: name={}, action={}\n"sv, wcs_name, wcs_action);
 
 			g_command_signal.notify();
 		}
@@ -933,12 +979,14 @@ namespace freeze::detail
 	private:
 		bool _connect()
 		{
+			_opts.set_cnn_name();
 			auto status = natsConnection_Connect(&_nc, _opts);
 			auto ok = status == NATS_OK;
 			if (ok)
 			{
 				ok = _want_header_support();
 			}
+
 			return ok;
 		}
 
@@ -965,9 +1013,11 @@ namespace freeze::detail
 		}
 
 	private:
+		std::mutex _mutex;
+
+	private:
 		natsConnection* _nc = nullptr;
 		_nats_options _opts;
-		std::mutex _mutex;
 	};
 }
 
@@ -1010,7 +1060,7 @@ namespace freeze
 
 	void nats_client::listen_message()
 	{
-		if (pimpl->subject_message())
+		if (pimpl->subject_recv_message())
 		{
 			_msg_thread_running = true;
 		}
@@ -1037,14 +1087,28 @@ namespace freeze
 	void nats_client::notify_message() const
 	{
 		std::unique_lock<std::mutex> lock(_mutex);
+		DEBUG_STRING(L"notify-message: {}"sv, detail::to_utf16(g_current_message));
+		if (g_current_message.empty())
+		{
+			return;
+		}
 
-		auto _recv_msg = detail::parse_recv_message(g_current_message);
+		std::string _message = std::exchange(g_current_message,{});
+		auto _recv_msg = detail::parse_recv_message(_message);
+
 		// 1. {name:"list-disk"}
 		// 2. {name:"select-directory", folder:"path/to/directory"}
 		if (_recv_msg.name == "list-disk")
 		{
 			auto disk_names = detail::get_harddisks();
-			std::string _send_msg;
+			std::string _send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
+			pimpl->publish_message(_send_msg, json_type.data());
+		}
+		else if (_recv_msg.name == "select-directory")
+		{
+			auto dir = detail::to_utf16(_recv_msg.folder);
+			auto folders = detail::get_directories_without_subdir(dir);
+			std::string _send_msg = detail::make_send_message_string(_recv_msg.name, folders);
 			pimpl->publish_message(_send_msg, json_type.data());
 		}
 	}
@@ -1052,9 +1116,21 @@ namespace freeze
 	void nats_client::notify_command() const
 	{
 		std::unique_lock<std::mutex> lock(_mutex);
-		if (g_current_command.name == "modify-folder")
+		if (g_current_command.name.empty())
 		{
-			auto folder = detail::to_utf16(g_current_command.action);
+			return;
+		}
+
+		detail::nats_cmd cmd;
+		cmd.name = g_current_command.name;
+		cmd.action = g_current_command.action;
+
+		g_current_command.name = {};
+		g_current_command.action = {};
+
+		if (cmd.name == "modify-folder")
+		{
+			auto folder = detail::to_utf16(cmd.action);
 			if (!folder.empty())
 			{
 				if (fs::exists(fs::path{ folder }))
@@ -1090,11 +1166,14 @@ namespace freeze
 
 	void nats_client::on_command()
 	{
+		DEBUG_STRING(L"command: want wakeup sleep-thread ...\n");
 		global_reason_signal.notify_reason(sync_reason_recv_command);
 	}
 
 	void nats_client::on_message()
 	{
+		DEBUG_STRING(L"message: want wakeup sleep-thread ...\n");
+		// wakup sleep-thread
 		global_reason_signal.notify_reason(sync_reason_recv_message);
 	}
 
@@ -1110,6 +1189,7 @@ namespace freeze
 					{
 						break;
 					}
+					DEBUG_STRING(L"_msg_thread: g_message_signal wait ready ...\n");
 					self_ptr->on_message();
 					if (!(self_ptr->_msg_thread_running))
 					{
@@ -1146,14 +1226,14 @@ namespace freeze
 		}
 
 		_cmd_thread_running = false;
-		g_message_signal.notify();
+		g_command_signal.notify();
 		if (_cmd_thread.joinable())
 		{
 			_cmd_thread.join();
 		}
 	}
 
-	bool nats_client::_maybe_heartbeat()
+	DWORD nats_client::_maybe_heartbeat()
 	{
 		return pimpl->_maybe_heartbeat();
 	}

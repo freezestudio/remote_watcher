@@ -130,7 +130,7 @@ namespace freeze
 	public:
 		atomic_sync()
 		{
-			_flag.clear();
+			//_flag.clear();
 		}
 
 		~atomic_sync()

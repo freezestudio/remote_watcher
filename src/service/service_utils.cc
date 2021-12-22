@@ -373,6 +373,11 @@ namespace freeze::detail
 	std::vector<std::string> get_directories_without_subdir(fs::path const& root)
 	{
 		std::vector<std::string> folders;
+		if (root.empty() || !fs::exists(root))
+		{
+			return folders;
+		}
+
 		fs::directory_iterator iter{ root };
 		for (auto& p : iter)
 		{

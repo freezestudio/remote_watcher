@@ -15,8 +15,24 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
 	DEBUG_STRING(L"@rg TimerCallback: ping ETA: {}\n."sv, _timeout);
 	_g_latest_time = dwTimerLowValue;
-	auto ok = nc_ptr->_maybe_heartbeat();
-	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n."sv, ok);
+	auto status = nc_ptr->_maybe_heartbeat();
+	auto status_msg = L"ok"s;
+	if (status != 0)
+	{
+		if (status == NATS_TIMEOUT)
+		{
+			status_msg = L"timeout"s;
+		}
+		else if (status == NATS_NO_RESPONDERS)
+		{
+			status_msg = L"no responsers"s;
+		}
+		else
+		{
+			status_msg = std::to_wstring(status);
+		}
+	}
+	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n."sv, status_msg);
 }
 
 namespace freeze

@@ -37,7 +37,13 @@ void reset_work_folder(bool notify/* = false */)
 	g_work_folder = fs::path{ latest_folder };
 	if (notify)
 	{
-		QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+		DEBUG_STRING(L"@rg reset_work_folder(): want wakeup work-thread ...\n");
+		auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+		if (!ret)
+		{
+			auto err = GetLastError();
+			DEBUG_STRING(L"@rg Wakup work-thread error: {}"sv, err);
+		}
 	}
 }
 
@@ -64,6 +70,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
+		DEBUG_STRING(L"@rg WorkerThread: Wakeup ...\n");
 		if (freeze::detail::check_exists(g_work_folder))
 		{
 			watcher.stop();
@@ -180,23 +187,30 @@ DWORD __stdcall _SleepThread(LPVOID)
 	{
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
+		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
 		switch (reason)
 		{
 		default: [[fallthrough]];
 		case sync_reason_none__reason:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_none__reason.\n");
 			break;
 		case sync_reason_recv_command:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_command.\n");
 			freeze::maybe_response_command(g_nats_client);
-			reset_work_folder();
+			reset_work_folder(true);
 			break;
 		case sync_reason_recv_message:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_message.\n");
 			freeze::maybe_send_message(g_nats_client);
 			break;
 		case sync_reason_send_command:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_command.\n");
 			break;
 		case sync_reason_send_message:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
 			break;
 		case sync_reason_send_payload:
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
 			// if reason is folder changed.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
