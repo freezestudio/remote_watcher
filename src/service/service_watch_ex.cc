@@ -254,7 +254,7 @@ namespace freeze
 
 	void folder_watchor_apc::start()
 	{
-		thread.swap(std::thread(folder_watchor_apc::loop_thread, this));
+		thread = std::thread(folder_watchor_apc::loop_thread, this);
 		DEBUG_STRING(L"folder_watchor_apc::start(): wait thread run ...\n");
 
 		signal.wait();

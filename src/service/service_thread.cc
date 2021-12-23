@@ -42,10 +42,12 @@ void reset_work_folder(bool notify/* = false */)
 
 	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
 	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
+	// TODO: add write lock (want using atomic)
 	g_work_folder = fs::path{ latest_folder };
 	if (!fs::exists(g_work_folder))
 	{
 		DEBUG_STRING(L"@rg Reset WorkFolder: folder not exists.\n"sv, g_work_folder.c_str());
+		return;
 	}
 
 	if (notify)
