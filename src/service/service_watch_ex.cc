@@ -209,7 +209,6 @@ namespace freeze
 namespace freeze
 {
 	folder_watchor_apc::folder_watchor_apc()
-		//: thread(folder_watchor_apc::loop_thread, this)
 		: signal{}
 	{
 		overlapped.hEvent = this;
@@ -280,13 +279,20 @@ namespace freeze
 
 	void folder_watchor_apc::stop()
 	{
+		if(!running)
+		{
+			return;
+		}
+
 		running = false;
 		auto ret = QueueUserAPC([](ULONG_PTR) {}, thread.native_handle(), (ULONG_PTR)(this));
 		if (!ret)
 		{
 			auto err = GetLastError();
 			DEBUG_STRING(L"folder_watchor_apc::stop() apc error: {}\n"sv, err);
+			return;
 		}
+
 		if (thread.joinable())
 		{
 			thread.join();
@@ -302,7 +308,7 @@ namespace freeze
 		auto self = reinterpret_cast<folder_watchor_apc*>(instance);
 		if (!self)
 		{
-			DEBUG_STRING(L"Error SleepEx result, Self is null.\n");
+			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error: Self is null.\n");
 			return;
 		}
 		self->signal.notify();
@@ -313,12 +319,19 @@ namespace freeze
 			auto result = SleepEx(INFINITE, TRUE);
 			if (WAIT_IO_COMPLETION != result)
 			{
-				DEBUG_STRING(L"Error SleepEx result not WAIT_IO_COMPLETION!.\n");
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: not WAIT_IO_COMPLETION!.\n");
 				//break;
 			}
+
+			if(!self)
+			{
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: Self is null.\n");
+				break;
+			}
+
 			if (!self->running)
 			{
-				DEBUG_STRING(L"Error SleepEx result, Self::running is false.\n");
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: self.running is false.\n");
 				break;
 			}
 		}
@@ -540,11 +553,12 @@ namespace freeze
 	watcher_win::watcher_win(folder_watchor_base& watchor)
 		: watchor{ watchor }
 	{
-
+		DEBUG_STRING(L"watcher_win::watcher_win(): Constructing ...\n");
 	}
 
 	void watcher_win::start()
 	{
+		DEBUG_STRING(L"watcher_win::start(): Starting...\n");
 		if (!watchor.set_watch_folder(folder, ignore_folders))
 		{
 			DEBUG_STRING(L"watcher_win::start() error: underline watchor set watch folder failure.\n");

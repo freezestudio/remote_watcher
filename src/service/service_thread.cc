@@ -63,6 +63,7 @@ void reset_work_folder(bool notify/* = false */)
 // worker thread.
 DWORD __stdcall _WorkerThread(LPVOID)
 {
+	DEBUG_STRING(L"@rg WorkerThread: Starting ...\n");
 	auto underline_watch = freeze::folder_watchor_apc{};
 	//auto underline_watch = freeze::folder_watchor_status{};
 	//auto underline_watch = freeze::folder_watchor_result{};
