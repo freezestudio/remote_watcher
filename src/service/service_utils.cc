@@ -158,7 +158,7 @@ namespace freeze::detail
 				nullptr                         // Arguments
 			) > 0)
 		{
-			DEBUG_STRING(L"Error: {}\n"sv, pBuffer);
+			DEBUG_STRING(L"RegKey Status Error: {}\n"sv, pBuffer);
 			LocalFree(pBuffer);
 		}
 		return false;

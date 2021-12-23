@@ -22,7 +22,12 @@ namespace freeze
         void resume();
 
     private:
+        void on_network_connect();
+        void on_network_disconnect();
+
+    private:
         std::thread _thread;
+        atomic_sync _signal;
 
     private:
         bool _running{false};

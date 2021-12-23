@@ -16,8 +16,7 @@ static bool read_resource(void** data, int* len)
 	auto _loaded = _resource.Load(MAKEINTRESOURCE(IDR_BLOB), MAKEINTRESOURCE(IDR_MAINFRAME));
 	if (!_loaded)
 	{
-		auto _msg = std::format(L"@rg Failed to load resource: {}", GetLastError());
-		DEBUG_STRING(_msg.data());
+		DEBUG_STRING(L"@rg Failed to load resource: {}\n"sv, GetLastError());
 		return false;
 	}
 	*len = _resource.GetSize();
@@ -109,7 +108,7 @@ std::wstring _service_state(DWORD state)
 //
 // install service to %ProgramFiles% or %SystemRoot% dependence SERVICE_PATH defined.
 //
-bool install_service()
+bool install_service(bool auto_start /*= true*/)
 {
 	wchar_t _path_buf[MAX_PATH]{};
 #ifdef SERVICE_PATH
@@ -133,7 +132,7 @@ bool install_service()
 		}
 	}
 #endif
-	DEBUG_STRING(L"@rg Install Service: Select service path.\n");
+	DEBUG_STRING(L"@rg Install Service: service path is {}.\n", _install_path.c_str());
 
 	// decompress blob
 	auto _resource = WTL::CResource();
@@ -141,7 +140,7 @@ bool install_service()
 	int _len = 0;
 	if (!read_resource(&_data, &_len))
 	{
-		DEBUG_STRING(L"Read Service Resource Failure.\n");
+		DEBUG_STRING(L"@rg Read Service Resource Failure.\n");
 		return false;
 	}
 	if (!decompress_blobs(_data, _len, _install_path.string().data()))
@@ -179,13 +178,15 @@ bool install_service()
 	auto _service_type = SERVICE_USER_SHARE_PROCESS;
 	auto _display_name = nullptr;
 #endif
+
+	auto _start_type = auto_start ? SERVICE_AUTO_START : SERVICE_DEMAND_START;
 	auto hsc = CreateService(
 		hscm,
 		SERVICE_NAME,
 		_display_name,        // dll, manual regkey
 		SERVICE_ALL_ACCESS,
 		_service_type,
-		SERVICE_AUTO_START, // SERVICE_AUTO_START, SERVICE_DEMAND_START
+		_start_type, // SERVICE_AUTO_START, SERVICE_DEMAND_START
 		SERVICE_ERROR_NORMAL,
 		_binary_path,
 		nullptr, nullptr, nullptr, nullptr, nullptr
@@ -193,9 +194,14 @@ bool install_service()
 	if (!hsc)
 	{
 		//ERROR_INVALID_PARAMETER; // 87
+		//ERROR_SERVICE_MARKED_FOR_DELETE; // 1072
 		auto _err = GetLastError();
 		DEBUG_STRING(L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
 			_err, SERVICE_NAME, _binary_path);
+		if (_err == ERROR_SERVICE_MARKED_FOR_DELETE)
+		{
+			MessageBox(nullptr, L"need reboot computer!", L"service", MB_ICONERROR | MB_OK);
+		}
 		CloseServiceHandle(hscm);
 		return false;
 	}
@@ -262,18 +268,13 @@ bool uninstall_service()
 	}
 	DEBUG_STRING(L"@rg Uninstall Service: DeleteService Successfully.\n");
 
-	// for dll
+	// for .dll
 #ifndef SERVICE_PATH
 	if (!remove_host_value())
 	{
 		return false;
 	}
 #endif
-
-	if (!remove_svc_keyvalue())
-	{
-		return false;
-	}
 
 	// TODO: maybe need remove USER\...\keys
 	// HKEY_CURRENT_USER\Software\Classes\Local Settings\MuiCache\f7\AAF68885
@@ -321,6 +322,11 @@ bool uninstall_service()
 		}
 	}
 #endif
+
+	if (!remove_svc_keyvalue())
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -375,17 +381,7 @@ bool start_service(LPCWSTR ip)
 
 	// service current state
 	auto current_state = sstatus.dwCurrentState;
-	do
-	{
-		//SERVICE_STOPPED                        0x00000001
-		//SERVICE_START_PENDING                  0x00000002
-		//SERVICE_STOP_PENDING                   0x00000003
-		//SERVICE_RUNNING                        0x00000004
-		//SERVICE_CONTINUE_PENDING               0x00000005
-		//SERVICE_PAUSE_PENDING                  0x00000006
-		//SERVICE_PAUSED                         0x00000007
-		DEBUG_STRING(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
-	} while (false);
+	DEBUG_STRING(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
 
 	// service state: not stop
 	if ((current_state != SERVICE_STOPPED) && (current_state != SERVICE_STOP_PENDING))
@@ -432,7 +428,6 @@ bool start_service(LPCWSTR ip)
 	wchar_t const* args[] = {
 		ip,
 	};
-
 	if (!::StartService(hsc, 1, args))
 	{
 		// ERROR_SERVICE_REQUEST_TIMEOUT (<=30s)
@@ -454,17 +449,7 @@ bool start_service(LPCWSTR ip)
 
 	// service status
 	current_state = sstatus.dwCurrentState;
-	do
-	{
-		//SERVICE_STOPPED                        0x00000001
-		//SERVICE_START_PENDING                  0x00000002
-		//SERVICE_STOP_PENDING                   0x00000003
-		//SERVICE_RUNNING                        0x00000004
-		//SERVICE_CONTINUE_PENDING               0x00000005
-		//SERVICE_PAUSE_PENDING                  0x00000006
-		//SERVICE_PAUSED                         0x00000007
-		DEBUG_STRING(L"@rg Start Service: Current service status: {}\n"sv, _service_state(current_state));
-	} while (false);
+	DEBUG_STRING(L"@rg Start Service: Current service status: {}\n"sv, _service_state(current_state));
 
 	auto check_point = sstatus.dwCheckPoint;
 	auto wait_tick = GetTickCount64();
@@ -494,10 +479,11 @@ bool start_service(LPCWSTR ip)
 			break;
 		}
 		current_state = sstatus.dwCurrentState;
-		do
+		DEBUG_STRING(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _service_state(current_state));
+		if (current_state == SERVICE_RUNNING)
 		{
-			DEBUG_STRING(L"@rg Start Service: after StartService() Current service status: {}\n"sv, _service_state(current_state));
-		} while (false);
+			break;
+		}
 
 		// service check point maybe changed.
 		if (sstatus.dwCheckPoint > check_point)
@@ -510,7 +496,7 @@ bool start_service(LPCWSTR ip)
 			auto duration = GetTickCount64() - wait_tick;
 			if (duration > sstatus.dwWaitHint)
 			{
-				DEBUG_STRING(L"@rg Start Service: Wait Service Start Pending Timeout.\n");
+				DEBUG_STRING(L"@rg Start Service: Wait Service Start Pending {}ms Timeout.\n"sv, sstatus.dwWaitHint);
 				break;
 			}
 		}
@@ -519,12 +505,12 @@ bool start_service(LPCWSTR ip)
 	// service started
 	if (current_state == SERVICE_RUNNING)
 	{
-		DEBUG_STRING(L"@rg Start Service[rgmsvc] Successfully.\n");
+		DEBUG_STRING(L"@rg Start Service Successfully.\n");
 	}
 	else
 	{
 		// failure
-		DEBUG_STRING(L"@rg Start Service[rgmsvc] Failure.\n");
+		DEBUG_STRING(L"@rg Start Service Failure.\n");
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
@@ -588,7 +574,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	}
 
 	// wait maybe service status is SERVICE_STOP_PENDING
-	auto current_state = sstatus.dwCurrentState;	
+	auto current_state = sstatus.dwCurrentState;
 	DEBUG_STRING(L"@rg before Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
 	auto wait_tick = GetTickCount64();
 	while (current_state == SERVICE_STOP_PENDING)

@@ -3,6 +3,7 @@
 //
 
 #include "service.h"
+#include "service_extern.h"
 
 //
 // TODO: #include <netlistmgr.h>
@@ -76,6 +77,9 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	DEBUG_STRING(L"@rg ServiceMain: rgmsvc starting ...\n");
 	if (init_service())
 	{
+#ifndef SERVICE_TEST
+		reset_work_folder();
+#endif
 		if (init_threadpool())
 		{
 			run_service();

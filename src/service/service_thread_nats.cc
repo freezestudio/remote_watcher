@@ -1,4 +1,5 @@
 #include "service_thread_nats.h"
+#include "service_extern.h"
 
 namespace freeze
 {
@@ -17,13 +18,19 @@ namespace freeze
 	void maybe_response_command(nats_client const& nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-NATS: maybe_response_command() ...\n");
-		nc.notify_command();
+		auto cmd = nc.notify_command();
+		if (cmd == "modify-folder")
+		{
+			reset_work_folder(true);
+		}
 	}
 }
 
 namespace freeze
 {
 	rgm_nats::rgm_nats()
+		: _signal{}
+		, _signal_reason{}
 	{
 
 	}

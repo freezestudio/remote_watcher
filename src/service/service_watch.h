@@ -16,12 +16,12 @@ namespace freeze
 		~async_watcher() noexcept;
 
 	public:
-		task_t<bool> watch(
-			detail::response_type = detail::response_type::overlapped) noexcept;
+		auto watch() noexcept;
 		task_t<bool> unwatch() noexcept;
 
 	public:
-		auto start() noexcept;
+		task_t<bool> start(
+			detail::response_type = detail::response_type::overlapped) noexcept;
 		void stop() noexcept;
 
 	public:

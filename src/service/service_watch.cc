@@ -14,8 +14,6 @@ namespace freeze
 				while (true)
 				{
 					_semaphore.wait();
-					auto watch_run = watch();
-					watch_run();
 					if (!_running)
 					{
 						break;
@@ -30,13 +28,39 @@ namespace freeze
 		stop();
 	}
 
-	auto async_watcher::start() noexcept
+	task_t<bool> async_watcher::start(detail::response_type response) noexcept
+	{
+		_watch_result.clear();
+		bool result = false;
+		switch (response)
+		{
+		default:
+			break;
+		case detail::response_type::overlapped:
+			result = overlapped_watch_();
+			break;
+		}
+		co_return result;
+	}
+
+	void async_watcher::stop() noexcept
+	{
+		_running = false;
+		_semaphore.notify();
+
+		if (_thread.joinable())
+		{
+			_thread.join();
+		}
+	}
+
+	auto async_watcher::watch() noexcept
 	{
 		struct awaitable
 		{
 			async_watcher* self;
 			awaitable(async_watcher* ptr)
-				: self{ptr}
+				: self{ ptr }
 			{
 
 			}
@@ -56,34 +80,7 @@ namespace freeze
 				return self->await_resume();
 			}
 		};
-		return awaitable{this};
-	}
-
-	void async_watcher::stop() noexcept
-	{
-		_running = false;
-		_semaphore.notify();
-
-		if (_thread.joinable())
-		{
-			_thread.join();
-		}
-	}
-
-	task_t<bool> async_watcher::watch(
-		detail::response_type response) noexcept
-	{
-		_watch_result.clear();
-		bool result = false;
-		switch (response)
-		{
-		default:
-			break;
-		case detail::response_type::overlapped:
-			result = overlapped_watch_();
-			break;
-		}
-		co_return result;
+		return awaitable{ this };
 	}
 
 	task_t<bool> async_watcher::unwatch() noexcept
@@ -170,7 +167,7 @@ namespace freeze
 	{
 		if (!_running)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::watch: running=false.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch: not running.\n");
 			return false;
 		}
 

@@ -1,14 +1,19 @@
+//
+// heartbeat timer
+//
+
 #include "service_thread_timer.h"
 #include "service_nats_client.h"
+#include "service_extern.h"
 
 DWORD _g_latest_time = 0;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
 #ifndef SERVICE_TEST
-	//if (ss_current_status != freeze::service_state::running)
-	//{
-	//	return;
-	//}
+	if (get_service_status() != freeze::service_state::running)
+	{
+		return;
+	}
 #endif
 
 	auto nc_ptr = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
@@ -45,6 +50,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 namespace freeze
 {
 	rgm_timer::rgm_timer()
+		: _signal{}
 	{
 
 	}
@@ -70,6 +76,19 @@ namespace freeze
 	}
 
 	void rgm_timer::resume()
+	{
+
+	}
+}
+
+namespace freeze
+{
+	void rgm_timer::on_network_connect()
+	{
+
+	}
+
+	void rgm_timer::on_network_disconnect()
 	{
 
 	}

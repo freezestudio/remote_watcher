@@ -243,7 +243,7 @@ namespace freeze
 
 	public:
 		void notify_message() const;
-		void notify_command() const;
+		std::string notify_command() const;
 		void notify_payload(fs::path const&) const;
 
 	public:

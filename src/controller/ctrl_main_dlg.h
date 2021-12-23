@@ -1,6 +1,7 @@
 #ifndef CTRL_MAIN_DLG_H
 #define CTRL_MAIN_DLG_H
 
+#define IP_ADDRESS_LEN 16
 using namespace std::literals;
 
 class MainDlg
@@ -87,6 +88,7 @@ public:
 		}
 
 		CheckDlgButton(IDC_CHECK_AUTO_START, BST_CHECKED);
+		_CheckLinkEnable(is_installed);
 
 		_SetIcon();
 		_SetIcon(true);
@@ -111,34 +113,23 @@ public:
 
 	void OnInstall(UINT uNotifyCode, int nID, CWindow /* wndCtl */)
 	{
-		DWORD addr;
-		auto _ipfields = mIP.GetAddress(&addr);
-		int ip0, ip1, ip2, ip3;
-		if (_ipfields == 4)
+		wchar_t ip[IP_ADDRESS_LEN]{};
+		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
+		if (addr == 0)
 		{
-			ip0 = FIRST_IPADDRESS(addr);
-			ip1 = SECOND_IPADDRESS(addr);
-			ip2 = THIRD_IPADDRESS(addr);
-			ip3 = FOURTH_IPADDRESS(addr);
-		}
-		else
-		{
-			//error
+			MessageBox(L"ip address failure.", L"monitor", MB_ICONWARNING | MB_OK);
 			return;
 		}
 
-		wchar_t ip[16]{};
-		auto str_ip = std::format(L"{}.{}.{}.{}", ip0, ip1, ip2, ip3);
-		wcscpy_s(ip, str_ip.c_str());
-		if (install_service())
+		if (install_service(mAutoStart))
 		{
-			save_ip(_ipfields);
+			save_ip(addr);
 			if (mAutoStart)
 			{
 				Sleep(1000);
 				auto started = start_service(ip);
 
-				DEBUG_STRING(L"Start Service Result: {}"sv, started);
+				DEBUG_STRING(L"Start Service Result: {}\n"sv, started);
 				if (started)
 				{
 					mEnableInstall = FALSE;
@@ -159,6 +150,7 @@ public:
 				SetDlgItemText(IDC_STATUS, L"installed, stopped!");
 			}
 			_SetButtonEnabled();
+			_CheckLinkEnable(true);
 		}
 		else
 		{
@@ -176,12 +168,13 @@ public:
 		{
 			SetDlgItemText(IDC_STATUS, L"stopped!");
 			auto uninstalled = uninstall_service();
-			DEBUG_STRING(L"Uninstall Service Result: {}"sv, uninstalled);
+			DEBUG_STRING(L"Uninstall Service Result: {}\n"sv, uninstalled);
 			if (uninstalled)
 			{
 				mEnableInstall = TRUE;
 				mEnableUninstall = FALSE;
 				SetDlgItemText(IDC_STATUS, L"uninstalled!");
+				// TODO: remove HKEY_CURRENT_USER\Software\richgolden\rgmsvc
 			}
 			else
 			{
@@ -190,6 +183,7 @@ public:
 				SetDlgItemText(IDC_STATUS, L"stopped, uninstall failure!");
 			}
 			_SetButtonEnabled();
+			_CheckLinkEnable(false);
 		}
 		else
 		{
@@ -228,33 +222,34 @@ public:
 
 	LRESULT OnStartService(LPNMHDR pnmh)
 	{
-		DWORD addr;
-		auto _ipfields = mIP.GetAddress(&addr);
-		int ip0, ip1, ip2, ip3;
-		if (_ipfields == 4)
+		wchar_t ip[IP_ADDRESS_LEN]{};
+		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
+		if (addr == 0)
 		{
-			ip0 = FIRST_IPADDRESS(addr);
-			ip1 = SECOND_IPADDRESS(addr);
-			ip2 = THIRD_IPADDRESS(addr);
-			ip3 = FOURTH_IPADDRESS(addr);
-		}
-		else
-		{
-			//error
+			MessageBox(L"ip address failure.", L"monitor", MB_ICONWARNING | MB_OK);
 			return FALSE;
 		}
 
-		wchar_t ip[16]{};
-		auto str_ip = std::format(L"{}.{}.{}.{}", ip0, ip1, ip2, ip3);
-		wcscpy_s(ip, str_ip.c_str());
-		start_service(ip);
+		auto ok = start_service(ip);
+		if (ok)
+		{
+			ok = save_ip(addr);
+		}
+		if (ok)
+		{
+			SetDlgItemText(IDC_STATUS, L"running!");
+		}
 
 		return TRUE;
 	}
 
 	LRESULT OnStopService(LPNMHDR pnmh)
 	{
-		stop_service();
+		auto stopped = stop_service();
+		if (stopped)
+		{
+			SetDlgItemText(IDC_STATUS, L"stopped!");
+		}
 		return TRUE;
 	}
 
@@ -262,7 +257,7 @@ private:
 	void _Subclass()
 	{
 		mIP.Attach(GetDlgItem(IDC_REMOTEIP));
-		mIP.SetAddress(MAKEIPADDRESS(192, 168, 0, 1));
+		mIP.SetAddress(MAKEIPADDRESS(0, 0, 0, 0));
 
 		mInstallButton.SetBitmapButtonExtendedStyle(BMPBTN_HOVER, BMPBTN_HOVER);
 		mInstallButtonImage.CreateFromImage(IDR_BMP_INSTALL, 90, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);
@@ -320,6 +315,48 @@ private:
 	{
 		DestroyWindow();
 		PostQuitMessage(0);
+	}
+
+	void _CheckLinkEnable(bool enabled)
+	{
+		BOOL bEnable = enabled ? TRUE : FALSE;
+		auto _start_link = GetDlgItem(IDC_SYSLINK_START);
+		if (_start_link)
+		{
+			::EnableWindow(_start_link, bEnable);
+		}
+		auto _stop_link = GetDlgItem(IDC_SYSLINK_STOP);
+		if (_stop_link)
+		{
+			::EnableWindow(_stop_link, bEnable);
+		}
+	}
+
+	DWORD _IpAddress(wchar_t* buffer, int len)
+	{
+		DWORD addr;
+		auto _ipfields = mIP.GetAddress(&addr);
+		int ip0, ip1, ip2, ip3;
+		if (_ipfields == 4)
+		{
+			ip0 = FIRST_IPADDRESS(addr);
+			ip1 = SECOND_IPADDRESS(addr);
+			ip2 = THIRD_IPADDRESS(addr);
+			ip3 = FOURTH_IPADDRESS(addr);
+		}
+		else
+		{
+			return 0;
+		}
+
+		auto str_ip = std::format(L"{}.{}.{}.{}", ip0, ip1, ip2, ip3);
+		auto err = wcscpy_s(buffer, len, str_ip.c_str());
+		if (err != NO_ERROR)
+		{
+			buffer = nullptr;
+			return 0;
+		}
+		return addr;
 	}
 };
 

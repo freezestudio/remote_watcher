@@ -720,6 +720,14 @@ namespace freeze::detail
 			{
 				auto status = natsConnection_PublishMsg(_nc, _m);
 				ok = status == NATS_OK;
+				if (!ok)
+				{
+					DEBUG_STRING(L"publish-message: publish message failure.\n");
+				}
+			}
+			else
+			{
+				DEBUG_STRING(L"publish-message: make message failure.\n");
 			}
 			return ok;
 		}
@@ -1096,6 +1104,8 @@ namespace freeze
 		std::string _message = std::exchange(g_current_message,{});
 		auto _recv_msg = detail::parse_recv_message(_message);
 
+		lock.unlock();
+
 		// 1. {name:"list-disk"}
 		// 2. {name:"select-directory", folder:"path/to/directory"}
 		if (_recv_msg.name == "list-disk")
@@ -1113,12 +1123,12 @@ namespace freeze
 		}
 	}
 
-	void nats_client::notify_command() const
+	std::string nats_client::notify_command() const
 	{
 		std::unique_lock<std::mutex> lock(_mutex);
 		if (g_current_command.name.empty())
 		{
-			return;
+			return {};
 		}
 
 		detail::nats_cmd cmd;
@@ -1128,6 +1138,9 @@ namespace freeze
 		g_current_command.name = {};
 		g_current_command.action = {};
 
+		lock.unlock();
+
+		std::string cmd_name = cmd.name;
 		if (cmd.name == "modify-folder")
 		{
 			auto folder = detail::to_utf16(cmd.action);
@@ -1135,10 +1148,22 @@ namespace freeze
 			{
 				if (fs::exists(fs::path{ folder }))
 				{
-					detail::save_latest_folder(folder);
+					if (detail::save_latest_folder(folder))
+					{
+						// success.
+					}
 				}
 			}
 		}
+		else if (cmd.name == "modify-ignores")
+		{
+
+		}
+		else if (cmd.name == "current-folder")
+		{
+
+		}
+		return cmd_name;
 	}
 
 	void nats_client::notify_payload(fs::path const& root) const

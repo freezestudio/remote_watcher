@@ -26,6 +26,8 @@ namespace freeze
 
     private:
         std::thread _thread;
+        atomic_sync _signal;
+        atomic_sync_reason _signal_reason;
 
     private:
         bool _running{ false };

@@ -11,16 +11,6 @@
 #include "service_thread_nats.h"
 #include "service_thread_timer.h"
 
-// #define SERVICE_TEST
-
-#ifndef SERVICE_TEST
-extern freeze::service_state ss_current_status;
-#endif
-
-extern std::wstring g_wcs_ip;
-extern fs::path g_work_folder;
-extern std::vector<fs::path> g_work_ignore_folders;
-
 bool init_service();
 void run_service();
 void stop_service();
@@ -35,9 +25,6 @@ DWORD __stdcall _WorkerThread(LPVOID);
 DWORD __stdcall _TimerThread(LPVOID);
 DWORD __stdcall _SleepThread(LPVOID);
 
-
-void reset_work_folder(bool notify = false);
-
 namespace freeze
 {
 	class rgm_service
@@ -47,12 +34,14 @@ namespace freeze
 		~rgm_service();
 
 	public:
-		bool initial();
+		bool initialize();
+		bool update_status(service_state, DWORD = NO_ERROR);
+
+	public:
 		void start();
 		void stop();
 		void pause();
 		void resume();
-		bool update_status(service_state, DWORD = NO_ERROR);
 
 	public:
 		static DWORD __stdcall control_code_handle_ex(DWORD, DWORD, LPVOID, LPVOID);

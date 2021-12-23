@@ -196,6 +196,7 @@ namespace freeze
 		}
 		return lRes;
 	}
+
 	LSTATUS reg_key::QueryValue(
 		_In_opt_z_ LPCWSTR pszValueName,
 		_Out_opt_ DWORD* pdwType,

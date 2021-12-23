@@ -19,12 +19,14 @@ namespace freeze
 	{
 		if (folder.empty())
 		{
+			DEBUG_STRING(L"folder_watchor_base::set_watch_folder(): folder is null.\n");
 			return false;
 		}
 
 		auto generic_folder = folder.lexically_normal();
 		if (!fs::exists(generic_folder))
 		{
+			DEBUG_STRING(L"folder_watchor_base::set_watch_folder(): folder {} not exists.\n"sv, generic_folder.c_str());
 			return false;
 		}
 
@@ -222,13 +224,13 @@ namespace freeze
 	{
 		if (!running)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::watch: running=false.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch: can not run.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
-			DEBUG_STRING(L"folder_watchor_apc::watch: folder not exists.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch: folder not exists, can not run.\n");
 			running = false;
 			return false;
 		}
@@ -254,9 +256,10 @@ namespace freeze
 	void folder_watchor_apc::start()
 	{
 		thread = std::thread(folder_watchor_apc::loop_thread, this);
+		DEBUG_STRING(L"folder_watchor_apc::start(): wait thread run ...\n");
 
 		signal.wait();
-		QueueUserAPC([](ULONG_PTR instance)
+		auto ret = QueueUserAPC([](ULONG_PTR instance)
 			{
 				auto self = reinterpret_cast<folder_watchor_apc*>(instance);
 				if (self)
@@ -268,12 +271,22 @@ namespace freeze
 					DEBUG_STRING(L"folder_watchor_apc::start() error: install is null.\n");
 				}
 			}, thread.native_handle(), (ULONG_PTR)(this));
+		if (!ret)
+		{
+			auto err = GetLastError();
+			DEBUG_STRING(L"folder_watchor_apc::start() apc error: {}\n"sv, err);
+		}
 	}
 
 	void folder_watchor_apc::stop()
 	{
 		running = false;
-		QueueUserAPC([](ULONG_PTR) {}, thread.native_handle(), (ULONG_PTR)(this));
+		auto ret = QueueUserAPC([](ULONG_PTR) {}, thread.native_handle(), (ULONG_PTR)(this));
+		if (!ret)
+		{
+			auto err = GetLastError();
+			DEBUG_STRING(L"folder_watchor_apc::stop() apc error: {}\n"sv, err);
+		}
 		if (thread.joinable())
 		{
 			thread.join();
@@ -296,6 +309,7 @@ namespace freeze
 
 		while (true)
 		{
+			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): thread run and sleep.\n");
 			auto result = SleepEx(INFINITE, TRUE);
 			if (WAIT_IO_COMPLETION != result)
 			{

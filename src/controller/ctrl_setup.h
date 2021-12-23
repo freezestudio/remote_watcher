@@ -10,7 +10,7 @@
 #include "ctrl_dep.h"
 
 bool is_service_installed(LPDWORD=nullptr);
-bool install_service();
+bool install_service(bool = true);
 bool uninstall_service();
 bool start_service(LPCWSTR ip);
 bool stop_service(SC_HANDLE=nullptr, SC_HANDLE=nullptr);

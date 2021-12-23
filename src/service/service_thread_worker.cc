@@ -5,6 +5,7 @@ namespace freeze
 	rgm_worker::rgm_worker()
 		: _running{ false }
 		, _paused{ false }
+		, _signal{}
 	{
 
 	}

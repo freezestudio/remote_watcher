@@ -1,11 +1,27 @@
+//
+// service implement
+//
+
 #include "service.h"
+#include "service_extern.h"
 
 // service status handle.
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable_event = nullptr;
 DWORD cp_check_point = 0;
+
+#ifndef SERVICE_TEST
 /* extern */
 freeze::service_state ss_current_status = freeze::service_state::stopped;
+freeze::service_state get_service_status()
+{
+	return ss_current_status;
+}
+void set_service_status(DWORD status)
+{
+	ss_current_status = to_enum<freeze::service_state>(status);
+}
+#endif
 
 bool init_service()
 {
@@ -13,7 +29,7 @@ bool init_service()
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
-		DEBUG_STRING(L"@rg register Service Control Handler failure, exit.\n");
+		DEBUG_STRING(L"@rg Register Service Control Handler failure, exit.\n");
 		return false;
 	}
 	DEBUG_STRING(L"@rg Service control handler registered.\n");
@@ -25,7 +41,7 @@ bool init_service()
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable_event)
 	{
-		DEBUG_STRING(L"@rg create waitable handle failure, exit.\n");
+		DEBUG_STRING(L"@rg Create waitable handle failure, exit.\n");
 
 		update_status(ss_handle, SERVICE_STOP_PENDING);
 		DEBUG_STRING(L"@rg Service CreateEvent Failure. stop pending.\n");
@@ -39,7 +55,7 @@ void run_service()
 #ifndef SERVICE_TEST
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
-	DEBUG_STRING(L"@rg Service Starting ...\n");
+	DEBUG_STRING(L"@rg Service Started.\n");
 #endif
 
 	while (true)
@@ -63,7 +79,7 @@ void stop_service()
 		hh_waitable_event = nullptr;
 	}
 
-	DEBUG_STRING(L"@rg service:rgmsvc stopped.\n");
+	DEBUG_STRING(L"@rg Service:rgmsvc stopped.\n");
 }
 
 
@@ -79,20 +95,16 @@ DWORD __stdcall handler_proc_ex(
 		// pause service
 		DEBUG_STRING(L"@rg Recv [pause] control code.\n");
 		update_status(ss_handle, SERVICE_PAUSE_PENDING);
-		ss_current_status = freeze::service_state::pause_pending;
 		DEBUG_STRING(L"@rg Recv [pause] control code: do-something ...\n");
 		update_status(ss_handle, SERVICE_PAUSED);
-		ss_current_status = freeze::service_state::paused;
 		DEBUG_STRING(L"@rg Recv [pause] control code: Service Paused.\n");
 		break;
 	case SERVICE_CONTROL_CONTINUE:
 		// resume service
 		DEBUG_STRING(L"@rg Recv [resume] control code.\n");
 		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
-		ss_current_status = freeze::service_state::continue_pending;
 		DEBUG_STRING(L"@rg Recv [resume] control code: do-something...\n");
 		update_status(ss_handle, SERVICE_RUNNING);
-		ss_current_status = freeze::service_state::running;
 		DEBUG_STRING(L"@rg Recv [resume] control code: Service Running.\n");
 		break;
 	case SERVICE_CONTROL_INTERROGATE:
@@ -112,16 +124,15 @@ DWORD __stdcall handler_proc_ex(
 		SetEvent(hh_waitable_event);
 		DEBUG_STRING(L"@rg Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);
-		ss_current_status = freeze::service_state::stop_pending;
 		// SERVICE_STOPPED
 		break;
 	case SERVICE_CONTROL_NETWORK_CONNECT:
 		// return ERROR_CALL_NOT_IMPLEMENTED;
-		ss_current_status = freeze::service_state::network_connect;
+		update_status(ss_handle, SERVICE_CONTROL_NETWORK_CONNECT);
 		break;
 	case SERVICE_CONTROL_NETWORK_DISCONNECT:
 		// return ERROR_CALL_NOT_IMPLEMENTED;
-		ss_current_status = freeze::service_state::network_disconnect;
+		update_status(ss_handle, SERVICE_CONTROL_NETWORK_DISCONNECT);
 		break;
 	default:
 		break;
@@ -169,5 +180,11 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 	}
 
 	auto ok = SetServiceStatus(hss, &service_status) ? true : false;
+#ifndef SERVICE_TEST
+	if(ok)
+	{
+		set_service_status(state);
+	}
+#endif
 	return ok;
 }

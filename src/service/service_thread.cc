@@ -2,6 +2,7 @@
 // parallel threads
 //
 #include "service.h"
+#include "service_extern.h"
 
 // file time: 100 nanosecond.
 constexpr auto time_second = 10000000L;
@@ -32,17 +33,29 @@ fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
 	auto wcs_folder = freeze::detail::read_latest_folder();
+	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}.\n"sv, wcs_folder);
+	if (wcs_folder.empty())
+	{
+		DEBUG_STRING(L"@rg Reset WorkFolder: folder is null.\n");
+		return;
+	}
+
 	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
 	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
 	g_work_folder = fs::path{ latest_folder };
+	if (!fs::exists(g_work_folder))
+	{
+		DEBUG_STRING(L"@rg Reset WorkFolder: folder not exists.\n"sv, g_work_folder.c_str());
+	}
+
 	if (notify)
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): want wakeup work-thread ...\n");
+		DEBUG_STRING(L"@rg reset_work_folder(): Want Wakeup work-thread ...\n");
 		auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
 		if (!ret)
 		{
 			auto err = GetLastError();
-			DEBUG_STRING(L"@rg Wakup work-thread error: {}"sv, err);
+			DEBUG_STRING(L"@rg Wakup work-thread error: {}\n"sv, err);
 		}
 	}
 }
@@ -55,11 +68,16 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	//auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{ underline_watch };
 
-#ifdef SERVICE_TEST
-	watcher.set_watch_folder(g_work_folder);
-	watcher.set_ignore_folders(g_work_ignore_folders);
-	watcher.start();
-#endif
+	if (freeze::detail::check_exists(g_work_folder))
+	{
+		watcher.set_watch_folder(g_work_folder);
+		watcher.set_ignore_folders(g_work_ignore_folders);
+		watcher.start();
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg WorkerThread: current folder [{}], not exists, watcher not started.\n"sv, g_work_folder.c_str());
+	}
 
 	while (!bb_worker_thread_exit)
 	{
@@ -68,19 +86,23 @@ DWORD __stdcall _WorkerThread(LPVOID)
 
 #ifndef SERVICE_TEST
 		// maybe service paused.
-		if (ss_current_status != freeze::service_state::running)
+		if (get_service_status() != freeze::service_state::running)
 		{
 			continue;
 		}
 #endif
 
-		DEBUG_STRING(L"@rg WorkerThread: Wakeup ...\n");
+		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup.\n");
 		if (freeze::detail::check_exists(g_work_folder))
 		{
 			watcher.stop();
 			watcher.set_watch_folder(g_work_folder);
 			watcher.set_ignore_folders(g_work_ignore_folders);
 			watcher.start();
+		}
+		else
+		{
+			DEBUG_STRING(L"@rg WorkerThread: when wakeup, the folder maybe is null: {}.\n"sv, g_work_folder.c_str());
 		}
 	}
 	return 0;
@@ -135,7 +157,15 @@ DWORD __stdcall _TimerThread(LPVOID)
 	};
 	reason.Reason.SimpleReasonString = reason_string;
 	ULONG delay = 0; // tolerable delay 5000
-	auto ok = ::SetWaitableTimerEx(hh_timer, &due_time, period, _TimerCallback, (LPVOID)(&g_nats_client), &reason, delay);
+	auto ok = ::SetWaitableTimerEx(
+		hh_timer,
+		&due_time,
+		period,
+		_TimerCallback,
+		(LPVOID)(&g_nats_client),
+		&reason,
+		delay
+	);
 	if (!ok)
 	{
 		auto err = GetLastError();
@@ -160,7 +190,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 }
 
 DWORD __stdcall _SleepThread(LPVOID)
-{	
+{
 	if (!g_wcs_ip.empty())
 	{
 		auto ip = freeze::detail::make_ip_address(g_wcs_ip);
@@ -175,7 +205,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg SleepThread: error invalid ip.\n");
+			DEBUG_STRING(L"@rg SleepThread Error: invalid ip.\n");
 			// notify other thread and service stop.
 			return 0;
 		}
@@ -201,7 +231,6 @@ DWORD __stdcall _SleepThread(LPVOID)
 		case sync_reason_recv_command:
 			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_command.\n");
 			freeze::maybe_response_command(g_nats_client);
-			reset_work_folder(true);
 			break;
 		case sync_reason_recv_message:
 			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_message.\n");
@@ -215,7 +244,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			break;
 		case sync_reason_send_payload:
 			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
-			// if reason is folder changed.
+			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
@@ -235,6 +264,13 @@ bool init_threadpool()
 			bb_worker_thread_exit = true;
 			return false;
 		}
+		if (hh_worker_thread == INVALID_HANDLE_VALUE)
+		{
+			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			hh_worker_thread = nullptr;
+			bb_worker_thread_exit = true;
+			return false;
+		}
 	}
 
 	bb_timer_thread_exit = false;
@@ -247,6 +283,13 @@ bool init_threadpool()
 			DEBUG_STRING(L"@rg service create timer thread failure.\n");
 			return false;
 		}
+		if (hh_timer_thread == INVALID_HANDLE_VALUE)
+		{
+			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			hh_timer_thread = nullptr;
+			bb_timer_thread_exit = true;
+			return false;
+		}
 	}
 
 	bb_sleep_thread_exit = false;
@@ -257,6 +300,13 @@ bool init_threadpool()
 		{
 			bb_sleep_thread_exit = true;
 			DEBUG_STRING(L"@rg service create sleep thread failure.\n");
+			return false;
+		}
+		if (hh_sleep_thread == INVALID_HANDLE_VALUE)
+		{
+			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			hh_sleep_thread = nullptr;
+			bb_sleep_thread_exit = true;
 			return false;
 		}
 	}
@@ -310,9 +360,13 @@ namespace freeze
 
 	}
 
-	bool rgm_service::initial()
+	bool rgm_service::initialize()
 	{
-		_service_status_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, rgm_service::control_code_handle_ex, (LPVOID)(this));
+		_service_status_handle = ::RegisterServiceCtrlHandlerEx(
+			SERVICE_NAME,
+			rgm_service::control_code_handle_ex,
+			(LPVOID)(this)
+		);
 		if (!_service_status_handle)
 		{
 			return false;
@@ -329,7 +383,7 @@ namespace freeze
 
 		update_status(service_state::running);
 
-		// main thread waiting ...
+		// main thread waiting until stopped ...
 		_signal.wait();
 	}
 
@@ -394,10 +448,12 @@ namespace freeze
 			_service_status.dwWaitHint = 3000;
 		}
 
-		return ::SetServiceStatus(_service_status_handle, &_service_status) ? true : false;
+		return ::SetServiceStatus(
+			_service_status_handle, &_service_status) ? true : false;
 	}
 
-	DWORD __stdcall rgm_service::control_code_handle_ex(DWORD code, DWORD event_type, LPVOID lpevdata, LPVOID lpcontext)
+	DWORD __stdcall rgm_service::control_code_handle_ex(
+		DWORD code, DWORD event_type, LPVOID lpevdata, LPVOID lpcontext)
 	{
 		auto self = reinterpret_cast<rgm_service*>(lpcontext);
 		if (!self)
@@ -414,19 +470,19 @@ namespace freeze
 			self->update_status(service_state::stop_pending);
 			self->stop();
 			break;
+		case freeze::service_control::network_disconnect:
+			[[fallthrough]];
 		case freeze::service_control::pause:
 			self->update_status(service_state::pause_pending);
 			self->pause();
 			break;
+		case freeze::service_control::network_connect:
+			[[fallthrough]];
 		case freeze::service_control::_continue:
 			self->update_status(service_state::continue_pending);
 			self->resume();
 			break;
 		case freeze::service_control::param_change:
-			break;
-		case freeze::service_control::network_connect:
-			break;
-		case freeze::service_control::network_disconnect:
 			break;
 		default:
 			break;
