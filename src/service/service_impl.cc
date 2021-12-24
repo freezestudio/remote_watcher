@@ -35,7 +35,7 @@ bool init_service()
 	DEBUG_STRING(L"@rg Service: ControlHandler Registered.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
-	DEBUG_STRING(L"@rg Service: Start Pending 10s.\n");
+	DEBUG_STRING(L"@rg Service: Start Pending 30s.\n");
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -176,7 +176,7 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 	else
 	{
 		service_status.dwCheckPoint = cp_check_point++;
-		service_status.dwWaitHint = 10000;
+		service_status.dwWaitHint = 30000;
 	}
 
 	auto ok = SetServiceStatus(hss, &service_status) ? true : false;

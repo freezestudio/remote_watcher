@@ -383,7 +383,8 @@ namespace freeze::detail
 		{
 			if (p.is_directory())
 			{
-				auto mbs_folder = to_utf8(static_cast<fs::path>(p).c_str());
+				auto _folder = p.path().lexically_normal();
+				auto mbs_folder = to_utf8(_folder.c_str());
 				folders.emplace_back(mbs_folder);
 			}
 		}

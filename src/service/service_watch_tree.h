@@ -25,6 +25,7 @@ namespace freeze
 
 namespace freeze
 {
+	// TODO: refact, fs::path to std::string.
 	class watch_tree
 	{
 	public:
@@ -35,6 +36,9 @@ namespace freeze
 		void add(fs::path const& file);
 		void remove(fs::path const& file);
 		void modify(fs::path const& file);
+
+	public:
+		std::size_t current_count();
 		void clear();
 
 	public:

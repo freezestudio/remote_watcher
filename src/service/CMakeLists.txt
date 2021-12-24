@@ -2,9 +2,9 @@
 # rgmsvc service
 #
 
-option(SERVICE_EXEC_TYPE "use exe service? otherwise dll" ON)
+option(SERVICE_BUILD_TYPE "use exe service? otherwise dll" ON)
 
-if(SERVICE_EXEC_TYPE)
+if(SERVICE_BUILD_TYPE)
     #
     # SERVICE EXE
     #
@@ -45,7 +45,7 @@ if(SERVICE_EXEC_TYPE)
     # more ...
 
     add_custom_command(TARGET ${SERVICE_EXE} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "Make ${SERVICE_EXE} blob bundle ..."
+        COMMAND ${CMAKE_COMMAND} -E echo "Make ${PROJECT_SOURCE_DIR}/tools/${SERVICE_EXE_NAME} blob bundle ..."
         COMMAND ${CMAKE_COMMAND} -E copy ${SERVICE_EXE_PATH} ${PROJECT_SOURCE_DIR}/tools/${SERVICE_EXE_NAME}
         COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_SOURCE_DIR}/tools 
             ${CMAKE_COMMAND} -E tar cz "${PROJECT_SOURCE_DIR}/assets/blob.tgz" -- 

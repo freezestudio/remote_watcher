@@ -10,8 +10,9 @@ DWORD _g_latest_time = 0;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
 #ifndef SERVICE_TEST
-	if (get_service_status() != freeze::service_state::running)
+	if (auto state = get_service_status(); state != freeze::service_state::running /* 4 */)
 	{
+		DEBUG_STRING(L"@rg TimerCallback: Service Status={}.\n"sv, to_dword(state));
 		return;
 	}
 #endif

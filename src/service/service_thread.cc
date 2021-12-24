@@ -66,9 +66,9 @@ void reset_work_folder(bool notify/* = false */)
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg WorkerThread: Starting ...\n");
-	auto underline_watch = freeze::folder_watchor_apc{};
-	//auto underline_watch = freeze::folder_watchor_status{};
-	//auto underline_watch = freeze::folder_watchor_result{};
+	// auto underline_watch = freeze::folder_watchor_apc{};
+	// auto underline_watch = freeze::folder_watchor_status{};
+	auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{ underline_watch };
 
 	if (freeze::detail::check_exists(g_work_folder))
@@ -108,6 +108,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			DEBUG_STRING(L"@rg WorkerThread: when wakeup, the folder maybe is null: {}.\n"sv, g_work_folder.c_str());
 		}
 	}
+	DEBUG_STRING(L"@rg WorkerThread: Stopped.\n");
 	return 0;
 }
 
@@ -173,7 +174,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	if (!ok)
 	{
 		auto err = GetLastError();
-		DEBUG_STRING(L"@rg service set timer error: {}\n"sv, err);
+		DEBUG_STRING(L"@rg TimerThread: set timer error: {}, stop.\n"sv, err);
 		return 0;
 	}
 
@@ -189,7 +190,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 		CloseHandle(hh_timer);
 		hh_timer = nullptr;
 	}
-
+	DEBUG_STRING(L"@rg TimerThread: Stopped.\n");
 	return 0;
 }
 
@@ -210,14 +211,14 @@ DWORD __stdcall _SleepThread(LPVOID)
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg SleepThread Error: invalid ip.\n");
+			DEBUG_STRING(L"@rg SleepThread Error: invalid ip, stop.\n");
 			// notify other thread and service stop.
 			return 0;
 		}
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg SleepThread: error remote ip is null.\n");
+		DEBUG_STRING(L"@rg SleepThread: error remote ip is null, stop.\n");
 		// notify other thread and service stop.
 		return 0;
 	}
@@ -227,35 +228,40 @@ DWORD __stdcall _SleepThread(LPVOID)
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
-		// TODO: pause timer-thread
+		// pause timer-thread (SERVICE_PAUSED=7)
+		set_service_status(SERVICE_PAUSED);
+		DEBUG_STRING(L"@rg SleepThread: wakeup Pause-TimerThread.\n");
 		switch (reason)
 		{
 		default: [[fallthrough]];
 		case sync_reason_none__reason:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_none__reason.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_none__reason(0).\n");
 			break;
 		case sync_reason_recv_command:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_command.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_command(1).\n");
 			freeze::maybe_response_command(g_nats_client);
 			break;
 		case sync_reason_recv_message:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_message.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_message(2).\n");
 			freeze::maybe_send_message(g_nats_client);
 			break;
 		case sync_reason_send_command:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_command.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_command(3).\n");
 			break;
 		case sync_reason_send_message:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message(4).\n");
 			break;
 		case sync_reason_send_payload:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_payload.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_payload(5).\n");
 			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
-		// TODO: resume timer-thread
+		// resume timer-thread (SERVICE_RUNNING=4)
+		set_service_status(SERVICE_RUNNING);
+		DEBUG_STRING(L"@rg SleepThread: wakeup Resume-TimerThread.\n");
 	}
+	DEBUG_STRING(L"@rg SleepThread: Stopped.\n");
 	return 0;
 }
 

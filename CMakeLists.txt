@@ -46,6 +46,7 @@ include(common)
 #
 # rgmsvc Service (.dll or .exe)
 #
+set(SERVICE_EXEC_TYPE ON)
 add_subdirectory(src/service ${PROJECT_BINARY_DIR}/service)
 
 #
@@ -57,17 +58,26 @@ set(EXEC_NAME monitor)
 # auto find *.cc in src/controller
 file(GLOB EXEC_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/*.cc)
 add_executable(${EXEC_NAME} WIN32 ${EXEC_SRC})
+# if(SERVICE_BUILD_TYPE)
+#     add_dependencies(${EXEC_NAME} ${SERVICE_EXE})
+# else()
+#     add_dependencies(${EXEC_NAME} ${SERVICE_DLL})
+# endif()
+add_dependencies(${EXEC_NAME} rgmsvc)
 target_include_directories(${EXEC_NAME} 
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/wtl/include ${CMAKE_CURRENT_SOURCE_DIR}/3rdpart/zlib
     PUBLIC ${PROJECT_BINARY_DIR}/zlib
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/controller  ./include
 )
+# 1. failure
 #target_link_options(monitor
 #    PRIVATE /SUBSYSTEM:WINDOWS
 #    PUBLIC /MANIFESTUAC:"level='requireAdministrator' uiAccess='false'"
 #)
-set_target_properties(${EXEC_NAME} PROPERTIES LINK_FLAGS /MANIFESTUAC:"level='requireAdministrator' uiAccess='false'")
+# 2. failure
 # SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /level='requireAdministrator' /uiAccess='false'")
+# 3. success
+set_target_properties(${EXEC_NAME} PROPERTIES LINK_FLAGS /MANIFESTUAC:"level='requireAdministrator' uiAccess='false'")
 target_sources(${EXEC_NAME} PUBLIC
     ./assets/${EXEC_NAME}.rc
     ./assets/${EXEC_NAME}.ico
@@ -76,12 +86,11 @@ target_sources(${EXEC_NAME} PUBLIC
     ./assets/blob.tgz
 )
 target_link_libraries(${EXEC_NAME} zlibstatic)
-
 #
 # custom command: check blob
 #
 add_custom_command(TARGET ${EXEC_NAME} PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "before build monitor: check blob ..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Before build ${EXEC_NAME}: check blob ..."
 )
 
 #

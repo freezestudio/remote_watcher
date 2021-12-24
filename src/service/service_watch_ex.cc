@@ -11,11 +11,12 @@ namespace freeze
 	folder_watchor_base::~folder_watchor_base()
 	{
 		stop();
+		unwatch();
 	}
 
 	bool folder_watchor_base::set_watch_folder(
-		fs::path const& folder,
-		std::vector<fs::path> const& ignores /*= {}*/)
+		fs::path const &folder,
+		std::vector<fs::path> const &ignores /*= {}*/)
 	{
 		if (folder.empty())
 		{
@@ -43,6 +44,7 @@ namespace freeze
 			}
 			if (folder_handle)
 			{
+				CancelIo(folder_handle);
 				CloseHandle(folder_handle);
 				folder_handle = nullptr;
 			}
@@ -57,8 +59,7 @@ namespace freeze
 				nullptr,
 				OPEN_EXISTING,
 				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-				nullptr
-			);
+				nullptr);
 			if (INVALID_HANDLE_VALUE == folder_handle)
 			{
 				DEBUG_STRING(L"folder_watchor_base::set_weatch_folder() error: open folder handle failure.\n");
@@ -97,11 +98,13 @@ namespace freeze
 
 	bool folder_watchor_base::watch()
 	{
+		// derived class re-implementaion.
 		return false;
 	}
 
 	void folder_watchor_base::unwatch()
 	{
+		DEBUG_STRING(L"folder_watchor_base::unwatch() ...\n");
 		if (folder_handle)
 		{
 			CancelIo(folder_handle);
@@ -114,13 +117,13 @@ namespace freeze
 	{
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > read_buffer.size())
 		{
-			DEBUG_STRING(L"folder_watchor_base::on_data, maybe need more buffer.\n");
+			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): maybe need more buffer.\n");
 			return;
 		}
 
 		if (!watch_tree_ptr)
 		{
-			DEBUG_STRING(L"folder_watchor_base::on_data, watch tree pointer is null.\n");
+			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): watch tree pointer is null.\n");
 			return;
 		}
 
@@ -138,7 +141,12 @@ namespace freeze
 			data += info->NextEntryOffset;
 		}
 
-		watch_tree_ptr->notify();
+		auto count = watch_tree_ptr->current_count();
+		if (count > 0)
+		{
+			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): parse {} files, notify!\n"sv, count);
+			watch_tree_ptr->notify();
+		}
 	}
 
 	void folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
@@ -158,7 +166,7 @@ namespace freeze
 		{
 			DEBUG_STRING(L"Ignore: parse notify {}, name={}\n"sv, info->Action, filename);
 
-			auto file_path = fs::path{ filename }.lexically_normal();
+			auto file_path = fs::path{filename}.lexically_normal();
 			watch_tree_ptr->remove(file_path);
 			return;
 		}
@@ -181,7 +189,7 @@ namespace freeze
 
 			if (fs::is_regular_file(full_filename))
 			{
-				auto file_path = fs::path{ filename }.lexically_normal();
+				auto file_path = fs::path{filename}.lexically_normal();
 				watch_tree_ptr->add(file_path);
 				DEBUG_STRING(L"Update: watch-tree added: {}\n"sv, file_path.c_str());
 			}
@@ -215,11 +223,13 @@ namespace freeze
 	folder_watchor_apc::folder_watchor_apc()
 		: signal{}
 	{
+		DEBUG_STRING(L"folder_watchor_apc: constructor.\n");
 		overlapped.hEvent = this;
 	}
 
 	folder_watchor_apc::~folder_watchor_apc()
 	{
+		DEBUG_STRING(L"folder_watchor_apc: de-constructor.\n");
 		stop();
 	}
 
@@ -227,31 +237,30 @@ namespace freeze
 	{
 		if (!running)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::watch: can not run.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch(): can not run.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
-			DEBUG_STRING(L"folder_watchor_apc::watch: folder not exists, can not run.\n");
+			DEBUG_STRING(L"folder_watchor_apc::watch(): folder not exists, can not run.\n");
 			running = false;
 			return false;
 		}
 
 		auto result = ReadDirectoryChangesW(
-			folder_handle,
-			reinterpret_cast<LPVOID>(write_buffer.data()),
-			static_cast<DWORD>(write_buffer.size()),
-			TRUE,
-			gNotifyFilter,
-			nullptr,
-			&overlapped,
-			folder_watchor_apc::completion_routine
-		) != FALSE;
+						  folder_handle,
+						  reinterpret_cast<LPVOID>(write_buffer.data()),
+						  static_cast<DWORD>(write_buffer.size()),
+						  TRUE,
+						  gNotifyFilter,
+						  nullptr,
+						  &overlapped,
+						  folder_watchor_apc::completion_routine) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
-			DEBUG_STRING(L"folder_watchor_apc::watch error: {}\n"sv, error);
+			DEBUG_STRING(L"folder_watchor_apc::watch() error: {}\n"sv, error);
 		}
 		return result;
 	}
@@ -259,33 +268,37 @@ namespace freeze
 	void folder_watchor_apc::start()
 	{
 		thread = std::thread(folder_watchor_apc::loop_thread, this);
-		DEBUG_STRING(L"folder_watchor_apc::start(): wait thread run ...\n");
+		DEBUG_STRING(L"folder_watchor_apc::start(): wait this-thread run ...\n");
 
 		signal.wait();
 		auto ret = QueueUserAPC([](ULONG_PTR instance)
-			{
-				auto self = reinterpret_cast<folder_watchor_apc*>(instance);
-				if (self)
-				{
-					self->watch();
-				}
-				else
-				{
-					DEBUG_STRING(L"folder_watchor_apc::start() error: install is null.\n");
-				}
-			}, thread.native_handle(), (ULONG_PTR)(this));
+								{
+									auto self = reinterpret_cast<folder_watchor_apc *>(instance);
+									if (self)
+									{
+										auto success = self->watch();
+										DEBUG_STRING(L"folder_watchor_apc::start() apc watching {}\n"sv, success);
+									}
+									else
+									{
+										DEBUG_STRING(L"folder_watchor_apc::start() apc error: install is null.\n");
+									}
+								},
+								thread.native_handle(), (ULONG_PTR)(this));
 		if (!ret)
 		{
 			auto err = GetLastError();
 			DEBUG_STRING(L"folder_watchor_apc::start() apc error: {}\n"sv, err);
 		}
-		DEBUG_STRING(L"folder_watchor_apc::start() apc: Will Wakeup Sleep thread ...\n");
+		DEBUG_STRING(L"folder_watchor_apc::start() apc: Will Wakeup this-thread ...\n");
 	}
 
 	void folder_watchor_apc::stop()
 	{
-		if(!running)
+		DEBUG_STRING(L"folder_watchor_apc::stop(): stopping ...\n");
+		if (!running)
 		{
+			DEBUG_STRING(L"folder_watchor_apc::stop(): running=false, stop.\n");
 			return;
 		}
 
@@ -297,22 +310,24 @@ namespace freeze
 			DEBUG_STRING(L"folder_watchor_apc::stop() apc error: {}\n"sv, err);
 			return;
 		}
+		DEBUG_STRING(L"folder_watchor_apc::stop() apc alearable this-thread to stop ...\n");
 
 		if (thread.joinable())
 		{
-			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Will Wakeup Sleep thread stop.\n");
+			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Will Wakeup this-thread(join) stop.\n");
 			thread.join();
 		}
 		else
 		{
-			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Want Wakeup Sleep thread [assert self==null].\n");
+			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Want Wakeup this-thread(detach) [assert self==null].\n");
 			thread.detach();
 		}
 	}
 
-	void folder_watchor_apc::loop_thread(void* instance)
+	void folder_watchor_apc::loop_thread(void *instance)
 	{
-		auto self = reinterpret_cast<folder_watchor_apc*>(instance);
+		DEBUG_STRING(L"folder_watchor_apc::loop_thread(): starting ...\n");
+		auto self = reinterpret_cast<folder_watchor_apc *>(instance);
 		if (!self)
 		{
 			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error: Self is null.\n");
@@ -324,24 +339,28 @@ namespace freeze
 		{
 			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): thread run and sleep.\n");
 			auto result = SleepEx(INFINITE, TRUE);
-			//if (WAIT_IO_COMPLETION != result) // C0(192)
-			//{
-			//	DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: not WAIT_IO_COMPLETION!.\n");
-			//}
-			DEBUG_STRING(L"folder_watchor_apc::loop_thread() SleepEx result: {}.\n"sv, result);
-
-			if(!self)
+			if (WAIT_IO_COMPLETION == result) // 0XC0L(192)
 			{
-				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: Self is null.\n");
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): SleepEx result: WAIT_IO_COMPLETION!.\n");
+			}
+			else
+			{
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): SleepEx result: {}.\n"sv, result);
+			}
+
+			if (!self)
+			{
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error SleepEx result: Self is null.\n");
 				break;
 			}
 
 			if (!self->running)
 			{
-				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: self.running is false.\n");
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error SleepEx result: self.running is false.\n");
 				break;
 			}
 		}
+		DEBUG_STRING(L"folder_watchor_apc::loop_thread(): stopped.\n");
 	}
 
 	void folder_watchor_apc::completion_routine(DWORD code, DWORD num, LPOVERLAPPED lpov)
@@ -352,7 +371,7 @@ namespace freeze
 			return;
 		}
 
-		auto self = reinterpret_cast<folder_watchor_apc*>(lpov->hEvent);
+		auto self = reinterpret_cast<folder_watchor_apc *>(lpov->hEvent);
 		if (!self)
 		{
 			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error self is null.\n");
@@ -391,9 +410,8 @@ namespace freeze
 namespace freeze
 {
 	folder_watchor_status::folder_watchor_status()
-		: io_port_handle{ nullptr }
+		: io_port_handle{nullptr}
 	{
-
 	}
 
 	folder_watchor_status::~folder_watchor_status()
@@ -415,15 +433,14 @@ namespace freeze
 		}
 
 		auto result = ReadDirectoryChangesW(
-			folder_handle,
-			reinterpret_cast<LPVOID>(write_buffer.data()),
-			static_cast<DWORD>(write_buffer.size()),
-			TRUE,
-			gNotifyFilter,
-			nullptr,
-			&overlapped,
-			nullptr
-		) != FALSE;
+						  folder_handle,
+						  reinterpret_cast<LPVOID>(write_buffer.data()),
+						  static_cast<DWORD>(write_buffer.size()),
+						  TRUE,
+						  gNotifyFilter,
+						  nullptr,
+						  &overlapped,
+						  nullptr) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
@@ -493,25 +510,26 @@ namespace freeze
 	{
 		if (!running)
 		{
+			DEBUG_STRING(L"folder_watchor_result::watch(): can not run.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
+			DEBUG_STRING(L"folder_watchor_result::watch(): folder not exists.\n");
 			running = false;
 			return false;
 		}
 
 		auto result = ReadDirectoryChangesW(
-			folder_handle,
-			reinterpret_cast<LPVOID>(write_buffer.data()),
-			static_cast<DWORD>(write_buffer.size()),
-			TRUE,
-			gNotifyFilter,
-			nullptr,
-			&overlapped,
-			nullptr
-		) != FALSE;
+						  folder_handle,
+						  reinterpret_cast<LPVOID>(write_buffer.data()),
+						  static_cast<DWORD>(write_buffer.size()),
+						  TRUE,
+						  gNotifyFilter,
+						  nullptr,
+						  &overlapped,
+						  nullptr) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
@@ -539,6 +557,7 @@ namespace freeze
 
 	void folder_watchor_result::start()
 	{
+		DEBUG_STRING(L"folder_watchor_result::start(): running={}\n"sv, running);
 		while (running)
 		{
 			watch();
@@ -547,18 +566,20 @@ namespace freeze
 
 	void folder_watchor_result::stop()
 	{
+		DEBUG_STRING(L"folder_watchor_result::stop(): stopping ...\n");
 		running = false;
 		if (overlapped.hEvent)
 		{
 			CloseHandle(overlapped.hEvent);
+			overlapped.hEvent = nullptr;
 		}
 	}
 }
 
 namespace freeze
 {
-	watcher_win::watcher_win(folder_watchor_base& watchor)
-		: watchor{ watchor }
+	watcher_win::watcher_win(folder_watchor_base &watchor)
+		: watchor{watchor}
 	{
 		DEBUG_STRING(L"watcher_win::watcher_win(): Constructor ...\n");
 	}
@@ -576,15 +597,16 @@ namespace freeze
 
 	void watcher_win::stop()
 	{
+		DEBUG_STRING(L"watcher_win::stop(): Stopping ...\n");
 		watchor.stop();
 	}
 
-	void watcher_win::set_watch_folder(fs::path const& folder)
+	void watcher_win::set_watch_folder(fs::path const &folder)
 	{
 		this->folder = folder;
 	}
 
-	void watcher_win::set_ignore_folders(std::vector<fs::path> const& ignores)
+	void watcher_win::set_ignore_folders(std::vector<fs::path> const &ignores)
 	{
 		this->ignore_folders = ignores;
 	}
