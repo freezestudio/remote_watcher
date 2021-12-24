@@ -74,12 +74,10 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		goto theend;
 	}
 
-	DEBUG_STRING(L"@rg ServiceMain: rgmsvc starting ...\n");
+	DEBUG_STRING(L"@rg ServiceMain: Service Starting ...\n");
 	if (init_service())
 	{
-#ifndef SERVICE_TEST
 		reset_work_folder();
-#endif
 		if (init_threadpool())
 		{
 			run_service();
@@ -90,30 +88,12 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	stop_service();
 
 theend:
-	DEBUG_STRING(L"@rg ServiceMain: rgmsvc stopped.\n");
+	DEBUG_STRING(L"@rg ServiceMain: Service Stopped.\n");
 }
 
 int __stdcall wmain()
 {
 #ifdef SERVICE_TEST
-	reset_work_folder();
-	if (g_work_folder.empty() || !fs::exists(g_work_folder))
-	{
-		g_work_folder = fs::path{ L"f:/templ/abc"s };
-	}
-
-	DEBUG_STRING(
-		L"@rg Warning: current mock watch {}, shoud change it from remote.\n"sv,
-		g_work_folder.c_str());
-
-	//wchar_t arg1[] = L"rgmsvc";
-	//wchar_t arg2[] = L"192.168.2.95";
-	//wchar_t* argv[] = {
-	//	arg1,
-	//	arg2,
-	//};
-	//ServiceMain(2, argv);
-
 	ServiceMain(0, nullptr);
 #else
 	wchar_t _service_name[] = SERVICE_NAME;

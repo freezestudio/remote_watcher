@@ -33,7 +33,7 @@ fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
 	auto wcs_folder = freeze::detail::read_latest_folder();
-	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}.\n"sv, wcs_folder);
+	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}.\r\n"sv, wcs_folder);
 	if (wcs_folder.empty())
 	{
 		DEBUG_STRING(L"@rg Reset WorkFolder: folder is null.\n");
@@ -113,6 +113,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 
 DWORD __stdcall _TimerThread(LPVOID)
 {
+	DEBUG_STRING(L"@rg TimerThread: Starting ...\n");
 	HANDLE hh_timer = nullptr;
 	auto _timer_name = L"Local\\Watcher_Timer";
 	do
@@ -194,6 +195,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 
 DWORD __stdcall _SleepThread(LPVOID)
 {
+	DEBUG_STRING(L"@rg SleepThread: Starting ...\n");
 	if (!g_wcs_ip.empty())
 	{
 		auto ip = freeze::detail::make_ip_address(g_wcs_ip);
@@ -225,6 +227,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
+		// TODO: pause timer-thread
 		switch (reason)
 		{
 		default: [[fallthrough]];
@@ -246,11 +249,12 @@ DWORD __stdcall _SleepThread(LPVOID)
 			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
 			break;
 		case sync_reason_send_payload:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message.\n");
+			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_payload.\n");
 			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
+		// TODO: resume timer-thread
 	}
 	return 0;
 }
@@ -263,18 +267,19 @@ bool init_threadpool()
 		hh_worker_thread = ::CreateThread(nullptr, 0, _WorkerThread, nullptr, 0, nullptr);
 		if (!hh_worker_thread)
 		{
-			DEBUG_STRING(L"@rg service create worker thread failure.\n");
+			DEBUG_STRING(L"@rg Service: Create WorkerThread failure.\n");
 			bb_worker_thread_exit = true;
 			return false;
 		}
 		if (hh_worker_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg Service: Create WorkerThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_worker_thread = nullptr;
 			bb_worker_thread_exit = true;
 			return false;
 		}
 	}
+	DEBUG_STRING(L"@rg Service: Create WorkerThread Successfully.\n");
 
 	bb_timer_thread_exit = false;
 	if (!hh_timer_thread)
@@ -283,17 +288,18 @@ bool init_threadpool()
 		if (!hh_timer_thread)
 		{
 			bb_timer_thread_exit = true;
-			DEBUG_STRING(L"@rg service create timer thread failure.\n");
+			DEBUG_STRING(L"@rg Service: Create TimerThread Failure.\n");
 			return false;
 		}
 		if (hh_timer_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg Service: Create TimerThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_timer_thread = nullptr;
 			bb_timer_thread_exit = true;
 			return false;
 		}
 	}
+	DEBUG_STRING(L"@rg Service: Create TimerThread Successfully.\n");
 
 	bb_sleep_thread_exit = false;
 	if (!hh_sleep_thread)
@@ -302,17 +308,18 @@ bool init_threadpool()
 		if (!hh_sleep_thread)
 		{
 			bb_sleep_thread_exit = true;
-			DEBUG_STRING(L"@rg service create sleep thread failure.\n");
+			DEBUG_STRING(L"@rg Service: Create SleepThread Failure.\n");
 			return false;
 		}
 		if (hh_sleep_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg service create worker thread error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg Service: Create SleepThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_sleep_thread = nullptr;
 			bb_sleep_thread_exit = true;
 			return false;
 		}
 	}
+	DEBUG_STRING(L"@rg Service: Create SleepThread Successfully.\n");
 
 	return true;
 }

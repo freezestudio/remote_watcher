@@ -29,22 +29,22 @@ bool init_service()
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
-		DEBUG_STRING(L"@rg Register Service Control Handler failure, exit.\n");
+		DEBUG_STRING(L"@rg Service: Register ControlHandler failure, exit.\n");
 		return false;
 	}
-	DEBUG_STRING(L"@rg Service control handler registered.\n");
+	DEBUG_STRING(L"@rg Service: ControlHandler Registered.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
-	DEBUG_STRING(L"@rg Service Start Pending 3s.\n");
+	DEBUG_STRING(L"@rg Service: Start Pending 10s.\n");
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable_event)
 	{
-		DEBUG_STRING(L"@rg Create waitable handle failure, exit.\n");
+		DEBUG_STRING(L"@rg Service: Create waitable handle failure, exit.\n");
 
 		update_status(ss_handle, SERVICE_STOP_PENDING);
-		DEBUG_STRING(L"@rg Service CreateEvent Failure. stop pending.\n");
+		DEBUG_STRING(L"@rg Service: CreateEvent Failure. Stop Pending...\n");
 		return false;
 	}
     return true;
@@ -55,7 +55,7 @@ void run_service()
 #ifndef SERVICE_TEST
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
-	DEBUG_STRING(L"@rg Service Started.\n");
+	DEBUG_STRING(L"@rg Service: Started.\n");
 #endif
 
 	while (true)
@@ -63,6 +63,7 @@ void run_service()
 		::WaitForSingleObject(hh_waitable_event, INFINITE);
 		break;
 	}
+	DEBUG_STRING(L"@rg Service: Stopping ...\n");
 }
 
 void stop_service()
@@ -79,7 +80,7 @@ void stop_service()
 		hh_waitable_event = nullptr;
 	}
 
-	DEBUG_STRING(L"@rg Service:rgmsvc stopped.\n");
+	DEBUG_STRING(L"@rg Service: Service stopped.\n");
 }
 
 
@@ -118,7 +119,7 @@ DWORD __stdcall handler_proc_ex(
 		// break;
 	case SERVICE_CONTROL_SHUTDOWN:
 		// shutdown, return NO_ERROR;
-		// break;
+		[[fallthrough]];
 	case SERVICE_CONTROL_STOP:
 		// stop service, eturn NO_ERROR;
 		SetEvent(hh_waitable_event);
@@ -147,10 +148,9 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 		return false;
 	}
 
-	SERVICE_STATUS service_status{
-		.dwServiceType = SERVICE_WIN32_OWN_PROCESS,
-		.dwServiceSpecificExitCode = 0,
-	};
+	SERVICE_STATUS service_status;
+	service_status.dwServiceType = SERVICE_WIN32;
+	service_status.dwServiceSpecificExitCode = 0;
 
 	service_status.dwCurrentState = state;
 	service_status.dwWin32ExitCode = error_code;
@@ -176,7 +176,7 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 	else
 	{
 		service_status.dwCheckPoint = cp_check_point++;
-		service_status.dwWaitHint = 3000;
+		service_status.dwWaitHint = 10000;
 	}
 
 	auto ok = SetServiceStatus(hss, &service_status) ? true : false;

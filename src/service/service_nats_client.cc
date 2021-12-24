@@ -742,6 +742,7 @@ namespace freeze::detail
 
 		bool publish_payload(fs::path const& folder, fs::path const& file)
 		{
+			DEBUG_STRING(L"_nats_client::publish_payload(): {}, {}\n"sv, folder.c_str(), file.c_str());
 			std::lock_guard<std::mutex> lock(_mutex);
 			_nats_msg m{ payload_channel.data() };
 			uint8_t* buffer = nullptr;
@@ -1094,33 +1095,32 @@ namespace freeze
 
 	void nats_client::notify_message() const
 	{
+		DEBUG_STRING(L"notify-message: {}\n"sv, detail::to_utf16(g_current_message));
 		std::unique_lock<std::mutex> lock(_mutex);
-		DEBUG_STRING(L"notify-message: {}"sv, detail::to_utf16(g_current_message));
 		if (g_current_message.empty())
 		{
+			DEBUG_STRING(L"notify-message: message is empty!\n");
 			return;
 		}
-
 		std::string _message = std::exchange(g_current_message,{});
-		auto _recv_msg = detail::parse_recv_message(_message);
-
 		lock.unlock();
 
 		// 1. {name:"list-disk"}
 		// 2. {name:"select-directory", folder:"path/to/directory"}
+		auto _recv_msg = detail::parse_recv_message(_message);
+		std::string _send_msg;
 		if (_recv_msg.name == "list-disk")
 		{
 			auto disk_names = detail::get_harddisks();
-			std::string _send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
-			pimpl->publish_message(_send_msg, json_type.data());
+			_send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
 		}
 		else if (_recv_msg.name == "select-directory")
 		{
 			auto dir = detail::to_utf16(_recv_msg.folder);
 			auto folders = detail::get_directories_without_subdir(dir);
-			std::string _send_msg = detail::make_send_message_string(_recv_msg.name, folders);
-			pimpl->publish_message(_send_msg, json_type.data());
+			_send_msg = detail::make_send_message_string(_recv_msg.name, folders);
 		}
+		pimpl->publish_message(_send_msg, json_type.data());
 	}
 
 	std::string nats_client::notify_command() const
@@ -1128,6 +1128,7 @@ namespace freeze
 		std::unique_lock<std::mutex> lock(_mutex);
 		if (g_current_command.name.empty())
 		{
+			DEBUG_STRING(L"notify-command: command is empty!\n");
 			return {};
 		}
 
@@ -1168,7 +1169,8 @@ namespace freeze
 
 	void nats_client::notify_payload(fs::path const& root) const
 	{
-		std::unique_lock<std::mutex> lock(_mutex);
+		DEBUG_STRING(L"nats_client::notify_payload(): from root path: {}.\n"sv, root.c_str());
+		//std::unique_lock<std::mutex> lock(_mutex);
 		auto watch_tree_ptr = watch_tree_instace(root);
 		if (!watch_tree_ptr)
 		{
@@ -1178,13 +1180,13 @@ namespace freeze
 
 		auto files = std::move(watch_tree_ptr->get_all());
 		watch_tree_ptr->clear();
+		//lock.unlock();
 
-		lock.unlock();
-
+		DEBUG_STRING(L"nats_client::notify_payload(): files count={}.\n"sv, files.size());
 		auto root_str = root.c_str();
 		for (auto file : files)
 		{
-			DEBUG_STRING(L"nats client watcher: {}\n"sv, file.c_str());
+			DEBUG_STRING(L"nats client will publish: {}\n"sv, file.c_str());
 			pimpl->publish_payload(root_str, file);
 		}
 	}

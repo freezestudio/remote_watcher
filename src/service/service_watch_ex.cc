@@ -79,6 +79,9 @@ namespace freeze
 		watch_tree_ptr = watch_tree_instace(this->folder, ignores, force_reset);
 
 		running = true;
+		DEBUG_STRING(
+			L"folder_watchor_base::set_weatch_folder(): {}, running={}.\n"sv,
+			this->folder.c_str(), running);
 		return true;
 	}
 
@@ -153,7 +156,7 @@ namespace freeze
 
 		if (info->Action == FILE_ACTION_REMOVED || info->Action == FILE_ACTION_RENAMED_OLD_NAME)
 		{
-			DEBUG_STRING(L"ignore: parse notify {}, name={}\n"sv, info->Action, filename);
+			DEBUG_STRING(L"Ignore: parse notify {}, name={}\n"sv, info->Action, filename);
 
 			auto file_path = fs::path{ filename }.lexically_normal();
 			watch_tree_ptr->remove(file_path);
@@ -162,24 +165,25 @@ namespace freeze
 
 		if (!fs::exists(full_filename))
 		{
-			DEBUG_STRING(L"ignore: parse notify {}, name={}, not exists.\n"sv, detail::to_str(info->Action), filename);
+			DEBUG_STRING(L"Ignore: parse notify {}, name={}, not exists.\n"sv, detail::to_str(info->Action), filename);
 			return;
 		}
 
 		if (info->Action == FILE_ACTION_MODIFIED)
 		{
-			DEBUG_STRING(L"ignore: parse notify FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
+			DEBUG_STRING(L"Ignore: parse notify FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
 			return;
 		}
 
 		if (info->Action == FILE_ACTION_ADDED || info->Action == FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			DEBUG_STRING(L"update: parse notify {}, name={}\n"sv, detail::to_str(info->Action), filename.c_str());
+			DEBUG_STRING(L"Update: parse notify {}, name={}\n"sv, detail::to_str(info->Action), filename.c_str());
 
 			if (fs::is_regular_file(full_filename))
 			{
 				auto file_path = fs::path{ filename }.lexically_normal();
 				watch_tree_ptr->add(file_path);
+				DEBUG_STRING(L"Update: watch-tree added: {}\n"sv, file_path.c_str());
 			}
 		}
 	}
@@ -275,6 +279,7 @@ namespace freeze
 			auto err = GetLastError();
 			DEBUG_STRING(L"folder_watchor_apc::start() apc error: {}\n"sv, err);
 		}
+		DEBUG_STRING(L"folder_watchor_apc::start() apc: Will Wakeup Sleep thread ...\n");
 	}
 
 	void folder_watchor_apc::stop()
@@ -295,10 +300,12 @@ namespace freeze
 
 		if (thread.joinable())
 		{
+			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Will Wakeup Sleep thread stop.\n");
 			thread.join();
 		}
 		else
 		{
+			DEBUG_STRING(L"folder_watchor_apc::stop() apc: Want Wakeup Sleep thread [assert self==null].\n");
 			thread.detach();
 		}
 	}
@@ -317,11 +324,11 @@ namespace freeze
 		{
 			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): thread run and sleep.\n");
 			auto result = SleepEx(INFINITE, TRUE);
-			if (WAIT_IO_COMPLETION != result)
-			{
-				DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: not WAIT_IO_COMPLETION!.\n");
-				//break;
-			}
+			//if (WAIT_IO_COMPLETION != result) // C0(192)
+			//{
+			//	DEBUG_STRING(L"folder_watchor_apc::loop_thread() Error SleepEx result: not WAIT_IO_COMPLETION!.\n");
+			//}
+			DEBUG_STRING(L"folder_watchor_apc::loop_thread() SleepEx result: {}.\n"sv, result);
 
 			if(!self)
 			{
@@ -553,7 +560,7 @@ namespace freeze
 	watcher_win::watcher_win(folder_watchor_base& watchor)
 		: watchor{ watchor }
 	{
-		DEBUG_STRING(L"watcher_win::watcher_win(): Constructing ...\n");
+		DEBUG_STRING(L"watcher_win::watcher_win(): Constructor ...\n");
 	}
 
 	void watcher_win::start()

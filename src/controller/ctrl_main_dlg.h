@@ -129,7 +129,7 @@ public:
 				Sleep(1000);
 				auto started = start_service(ip);
 
-				DEBUG_STRING(L"Start Service Result: {}\n"sv, started);
+				DEBUG_STRING(L"Install Start Service Result: {}\n"sv, started);
 				if (started)
 				{
 					mEnableInstall = FALSE;

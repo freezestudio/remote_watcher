@@ -299,6 +299,7 @@ bool uninstall_service()
 		{
 			auto _msg = ec.message();
 			OutputDebugStringA(_msg.data());
+			DEBUG_STRING(L"@rg Uninstall Service: Delete path file Failure.\n");
 		}
 		else
 		{
@@ -325,6 +326,7 @@ bool uninstall_service()
 
 	if (!remove_svc_keyvalue())
 	{
+		DEBUG_STRING(L"@rg Uninstall Service: Remove svc-regkey Failure.\n");
 		return false;
 	}
 
@@ -353,10 +355,7 @@ bool start_service(LPCWSTR ip)
 		::CloseServiceHandle(hscm);
 		return false;
 	}
-
-	do {
-		DEBUG_STRING(L"@rg Start Service: {} opened.\n"sv, SERVICE_NAME);
-	} while (false);
+	DEBUG_STRING(L"@rg Start Service: {} opened.\n"sv, SERVICE_NAME);
 
 	// service state:
 	// 1. state: SERVICE_RUNNING, SERVICE_PAUSE_PENDING, SERVICE_PAUSED, SERVICE_CONTINUE_PENDING,
@@ -367,13 +366,7 @@ bool start_service(LPCWSTR ip)
 	SERVICE_STATUS sstatus;
 	if (!query_status(hsc, sstatus))
 	{
-		// ERROR_INVALID_HANDLE
-		// ERROR_ACCESS_DENIED
-		// ERROR_INSUFFICIENT_BUFFER
-		// ERROR_INVALID_PARAMETER
-		// ERROR_INVALID_LEVEL
-		// ERROR_SHUTDOWN_IN_PROGRESS
-		DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
+		DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed: {}\n", GetLastError());
 		::CloseServiceHandle(hsc);
 		::CloseServiceHandle(hscm);
 		return false;
