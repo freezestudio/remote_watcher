@@ -42,14 +42,21 @@ void reset_work_folder(bool notify/* = false */)
 
 	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
 	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
-	// TODO: add write lock (want using atomic)
-	g_work_folder = fs::path{ latest_folder };
-	if (!fs::exists(g_work_folder))
+	auto latest_path = fs::path{ latest_folder };
+	if (!fs::exists(latest_path))
 	{
-		DEBUG_STRING(L"@rg Reset WorkFolder: folder not exists.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg Reset WorkFolder: {}, folder not exists.\n"sv, latest_path.c_str());
 		return;
 	}
 
+	if (g_work_folder == latest_path)
+	{
+		DEBUG_STRING(L"@rg Reset WorkFolder: {}, already watched.\n"sv, latest_path.c_str());
+		return;
+	}
+
+	// TODO: add write lock (want using atomic)
+	g_work_folder = latest_path;
 	if (notify)
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): Want Wakeup work-thread ...\n");
@@ -197,16 +204,16 @@ DWORD __stdcall _TimerThread(LPVOID)
 DWORD __stdcall _SleepThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg SleepThread: Starting ...\n");
+	// TODO: check nats can connection ... (in timer-thread)
 	if (!g_wcs_ip.empty())
 	{
 		auto ip = freeze::detail::make_ip_address(g_wcs_ip);
 		if (ip > 0)
 		{
 			auto connected = g_nats_client.connect(ip);
-			if (connected)
+			if (!connected)
 			{
-				g_nats_client.listen_message();
-				g_nats_client.listen_command();
+				DEBUG_STRING(L"@rg SleepThread Error: remote not connected.\n");
 			}
 		}
 		else
@@ -228,6 +235,12 @@ DWORD __stdcall _SleepThread(LPVOID)
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
+		if (!is_service_running())
+		{
+			DEBUG_STRING(L"@rg SleepThread: wakeup, maybe service paused.\n");
+			continue;
+		}
+
 		// pause timer-thread (SERVICE_PAUSED=7)
 		set_service_status(SERVICE_PAUSED);
 		DEBUG_STRING(L"@rg SleepThread: wakeup Pause-TimerThread.\n");
@@ -261,6 +274,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		set_service_status(SERVICE_RUNNING);
 		DEBUG_STRING(L"@rg SleepThread: wakeup Resume-TimerThread.\n");
 	}
+
 	DEBUG_STRING(L"@rg SleepThread: Stopped.\n");
 	return 0;
 }
@@ -333,8 +347,15 @@ bool init_threadpool()
 void stop_threadpool()
 {
 	bb_worker_thread_exit = true;
+	QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+
 	bb_timer_thread_exit = true;
+	QueueUserAPC([](ULONG_PTR) {}, hh_timer_thread, 0);
+
 	bb_sleep_thread_exit = true;
+	global_reason_signal.notify_reason(sync_reason_exit__thread);
+
+	Sleep(3000);
 
 	if (hh_worker_thread)
 	{

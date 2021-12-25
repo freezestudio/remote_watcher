@@ -21,6 +21,10 @@ void set_service_status(DWORD status)
 {
 	ss_current_status = to_enum<freeze::service_state>(status);
 }
+bool is_service_running()
+{
+	return ss_current_status == freeze::service_state::running;
+}
 #endif
 
 bool init_service()
@@ -32,7 +36,7 @@ bool init_service()
 		DEBUG_STRING(L"@rg Service: Register ControlHandler failure, exit.\n");
 		return false;
 	}
-	DEBUG_STRING(L"@rg Service: ControlHandler Registered.\n");
+	DEBUG_STRING(L"@rg Service: ControlHandler Register Successfully.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
 	DEBUG_STRING(L"@rg Service: Start Pending 30s.\n");

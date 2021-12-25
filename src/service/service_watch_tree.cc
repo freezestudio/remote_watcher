@@ -6,30 +6,30 @@ namespace freeze
 	{
 	}
 
-	watch_tree::watch_tree(fs::path const &folder, std::vector<fs::path> const &ignore_folders)
-		: folder{folder}, ignore_folders{ignore_folders}
+	watch_tree::watch_tree(fs::path const& folder, std::vector<fs::path> const& ignore_folders)
+		: folder{ folder }, ignore_folders{ ignore_folders }
 	{
 	}
 
-	void watch_tree::add(fs::path const &file)
+	void watch_tree::add(fs::path const& file)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		files.emplace(file);
 	}
 
-	void watch_tree::remove(fs::path const &file)
+	void watch_tree::remove(fs::path const& file)
 	{
+		std::lock_guard<std::mutex> lock(mutex);
 		auto _file = maybe_include(file);
 		if (!_file.has_value() || _file.value().empty())
 		{
 			return;
 		}
 
-		std::lock_guard<std::mutex> lock(mutex);
 		files.erase(file);
 	}
 
-	void watch_tree::modify(fs::path const &file)
+	void watch_tree::modify(fs::path const& file)
 	{
 		// if exists, replace.
 	}
@@ -59,19 +59,19 @@ namespace freeze
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		std::vector<fs::path> vec_files;
-		std::copy_if(std::cbegin(files), std::cend(files), std::back_inserter(vec_files), [this](auto &&f)
-					 {
-						 auto _file = folder / f;
-						 auto _is_file = fs::is_regular_file(_file);
-						 return _is_file;
-					 });
+		std::copy_if(std::cbegin(files), std::cend(files), std::back_inserter(vec_files), [this](auto&& f)
+			{
+				auto _file = folder / f;
+				auto _is_file = fs::is_regular_file(_file);
+				return _is_file;
+			});
 		return vec_files;
 	}
 
-	std::optional<fs::path> watch_tree::maybe_include(fs::path const &file)
+	std::optional<fs::path> watch_tree::maybe_include(fs::path const& file)
 	{
-		std::lock_guard<std::mutex> lock(mutex);
-		for (auto &item : files)
+		//std::lock_guard<std::mutex> lock(mutex);
+		for (auto& item : files)
 		{
 			if (item == file)
 			{
@@ -92,10 +92,10 @@ namespace freeze
 		path_equal_to>
 		path_watch_trees;
 	static std::shared_ptr<watch_tree> _g_watch_tree_instance = nullptr;
-	// static std::mutex _g_mutex;
-	std::shared_ptr<watch_tree> watch_tree_instace(fs::path const &folder, std::vector<fs::path> const &ignores /*= {}*/, bool reset /*= false*/)
+	static std::mutex _g_mutex;
+	std::shared_ptr<watch_tree> watch_tree_instace(fs::path const& folder, std::vector<fs::path> const& ignores /*= {}*/, bool reset /*= false*/)
 	{
-		// std::lock_guard<std::mutex> lock(_g_mutex);
+		std::lock_guard<std::mutex> lock(_g_mutex);
 		if (!_g_watch_tree_instance || reset)
 		{
 			auto generic_folder = folder.lexically_normal();

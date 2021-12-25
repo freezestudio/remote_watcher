@@ -10,9 +10,9 @@ DWORD _g_latest_time = 0;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
 #ifndef SERVICE_TEST
-	if (auto state = get_service_status(); state != freeze::service_state::running /* 4 */)
+	if (!is_service_running())
 	{
-		DEBUG_STRING(L"@rg TimerCallback: Service Status={}.\n"sv, to_dword(state));
+		DEBUG_STRING(L"@rg TimerCallback: maybe service paused.\n");
 		return;
 	}
 #endif
@@ -26,7 +26,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 
 	auto _timeout = static_cast<DWORD>((dwTimerLowValue - _g_latest_time) * 1e-7);
 	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
-	DEBUG_STRING(L"@rg TimerCallback: ping ETA: {}\n."sv, _timeout);
+	DEBUG_STRING(L"@rg TimerCallback: ping duration: {}\n."sv, _timeout);
 	_g_latest_time = dwTimerLowValue;
 	auto status = nc_ptr->_maybe_heartbeat();
 	auto status_msg = L"ok"s;
@@ -45,7 +45,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 			status_msg = std::to_wstring(status);
 		}
 	}
-	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n."sv, status_msg);
+	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n"sv, status_msg);
 }
 
 namespace freeze

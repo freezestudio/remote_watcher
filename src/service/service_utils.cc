@@ -379,7 +379,7 @@ namespace freeze::detail
 		}
 
 		fs::directory_iterator iter{ root };
-		for (auto& p : iter)
+		for (auto const& p : iter)
 		{
 			if (p.is_directory())
 			{

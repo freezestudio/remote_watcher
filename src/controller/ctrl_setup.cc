@@ -612,7 +612,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		{
 			wait_tick = GetTickCount64();
 			DEBUG_STRING(L"@rg Stop Service: failure, timeout!\n");
-			//break;
+			break;
 		}
 	};
 
@@ -665,7 +665,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 			break;
 		}
 		auto duration = GetTickCount64() - wait_tick;
-		if (duration > 30000)
+		if (duration > sstatus.dwWaitHint)
 		{
 			DEBUG_STRING(L"@rg Stop Service: failure, wait 30s timeout!\n");
 			break;

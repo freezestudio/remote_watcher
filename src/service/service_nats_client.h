@@ -238,17 +238,14 @@ namespace freeze
 		void close();
 
 	public:
-		void listen_message();
-		void listen_command();
+		void notify_message();
+		std::string notify_command();
+		void notify_payload(fs::path const&);
 
 	public:
-		void notify_message() const;
-		std::string notify_command() const;
-		void notify_payload(fs::path const&) const;
-
-	public:
-		void on_message();
-		void on_command();
+		void send_payload();
+		void command_handle_result();
+		void message_response();
 
 	public:
 		DWORD _maybe_heartbeat();
@@ -263,9 +260,23 @@ namespace freeze
 	private:
 		std::thread _msg_thread;
 		std::thread _cmd_thread;
+		std::thread _pal_thread;
+
 		bool _msg_thread_running{ true };
 		bool _cmd_thread_running{ true };
+		bool _pal_thread_running{ true };
+
+		atomic_sync _message_signal{};
+		atomic_sync _command_signal{};
+		atomic_sync _payload_signal{};
+
+	private:
+		atomic_sync _cmd_response_signal{};
+		std::string _response_command;
+
+	private:
 		mutable std::mutex _mutex;
+		fs::path _watch_path;
 	};
 }
 

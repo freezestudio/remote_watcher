@@ -23,6 +23,7 @@ void reset_work_folder(bool notify = false);
 #ifndef SERVICE_TEST
 freeze::service_state get_service_status();
 void set_service_status(DWORD);
+bool is_service_running();
 #endif
 
 #endif

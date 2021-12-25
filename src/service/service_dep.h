@@ -116,6 +116,7 @@ constexpr DWORD operator|(B && t1, E && t2)
 	return static_cast<DWORD>(t1) | static_cast<DWORD>(t2);
 }
 
+constexpr auto sync_reason_exit__thread = -1L;
 constexpr auto sync_reason_none__reason = 0L;
 constexpr auto sync_reason_recv_command = 1L;
 constexpr auto sync_reason_recv_message = 2L;

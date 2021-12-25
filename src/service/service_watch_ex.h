@@ -144,6 +144,7 @@ namespace freeze
 	{
 	public:
 		watcher_win(folder_watchor_base&);
+		~watcher_win();
 
 	public:
 		virtual void start() override;

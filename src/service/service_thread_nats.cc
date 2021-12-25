@@ -3,19 +3,19 @@
 
 namespace freeze
 {
-	void maybe_send_message(nats_client const& nc)
+	void maybe_send_message(nats_client& nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() ...\n");
 		nc.notify_message();
 	}
 
-	void maybe_send_payload(nats_client const& nc, fs::path const& root)
+	void maybe_send_payload(nats_client& nc, fs::path const& root)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() ...\n");
 		nc.notify_payload(root);
 	}
 
-	void maybe_response_command(nats_client const& nc)
+	void maybe_response_command(nats_client& nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() ...\n");
 		auto cmd = nc.notify_command();

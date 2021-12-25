@@ -15,8 +15,8 @@ namespace freeze
 	}
 
 	bool folder_watchor_base::set_watch_folder(
-		fs::path const &folder,
-		std::vector<fs::path> const &ignores /*= {}*/)
+		fs::path const& folder,
+		std::vector<fs::path> const& ignores /*= {}*/)
 	{
 		if (folder.empty())
 		{
@@ -35,7 +35,7 @@ namespace freeze
 		if (this->folder != generic_folder)
 		{
 			auto path_str = generic_folder.c_str();
-			this->folder = fs::path{path_str};
+			this->folder = fs::path{ path_str };
 			if (!detail::save_latest_folder(path_str))
 			{
 				DEBUG_STRING(
@@ -81,7 +81,7 @@ namespace freeze
 
 		running = true;
 		DEBUG_STRING(
-			L"folder_watchor_base::set_weatch_folder(): {}, running={}.\n"sv,
+			L"folder_watchor_base::set_watch_folder(): {}, running={}.\n"sv,
 			this->folder.c_str(), running);
 		return true;
 	}
@@ -136,17 +136,12 @@ namespace freeze
 			processed_number += info->NextEntryOffset;
 			if (info->NextEntryOffset == 0 || processed_number > dwNumberOfBytesTransfered)
 			{
+				DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): parse completed.\n");
 				break;
 			}
 			data += info->NextEntryOffset;
 		}
-
-		auto count = watch_tree_ptr->current_count();
-		if (count > 0)
-		{
-			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): parse {} files, notify!\n"sv, count);
-			watch_tree_ptr->notify();
-		}
+		DEBUG_STRING(L"notify information handle done.\n");
 	}
 
 	void folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
@@ -166,7 +161,7 @@ namespace freeze
 		{
 			DEBUG_STRING(L"Ignore: parse notify {}, name={}\n"sv, info->Action, filename);
 
-			auto file_path = fs::path{filename}.lexically_normal();
+			auto file_path = fs::path{ filename }.lexically_normal();
 			watch_tree_ptr->remove(file_path);
 			return;
 		}
@@ -189,7 +184,7 @@ namespace freeze
 
 			if (fs::is_regular_file(full_filename))
 			{
-				auto file_path = fs::path{filename}.lexically_normal();
+				auto file_path = fs::path{ filename }.lexically_normal();
 				watch_tree_ptr->add(file_path);
 				DEBUG_STRING(L"Update: watch-tree added: {}\n"sv, file_path.c_str());
 			}
@@ -249,14 +244,14 @@ namespace freeze
 		}
 
 		auto result = ReadDirectoryChangesW(
-						  folder_handle,
-						  reinterpret_cast<LPVOID>(write_buffer.data()),
-						  static_cast<DWORD>(write_buffer.size()),
-						  TRUE,
-						  gNotifyFilter,
-						  nullptr,
-						  &overlapped,
-						  folder_watchor_apc::completion_routine) != FALSE;
+			folder_handle,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
+			TRUE,
+			gNotifyFilter,
+			nullptr,
+			&overlapped,
+			folder_watchor_apc::completion_routine) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
@@ -272,19 +267,19 @@ namespace freeze
 
 		signal.wait();
 		auto ret = QueueUserAPC([](ULONG_PTR instance)
-								{
-									auto self = reinterpret_cast<folder_watchor_apc *>(instance);
-									if (self)
-									{
-										auto success = self->watch();
-										DEBUG_STRING(L"folder_watchor_apc::start() apc watching {}\n"sv, success);
-									}
-									else
-									{
-										DEBUG_STRING(L"folder_watchor_apc::start() apc error: install is null.\n");
-									}
-								},
-								thread.native_handle(), (ULONG_PTR)(this));
+			{
+				auto self = reinterpret_cast<folder_watchor_apc*>(instance);
+				if (self)
+				{
+					auto success = self->watch();
+					DEBUG_STRING(L"folder_watchor_apc::start() apc watching {}\n"sv, success);
+				}
+				else
+				{
+					DEBUG_STRING(L"folder_watchor_apc::start() apc error: install is null.\n");
+				}
+			},
+			thread.native_handle(), (ULONG_PTR)(this));
 		if (!ret)
 		{
 			auto err = GetLastError();
@@ -298,7 +293,7 @@ namespace freeze
 		DEBUG_STRING(L"folder_watchor_apc::stop(): stopping ...\n");
 		if (!running)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::stop(): running=false, stop.\n");
+			DEBUG_STRING(L"folder_watchor_apc::stop(): running=false, stopped.\n");
 			return;
 		}
 
@@ -324,10 +319,10 @@ namespace freeze
 		}
 	}
 
-	void folder_watchor_apc::loop_thread(void *instance)
+	void folder_watchor_apc::loop_thread(void* instance)
 	{
 		DEBUG_STRING(L"folder_watchor_apc::loop_thread(): starting ...\n");
-		auto self = reinterpret_cast<folder_watchor_apc *>(instance);
+		auto self = reinterpret_cast<folder_watchor_apc*>(instance);
 		if (!self)
 		{
 			DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error: Self is null.\n");
@@ -367,14 +362,14 @@ namespace freeze
 	{
 		if (!lpov)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error self-ptr is null.\n");
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine() Error: self-ptr is null.\n");
 			return;
 		}
 
-		auto self = reinterpret_cast<folder_watchor_apc *>(lpov->hEvent);
+		auto self = reinterpret_cast<folder_watchor_apc*>(lpov->hEvent);
 		if (!self)
 		{
-			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error self is null.\n");
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine() Error: self is null.\n");
 			return;
 		}
 
@@ -404,18 +399,28 @@ namespace freeze
 		self->write_buffer.swap(self->read_buffer);
 		self->watch();
 		self->notify_information_handle(num);
+
+		// TODO: need refact?
+		auto count = self->watch_tree_ptr->current_count();
+		if (count > 0)
+		{
+			DEBUG_STRING(L"folder_watchor_apc::completion_routine(): parse {} files, notify!\n"sv, count);
+			self->watch_tree_ptr->notify();
+		}
 	}
 }
 
 namespace freeze
 {
 	folder_watchor_status::folder_watchor_status()
-		: io_port_handle{nullptr}
+		: io_port_handle{ nullptr }
 	{
+		DEBUG_STRING(L"folder_watchor_status::folder_watchor_status(): Constructor.\n");
 	}
 
 	folder_watchor_status::~folder_watchor_status()
 	{
+		DEBUG_STRING(L"folder_watchor_status::~folder_watchor_status(): de-constructor.\n");
 		stop();
 	}
 
@@ -423,29 +428,27 @@ namespace freeze
 	{
 		if (!running)
 		{
+			DEBUG_STRING(L"folder_watchor_status::watch(): failure, running=false.\n");
 			return false;
 		}
 
 		if (!folder_exists())
 		{
+			DEBUG_STRING(L"folder_watchor_status::watch(): failure, folder not exists.\n");
 			running = false;
 			return false;
 		}
 
+		DEBUG_STRING(L"folder_watchor_status::watch(): try new watching ...\n");
 		auto result = ReadDirectoryChangesW(
-						  folder_handle,
-						  reinterpret_cast<LPVOID>(write_buffer.data()),
-						  static_cast<DWORD>(write_buffer.size()),
-						  TRUE,
-						  gNotifyFilter,
-						  nullptr,
-						  &overlapped,
-						  nullptr) != FALSE;
-		if (!result)
-		{
-			auto error = GetLastError();
-			DEBUG_STRING(L"folder_watchor_status::watch error: {}\n"sv, error);
-		}
+			folder_handle,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
+			TRUE,
+			gNotifyFilter,
+			nullptr,
+			&overlapped,
+			nullptr) != FALSE;
 		// block until completion ...
 		if (result)
 		{
@@ -454,10 +457,13 @@ namespace freeze
 				io_port_handle = CreateIoCompletionPort(folder_handle, nullptr, 0, 0);
 				if (!io_port_handle)
 				{
+					auto error = GetLastError();
+					DEBUG_STRING(L"folder_watchor_status::watch(): create io port error: {}.\n"sv, error);
 					running = false;
 					return false;
 				}
 			}
+
 			DWORD bytes_transfer = 0;
 			ULONG_PTR key;
 			LPOVERLAPPED lpov = &overlapped;
@@ -467,30 +473,54 @@ namespace freeze
 				write_buffer.swap(read_buffer);
 				this->notify_information_handle(bytes_transfer);
 			}
+			else
+			{
+				auto error = GetLastError();
+				DEBUG_STRING(L"folder_watchor_status::watch() queue completion status error: {}\n"sv, error);
+				running = false;
+			}
 		}
-		if (!result)
+		else
 		{
+			auto error = GetLastError();
+			DEBUG_STRING(L"folder_watchor_status::watch() error: {}\n"sv, error);
 			running = false;
 		}
+
+		if (result)
+		{
+			auto count = watch_tree_ptr->current_count();
+			if (count > 0)
+			{
+				DEBUG_STRING(L"folder_watchor_status::watch(): parse {} files, notify!\n"sv, count);
+				watch_tree_ptr->notify();
+			}
+		}
+
+		DEBUG_STRING(L"folder_watchor_status::watch(): watch once success? {}.\n"sv, result);
 		return result;
 	}
 
 	void folder_watchor_status::start()
 	{
+		DEBUG_STRING(L"folder_watchor_status::start(): running={}\n"sv, running);
 		while (running)
 		{
 			watch();
 		}
+		DEBUG_STRING(L"folder_watchor_status::start(): running=false, stopped.\n");
 	}
 
 	void folder_watchor_status::stop()
 	{
+		DEBUG_STRING(L"folder_watchor_status::stop(): stopping ...\n");
 		running = false;
 		if (io_port_handle)
 		{
 			CloseHandle(io_port_handle);
 			io_port_handle = nullptr;
 		}
+		DEBUG_STRING(L"folder_watchor_status::stop(): stopped.\n");
 	}
 }
 
@@ -498,11 +528,13 @@ namespace freeze
 {
 	folder_watchor_result::folder_watchor_result()
 	{
+		DEBUG_STRING(L"folder_watchor_result::folder_watchor_result(): constructor.\n");
 		overlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	}
 
 	folder_watchor_result::~folder_watchor_result()
 	{
+		DEBUG_STRING(L"folder_watchor_result::~folder_watchor_result(): de-constructor.\n");
 		stop();
 	}
 
@@ -521,19 +553,20 @@ namespace freeze
 			return false;
 		}
 
+		DEBUG_STRING(L"folder_watchor_result::watch(): try new watching ...\n");
 		auto result = ReadDirectoryChangesW(
-						  folder_handle,
-						  reinterpret_cast<LPVOID>(write_buffer.data()),
-						  static_cast<DWORD>(write_buffer.size()),
-						  TRUE,
-						  gNotifyFilter,
-						  nullptr,
-						  &overlapped,
-						  nullptr) != FALSE;
+			folder_handle,
+			reinterpret_cast<LPVOID>(write_buffer.data()),
+			static_cast<DWORD>(write_buffer.size()),
+			TRUE,
+			gNotifyFilter,
+			nullptr,
+			&overlapped,
+			nullptr) != FALSE;
 		if (!result)
 		{
 			auto error = GetLastError();
-			DEBUG_STRING(L"folder_watchor_result::watch error: {}\n"sv, error);
+			DEBUG_STRING(L"folder_watchor_result::watch() error: {}\n"sv, error);
 		}
 
 		// block waiting ...
@@ -547,11 +580,25 @@ namespace freeze
 				write_buffer.swap(read_buffer);
 				this->notify_information_handle(bytes_transfer);
 			}
+			else
+			{
+				auto error = GetLastError();
+				DEBUG_STRING(L"folder_watchor_result::watch() overlapped result error: {}\n"sv, error);
+				running = false;
+			}
 		}
-		if (!result)
+
+		if (result)
 		{
-			running = false;
+			auto count = watch_tree_ptr->current_count();
+			if (count > 0)
+			{
+				DEBUG_STRING(L"folder_watchor_result::watch(): parse {} files, notify!\n"sv, count);
+				watch_tree_ptr->notify();
+			}
 		}
+
+		DEBUG_STRING(L"folder_watchor_result::watch(): watch once success? {}.\n"sv, result);
 		return result;
 	}
 
@@ -562,6 +609,7 @@ namespace freeze
 		{
 			watch();
 		}
+		DEBUG_STRING(L"folder_watchor_result::start(): running=false, stopped.\n");
 	}
 
 	void folder_watchor_result::stop()
@@ -573,15 +621,21 @@ namespace freeze
 			CloseHandle(overlapped.hEvent);
 			overlapped.hEvent = nullptr;
 		}
+		DEBUG_STRING(L"folder_watchor_result::stop(): stopped.\n");
 	}
 }
 
 namespace freeze
 {
-	watcher_win::watcher_win(folder_watchor_base &watchor)
-		: watchor{watchor}
+	watcher_win::watcher_win(folder_watchor_base& watchor)
+		: watchor{ watchor }
 	{
 		DEBUG_STRING(L"watcher_win::watcher_win(): Constructor ...\n");
+	}
+
+	watcher_win::~watcher_win()
+	{
+		stop();
 	}
 
 	void watcher_win::start()
@@ -601,12 +655,12 @@ namespace freeze
 		watchor.stop();
 	}
 
-	void watcher_win::set_watch_folder(fs::path const &folder)
+	void watcher_win::set_watch_folder(fs::path const& folder)
 	{
 		this->folder = folder;
 	}
 
-	void watcher_win::set_ignore_folders(std::vector<fs::path> const &ignores)
+	void watcher_win::set_ignore_folders(std::vector<fs::path> const& ignores)
 	{
 		this->ignore_folders = ignores;
 	}
