@@ -1153,19 +1153,19 @@ namespace freeze
 			auto watch_tree_ptr = watch_tree_instace(this->_watch_path);
 			if (!watch_tree_ptr)
 			{
-				DEBUG_STRING(L"nats_client::_maybe_send_payload(): watch-tree is null.\n");
+				DEBUG_STRING(L"nats_client::send_payload(): watch-tree is null.\n");
 				return;
 			}
-			DEBUG_STRING(L"nats_client::_maybe_send_payload(): read watch-tree files={}.\n", watch_tree_ptr->current_count());
+			DEBUG_STRING(L"nats_client::send_payload(): read watch-tree files={}.\n", watch_tree_ptr->current_count());
 
 			auto files = watch_tree_ptr->get_all();
-			DEBUG_STRING(L"nats_client::_maybe_send_payload(): move-files count={}.\n"sv, files.size());
+			DEBUG_STRING(L"nats_client::send_payload(): move-files count={}.\n"sv, files.size());
 
 			watch_tree_ptr->clear();
-			DEBUG_STRING(L"nats_client::_maybe_send_payload(): assert watch-tree=0: {}.\n"sv, watch_tree_ptr->current_count());
+			DEBUG_STRING(L"nats_client::send_payload(): assert watch-tree=0: {}.\n"sv, watch_tree_ptr->current_count());
 			//lock.unlock();
 
-			DEBUG_STRING(L"nats_client::_maybe_send_payload(): assert move-files>0: {}.\n"sv, files.size());
+			DEBUG_STRING(L"nats_client::send_payload(): assert move-files>0: {}.\n"sv, files.size());
 			auto root_str = this->_watch_path.c_str();
 			for (auto file : files)
 			{
@@ -1303,7 +1303,7 @@ namespace freeze
 						DEBUG_STRING(L"_pal_thread: running=false, thread stopping ....\n");
 						break;
 					}
-					self_ptr->_maybe_send_payload();
+					self_ptr->send_payload();
 				}
 				DEBUG_STRING(L"_pal_thread: stopped.\n");
 			}, this);
