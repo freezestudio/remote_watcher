@@ -257,7 +257,8 @@ private:
 	void _Subclass()
 	{
 		mIP.Attach(GetDlgItem(IDC_REMOTEIP));
-		mIP.SetAddress(MAKEIPADDRESS(0, 0, 0, 0));
+		//mIP.SetAddress(MAKEIPADDRESS(0, 0, 0, 0));
+		mIP.SetAddress(MAKEIPADDRESS(192, 168, 2, 95));
 
 		mInstallButton.SetBitmapButtonExtendedStyle(BMPBTN_HOVER, BMPBTN_HOVER);
 		mInstallButtonImage.CreateFromImage(IDR_BMP_INSTALL, 90, 4, CLR_NONE, IMAGE_BITMAP, LR_CREATEDIBSECTION);

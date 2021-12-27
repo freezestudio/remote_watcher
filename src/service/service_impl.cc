@@ -125,7 +125,7 @@ DWORD __stdcall handler_proc_ex(
 		// shutdown, return NO_ERROR;
 		[[fallthrough]];
 	case SERVICE_CONTROL_STOP:
-		// stop service, eturn NO_ERROR;
+		// stop service, return NO_ERROR;
 		SetEvent(hh_waitable_event);
 		DEBUG_STRING(L"@rg Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);

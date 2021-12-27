@@ -33,7 +33,7 @@ fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
 	auto wcs_folder = freeze::detail::read_latest_folder();
-	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}.\r\n"sv, wcs_folder);
+	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}, need notify={}.\n"sv, wcs_folder, notify);
 	if (wcs_folder.empty())
 	{
 		DEBUG_STRING(L"@rg Reset WorkFolder: folder is null.\n");
@@ -66,6 +66,10 @@ void reset_work_folder(bool notify/* = false */)
 			auto err = GetLastError();
 			DEBUG_STRING(L"@rg Wakup work-thread error: {}\n"sv, err);
 		}
+		else
+		{
+			DEBUG_STRING(L"@rg reset_work_folder(): work-thread will Wakup.\n");
+		}
 	}
 }
 
@@ -73,9 +77,9 @@ void reset_work_folder(bool notify/* = false */)
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg WorkerThread: Starting ...\n");
-	// auto underline_watch = freeze::folder_watchor_apc{};
+	auto underline_watch = freeze::folder_watchor_apc{};
 	// auto underline_watch = freeze::folder_watchor_status{};
-	auto underline_watch = freeze::folder_watchor_result{};
+	// auto underline_watch = freeze::folder_watchor_result{};
 	auto watcher = freeze::watcher_win{ underline_watch };
 
 	if (freeze::detail::check_exists(g_work_folder))
@@ -83,6 +87,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		watcher.set_watch_folder(g_work_folder);
 		watcher.set_ignore_folders(g_work_ignore_folders);
 		watcher.start();
+		DEBUG_STRING(L"@rg WorkerThread: Watcher started.\n");
 	}
 	else
 	{
@@ -91,18 +96,20 @@ DWORD __stdcall _WorkerThread(LPVOID)
 
 	while (!bb_worker_thread_exit)
 	{
+		DEBUG_STRING(L"@rg WorkerThread: Sleep, waiting wakeup ...\n");
 		// want wakeup from modify-folder command.
 		SleepEx(INFINITE, TRUE);
+		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup.\n");
 
 #ifndef SERVICE_TEST
 		// maybe service paused.
 		if (get_service_status() != freeze::service_state::running)
 		{
+			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, but Service not running.\n");
 			continue;
 		}
 #endif
 
-		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup.\n");
 		if (freeze::detail::check_exists(g_work_folder))
 		{
 			watcher.stop();
@@ -112,9 +119,12 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg WorkerThread: when wakeup, the folder maybe is null: {}.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when wakeup, the folder: {}, maybe is null.\n"sv, g_work_folder.c_str());
 		}
 	}
+
+	DEBUG_STRING(L"@rg WorkerThread: try stop watcher ...\n");
+	watcher.stop();
 	DEBUG_STRING(L"@rg WorkerThread: Stopped.\n");
 	return 0;
 }
@@ -205,45 +215,57 @@ DWORD __stdcall _SleepThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg SleepThread: Starting ...\n");
 	// TODO: check nats can connection ... (in timer-thread)
-	if (!g_wcs_ip.empty())
+	
+	auto ip = reset_ip_address();
+	if (ip <= 0)
 	{
-		auto ip = freeze::detail::make_ip_address(g_wcs_ip);
-		if (ip > 0)
-		{
-			auto connected = g_nats_client.connect(ip);
-			if (!connected)
-			{
-				DEBUG_STRING(L"@rg SleepThread Error: remote not connected.\n");
-			}
-		}
-		else
-		{
-			DEBUG_STRING(L"@rg SleepThread Error: invalid ip, stop.\n");
-			// notify other thread and service stop.
-			return 0;
-		}
-	}
-	else
-	{
-		DEBUG_STRING(L"@rg SleepThread: error remote ip is null, stop.\n");
+		DEBUG_STRING(L"@rg SleepThread: error remote ip is null, {}, stop.\n"sv, reset_ip_error(ip));
 		// notify other thread and service stop.
+		return 0;
+	}
+
+	auto connected = g_nats_client.connect(ip);
+	if (!connected)
+	{
+		DEBUG_STRING(L"@rg SleepThread Error: remote not connected.\n");
 		return 0;
 	}
 
 	while (!bb_sleep_thread_exit)
 	{
+		DEBUG_STRING(L"@rg SleepThread: waiting wakeup ...\n");
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
+#ifndef SERVICE_TEST
 		if (!is_service_running())
 		{
 			DEBUG_STRING(L"@rg SleepThread: wakeup, maybe service paused.\n");
 			continue;
 		}
+#endif
 
+		if (!g_nats_client.is_connected())
+		{
+			auto _ip = reset_ip_address();
+			if (_ip <= 0)
+			{
+				DEBUG_STRING(L"@rg SleepThread: wakeup error remote ip is null, {}, stop.\n"sv, reset_ip_error(_ip));
+				break;
+			}
+
+			auto connected = g_nats_client.connect(_ip);
+			if (!connected)
+			{
+				DEBUG_STRING(L"@rg SleepThread wakeup error: remote not connected, stop.\n");
+				break;
+			}
+		}
+#ifndef SERVICE_TEST
 		// pause timer-thread (SERVICE_PAUSED=7)
 		set_service_status(SERVICE_PAUSED);
 		DEBUG_STRING(L"@rg SleepThread: wakeup Pause-TimerThread.\n");
+#endif
 		switch (reason)
 		{
 		default: [[fallthrough]];
@@ -270,12 +292,15 @@ DWORD __stdcall _SleepThread(LPVOID)
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
+#ifndef SERVICE_TEST
 		// resume timer-thread (SERVICE_RUNNING=4)
 		set_service_status(SERVICE_RUNNING);
 		DEBUG_STRING(L"@rg SleepThread: wakeup Resume-TimerThread.\n");
+#endif
 	}
 
 	DEBUG_STRING(L"@rg SleepThread: Stopped.\n");
+	g_nats_client.close();
 	return 0;
 }
 
@@ -347,15 +372,35 @@ bool init_threadpool()
 void stop_threadpool()
 {
 	bb_worker_thread_exit = true;
-	QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+	auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+	if (ret == 0)
+	{
+		auto err = GetLastError();
+		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop failure: {}.\n", err);
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop.\n");
+	}	
 
 	bb_timer_thread_exit = true;
-	QueueUserAPC([](ULONG_PTR) {}, hh_timer_thread, 0);
+	ret = QueueUserAPC([](ULONG_PTR) {}, hh_timer_thread, 0);
+	if (ret == 0)
+	{
+		auto err = GetLastError();
+		DEBUG_STRING(L"@rg stop_threadpool(): notify TimerThread stop failure: {}.\n", err);
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg stop_threadpool(): notify TimerThread stop.\n");
+	}
 
 	bb_sleep_thread_exit = true;
 	global_reason_signal.notify_reason(sync_reason_exit__thread);
+	DEBUG_STRING(L"@rg stop_threadpool(): notify SleepThread stop.\n");
 
 	Sleep(3000);
+	DEBUG_STRING(L"@rg stop_threadpool(): wait 3s done.\n");
 
 	if (hh_worker_thread)
 	{
@@ -374,6 +419,7 @@ void stop_threadpool()
 		CloseHandle(hh_sleep_thread);
 		hh_sleep_thread = nullptr;
 	}
+	DEBUG_STRING(L"@rg stop_threadpool(): thread pool stop done.\n");
 }
 
 namespace freeze

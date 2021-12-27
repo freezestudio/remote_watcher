@@ -236,6 +236,7 @@ namespace freeze
 		void change_ip(DWORD ip, std::string const& = {});
 		bool connect(DWORD ip, std::string const& = {});
 		void close();
+		bool is_connected();
 
 	public:
 		void notify_message();

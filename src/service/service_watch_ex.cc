@@ -351,7 +351,7 @@ namespace freeze
 
 			if (!self->running)
 			{
-				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error SleepEx result: self.running is false.\n");
+				DEBUG_STRING(L"folder_watchor_apc::loop_thread(): Error SleepEx result: self.running=false.\n");
 				break;
 			}
 		}
@@ -503,12 +503,16 @@ namespace freeze
 
 	void folder_watchor_status::start()
 	{
-		DEBUG_STRING(L"folder_watchor_status::start(): running={}\n"sv, running);
-		while (running)
-		{
-			watch();
-		}
-		DEBUG_STRING(L"folder_watchor_status::start(): running=false, stopped.\n");
+		thread = std::thread([this]()
+			{
+				DEBUG_STRING(L"folder_watchor_status::start(): thread running={}\n"sv, running);
+				while (running)
+				{
+					watch();
+				}
+				DEBUG_STRING(L"folder_watchor_status::start(): thread running=false, stopped.\n");
+			});
+
 	}
 
 	void folder_watchor_status::stop()
@@ -517,8 +521,16 @@ namespace freeze
 		running = false;
 		if (io_port_handle)
 		{
+			// auto cancled = CancelIo(this->folder_handle);
+			// DEBUG_STRING(L"folder_watchor_status::stop(): stopping, folder hadle cancle? {}.\n"sv, cancled);
+			// TODO: PostQueuedCompletionStatus(port, num_transferred, key, lpov);
 			CloseHandle(io_port_handle);
 			io_port_handle = nullptr;
+		}
+		if (thread.joinable())
+		{
+			DEBUG_STRING(L"folder_watchor_status::stop(): stopping, thread joined.\n");
+			thread.join();
 		}
 		DEBUG_STRING(L"folder_watchor_status::stop(): stopped.\n");
 	}
@@ -604,12 +616,16 @@ namespace freeze
 
 	void folder_watchor_result::start()
 	{
-		DEBUG_STRING(L"folder_watchor_result::start(): running={}\n"sv, running);
-		while (running)
-		{
-			watch();
-		}
-		DEBUG_STRING(L"folder_watchor_result::start(): running=false, stopped.\n");
+		thread = std::thread([this]()
+			{
+				DEBUG_STRING(L"folder_watchor_result::start(): thread running={}\n"sv, running);
+				while (running)
+				{
+					watch();
+				}
+				DEBUG_STRING(L"folder_watchor_result::start(): thread running=false, stopped.\n");
+			});
+
 	}
 
 	void folder_watchor_result::stop()
@@ -618,8 +634,15 @@ namespace freeze
 		running = false;
 		if (overlapped.hEvent)
 		{
+			auto cancled = CancelIo(this->folder_handle);
+			DEBUG_STRING(L"folder_watchor_result::stop(): stopping, folder hadle cancle? {}.\n"sv, cancled);
 			CloseHandle(overlapped.hEvent);
 			overlapped.hEvent = nullptr;
+		}
+		if (thread.joinable())
+		{
+			DEBUG_STRING(L"folder_watchor_result::stop(): stopping, thread joined.\n");
+			thread.join();
 		}
 		DEBUG_STRING(L"folder_watchor_result::stop(): stopped.\n");
 	}
@@ -647,12 +670,14 @@ namespace freeze
 			return;
 		}
 		watchor.start();
+		DEBUG_STRING(L"watcher_win::start(): Started.\n");
 	}
 
 	void watcher_win::stop()
 	{
 		DEBUG_STRING(L"watcher_win::stop(): Stopping ...\n");
 		watchor.stop();
+		DEBUG_STRING(L"watcher_win::stop(): Stopped.\n");
 	}
 
 	void watcher_win::set_watch_folder(fs::path const& folder)

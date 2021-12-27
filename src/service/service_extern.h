@@ -8,7 +8,7 @@
 #include "service_dep.h"
 
 //do not setup service, then test service.
-//#define SERVICE_TEST
+// #define SERVICE_TEST
 
 #ifndef SERVICE_TEST
 extern freeze::service_state ss_current_status;
@@ -19,6 +19,8 @@ extern fs::path g_work_folder;
 extern std::vector<fs::path> g_work_ignore_folders;
 
 void reset_work_folder(bool notify = false);
+int64_t reset_ip_address(std::wstring const& = {});
+std::wstring reset_ip_error(int64_t);
 
 #ifndef SERVICE_TEST
 freeze::service_state get_service_status();

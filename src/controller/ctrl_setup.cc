@@ -374,7 +374,7 @@ bool start_service(LPCWSTR ip)
 
 	// service current state
 	auto current_state = sstatus.dwCurrentState;
-	DEBUG_STRING(L"Start Service: Current Service status: {}\n"sv, _service_state(current_state));
+	DEBUG_STRING(L"@rg Start Service: Current Service status: {}\n"sv, _service_state(current_state));
 
 	// service state: not stop
 	if ((current_state != SERVICE_STOPPED) && (current_state != SERVICE_STOP_PENDING))
@@ -396,7 +396,7 @@ bool start_service(LPCWSTR ip)
 			// ERROR_INVALID_PARAMETER
 			// ERROR_INVALID_LEVEL
 			// ERROR_SHUTDOWN_IN_PROGRESS
-			DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failed {}\n", GetLastError());
+			DEBUG_STRING(L"@rg Start Service: QueryServiceStatusEx failure: {}\n", GetLastError());
 			::CloseServiceHandle(hsc);
 			::CloseServiceHandle(hscm);
 			return false;
@@ -619,11 +619,22 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	// send control code: stop
 	if (!::ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&sstatus))
 	{
+		auto err = GetLastError();
 		if (!is_outer)
 		{
 			::CloseServiceHandle(service);
 			::CloseServiceHandle(scmanager);
 		}
+		//ERROR_ACCESS_DENIED; // 5L
+		//ERROR_INVALID_HANDLE; // 6L
+		//ERROR_INVALID_PARAMETER; // 87L
+		//ERROR_DEPENDENT_SERVICES_RUNNING; // 1051L
+		//ERROR_INVALID_SERVICE_CONTROL; // 1052L
+		//ERROR_SERVICE_REQUEST_TIMEOUT; // 1053L
+		//ERROR_SERVICE_CANNOT_ACCEPT_CTRL; // 1061L
+		//ERROR_SERVICE_NOT_ACTIVE; // 1062L
+		//ERROR_SHUTDOWN_IN_PROGRESS; // 1115L
+		DEBUG_STRING(L"@rg Stop Service: send [stop] control code failure: {}.\n"sv, err);
 		return false;
 	}
 	DEBUG_STRING(L"@rg Stop Service: send [stop] control code.\n");

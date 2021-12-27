@@ -17,12 +17,13 @@ namespace freeze
 
 	void maybe_response_command(nats_client& nc)
 	{
-		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() ...\n");
+		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
 		auto cmd = nc.notify_command();
 		if (cmd == "modify-folder")
 		{
 			reset_work_folder(true);
 		}
+		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): done.\n");
 	}
 }
 

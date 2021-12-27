@@ -33,6 +33,10 @@ namespace freeze::detail
 {
 	uint32_t make_ip_address(std::wstring const& ip)
 	{
+		if (ip.empty())
+		{
+			return 0;
+		}
 		auto ip4len = ip.size();
 		if (ip4len > 16)
 		{

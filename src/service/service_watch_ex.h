@@ -82,6 +82,9 @@ namespace freeze
 		bool running = false;
 		HANDLE folder_handle{ nullptr };
 		std::shared_ptr<watch_tree> watch_tree_ptr{ nullptr };
+
+	protected:
+		std::thread thread;
 	};
 
 	class folder_watchor_apc : public folder_watchor_base
@@ -102,7 +105,6 @@ namespace freeze
 		static void completion_routine(DWORD, DWORD, LPOVERLAPPED);
 
 	private:
-		std::thread thread;
 		atomic_sync signal;
 	};
 
