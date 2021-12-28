@@ -147,7 +147,7 @@ BEGIN
     IDS_DESC                "Watch a Folder, Send event to remote."
 END
 
-#endif    // ����(���壬�й�) resources
+#endif    // resources
 /////////////////////////////////////////////////////////////////////////////
 
 

@@ -467,7 +467,9 @@ namespace freeze
 			DWORD bytes_transfer = 0;
 			ULONG_PTR key;
 			LPOVERLAPPED lpov = &overlapped;
-			result = GetQueuedCompletionStatus(io_port_handle, &bytes_transfer, &key, &lpov, INFINITE);
+			// TODO: change INFINITE to < 30s
+			DWORD ms = INFINITE;
+			result = GetQueuedCompletionStatus(io_port_handle, &bytes_transfer, &key, &lpov, ms);
 			if (result)
 			{
 				write_buffer.swap(read_buffer);
@@ -585,18 +587,46 @@ namespace freeze
 		if (result)
 		{
 			DWORD bytes_transfer = 0;
-			result = GetOverlappedResult(folder_handle, &overlapped, &bytes_transfer, TRUE);
-			if (result)
+			BOOL bwait = TRUE;
+			if (bwait)
 			{
-				ResetEvent(overlapped.hEvent);
-				write_buffer.swap(read_buffer);
-				this->notify_information_handle(bytes_transfer);
+				// TODO: change bWait to FALSE
+				// If this parameter is TRUE, and the Internal member of the lpOverlapped structure is STATUS_PENDING,
+				// the function does not return until the operation has been completed.
+				// If this parameter is FALSE and the operation is still pending,
+				// the function returns FALSE and the GetLastError function returns ERROR_IO_INCOMPLETE.
+				result = GetOverlappedResult(folder_handle, &overlapped, &bytes_transfer, bwait);
+				if (result)
+				{
+					ResetEvent(overlapped.hEvent);
+					write_buffer.swap(read_buffer);
+					this->notify_information_handle(bytes_transfer);
+				}
+				else
+				{
+					auto error = GetLastError();
+					DEBUG_STRING(L"folder_watchor_result::watch() overlapped result error: {}\n"sv, error);
+					running = false;
+				}
 			}
 			else
 			{
-				auto error = GetLastError();
-				DEBUG_STRING(L"folder_watchor_result::watch() overlapped result error: {}\n"sv, error);
-				running = false;
+				do
+				{
+					result = GetOverlappedResult(folder_handle, &overlapped, &bytes_transfer, bwait);
+					if (!result)
+					{
+						auto error = GetLastError();
+						if (error == ERROR_IO_INCOMPLETE && overlapped.Internal == STATUS_PENDING)
+						{
+							continue;
+						}
+					}
+					if (result)
+					{
+						break;
+					}
+				} while (running);
 			}
 		}
 

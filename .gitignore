@@ -587,3 +587,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 .idea/
 *.sln.iml
+
+# others
+assets/blob.tgz

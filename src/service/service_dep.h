@@ -168,6 +168,52 @@ namespace freeze
 		std::atomic_flag _flag;
 	};
 
+	class atomic_sync_ex
+	{
+	public:
+		atomic_sync_ex()
+		{
+
+		}
+
+		~atomic_sync_ex()
+		{
+
+		}
+
+		atomic_sync_ex(atomic_sync_ex const&) = delete;
+		atomic_sync_ex& operator=(atomic_sync_ex const&) = delete;
+		atomic_sync_ex(atomic_sync_ex&&) = delete;
+		atomic_sync_ex& operator=(atomic_sync_ex&&) = delete;
+
+	public:
+		void wait()
+		{
+			_flag.wait(false);
+		}
+
+		void notify(bool all = true)
+		{
+			_flag.test_and_set();
+			if (all)
+			{
+				_flag.notify_all();
+			}
+			else
+			{
+				_flag.notify_one();
+			}
+		}
+
+		void reset()
+		{
+			_flag.clear();
+		}
+
+	private:
+		std::atomic_flag _flag;
+	};
+
 	class atomic_sync_reason
 	{
 	public:

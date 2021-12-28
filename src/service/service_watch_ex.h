@@ -13,7 +13,7 @@ namespace freeze
 	class watchable;
 	class watcher_base;
 	class watcher_win;
-	class folder_watchor;
+	// class folder_watchor;
 	class folder_watchor_base;
 }
 

@@ -29,6 +29,35 @@ namespace freeze
 
 namespace freeze
 {
+	rgm_nats_channel::rgm_nats_channel()
+		: _signal{}
+		, _running{true}
+	{
+
+	}
+	rgm_nats_channel::~rgm_nats_channel()
+	{
+		
+	}
+
+    void rgm_nats_channel::publish()
+	{
+
+	}
+
+    void rgm_nats_channel::subject()
+	{
+
+	}
+	
+    void rgm_nats_channel::notify()
+	{
+
+	}
+}
+
+namespace freeze
+{
 	rgm_nats::rgm_nats()
 		: _signal{}
 		, _signal_reason{}

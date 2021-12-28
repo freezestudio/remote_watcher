@@ -50,7 +50,24 @@ if(SERVICE_BUILD_TYPE)
         COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_SOURCE_DIR}/tools 
             ${CMAKE_COMMAND} -E tar cz "${PROJECT_SOURCE_DIR}/assets/blob.tgz" -- 
                 "${SERVICE_EXE_NAME}"
-                #"${DEP_CORE_FILE_NAME}"
+                "KERNEL32.dll"
+                "ADVAPI32.dll"
+                "MSVCP140.dll"
+                "MSVCP140_ATOMIC_WAIT.dll"
+                "WS2_32.dll"
+                "VCRUNTIME140.dll"
+                "VCRUNTIME140_1.dll"
+                "api-ms-win-crt-runtime-l1-1-0.dll"
+                "api-ms-win-crt-string-l1-1-0.dll"
+                "api-ms-win-crt-convert-l1-1-0.dll"
+                "api-ms-win-crt-math-l1-1-0.dll"
+                "api-ms-win-crt-heap-l1-1-0.dll"
+                "api-ms-win-crt-locale-l1-1-0.dll"
+                "api-ms-win-crt-stdio-l1-1-0.dll"
+                "api-ms-win-crt-filesystem-l1-1-0.dll"
+                "api-ms-win-crt-utility-l1-1-0.dll"
+                "api-ms-win-crt-environment-l1-1-0.dll"
+                "api-ms-win-crt-time-l1-1-0.dll"
                 # more ...
         COMMAND ${CMAKE_COMMAND} -E rm -f 
             "${PROJECT_SOURCE_DIR}/tools/${SERVICE_EXE_NAME}"

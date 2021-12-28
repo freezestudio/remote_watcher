@@ -12,6 +12,24 @@ namespace freeze
 
 namespace freeze
 {
+    class rgm_nats_channel
+    {
+    public:
+        rgm_nats_channel();
+        ~rgm_nats_channel();
+
+    public:
+        void publish();
+        void subject();
+        void notify();
+    
+    private:
+        std::string _name;
+        std::thread _thread;
+        atomic_sync_ex _signal;
+        bool _running;
+    };
+
     class rgm_nats
     {
     public:

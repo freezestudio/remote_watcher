@@ -1,5 +1,6 @@
-#ifndef COMMON_UTILS_H
-#define COMMON_UTILS_H
+#ifndef COMMON_UTILS_HPP
+#define COMMON_UTILS_HPP
 
+// some common utility functions
 
 #endif
