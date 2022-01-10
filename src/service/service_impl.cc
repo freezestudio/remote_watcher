@@ -40,7 +40,7 @@ bool init_service()
 	DEBUG_STRING(L"@rg Service: ControlHandler Register Successfully.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
-	DEBUG_STRING(L"@rg Service: Start Pending {}s.\n"sv, default_wait_hint);
+	DEBUG_STRING(L"@rg Service: Start Pending {} ms.\n"sv, default_wait_hint);
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);

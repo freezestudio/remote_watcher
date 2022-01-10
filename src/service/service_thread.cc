@@ -137,7 +137,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	do
 	{
 		hh_timer = ::CreateWaitableTimerEx(
-			nullptr,
+			nullptr,                            // LPSECURITY_ATTRIBUTES
 			_timer_name,
 			CREATE_WAITABLE_TIMER_MANUAL_RESET, // manual reset
 			TIMER_ALL_ACCESS);
@@ -184,7 +184,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 		&due_time,
 		period,
 		_TimerCallback,
-		(LPVOID)(&g_nats_client),
+		(LPVOID)(&g_nats_client), // lpArgToCompletionRoutine
 		&reason,
 		delay
 	);
@@ -194,9 +194,11 @@ DWORD __stdcall _TimerThread(LPVOID)
 		DEBUG_STRING(L"@rg TimerThread: set timer error: {}, stop.\n"sv, err);
 		return 0;
 	}
+	DEBUG_STRING(L"@rg TimerThread: SetWaitableTimerEx Successfully.\n");
 
 	while (!bb_timer_thread_exit)
 	{
+		DEBUG_STRING(L"@rg TimerThread: Block Waiting ...\n");
 		// Alertable Thread;
 		SleepEx(INFINITE, TRUE);
 	}
@@ -251,6 +253,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			if (_ip <= 0)
 			{
 				DEBUG_STRING(L"@rg SleepThread: wakeup error remote ip is null, {}, stop.\n"sv, reset_ip_error(_ip));
+				// TODO: maybe stop service. or continue?
 				break;
 			}
 
@@ -258,6 +261,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			if (!connected)
 			{
 				DEBUG_STRING(L"@rg SleepThread wakeup error: remote not connected, stop.\n");
+				// TODO: maybe stop service. or continue?
 				break;
 			}
 		}

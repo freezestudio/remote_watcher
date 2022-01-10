@@ -47,4 +47,6 @@ add_executable(service_zlib_test
 add_executable(controller_utils_test
     controller-utils.test.cc
     ../src/controller/ctrl_utils.cc
+    ../src/controller/ctrl_tar.cc
 )
+target_link_libraries(controller_utils_test zlibstatic)
