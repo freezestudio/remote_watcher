@@ -68,6 +68,8 @@ namespace freeze::detail
 	uint32_t read_ip();
     bool save_latest_folder(std::wstring const&);
     std::wstring read_latest_folder();
+	bool save_latest_ignores(std::vector<std::wstring> const&);
+	std::vector<std::wstring> read_latest_ignores();
 	bool save_token(std::wstring const&);
 	std::string read_token();
 }
@@ -77,7 +79,8 @@ namespace freeze::detail
 	std::vector<std::string> get_harddisks();
 	std::vector<std::string> get_harddisk_names();
 	std::vector<volume_type> get_volume_names();
-	std::vector<std::string> get_directories_without_subdir(fs::path const& root);
+	std::vector<std::string> get_directories_without_subdir(fs::path const&);
+	std::vector<std::string> get_files_without_subdir(fs::path const&);
 }
 
 #endif

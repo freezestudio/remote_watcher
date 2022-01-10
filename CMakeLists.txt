@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.20.0)
 # project name
 project(remote_win32)
 
+# if Release set THIS_DISABLE_DEBUG_TEST to OFF, else set ON.
+option(THIS_DISABLE_DEBUG_TEST "if config is not `Debug`, then disable build tests." OFF)
+message(STATUS "THIS_DISABLE_DEBUG_TEST? " ${THIS_DISABLE_DEBUG_TEST})
+
 #
 # compile nats
 # set some options
@@ -50,7 +54,7 @@ set(SERVICE_EXEC_TYPE ON)
 add_subdirectory(src/service ${PROJECT_BINARY_DIR}/service)
 
 #
-# the Manager of Service (rgmsvc)
+# the Service Manager (monitor[.exe])
 #
 
 set(EXEC_NAME monitor)
@@ -81,7 +85,6 @@ set_target_properties(${EXEC_NAME} PROPERTIES LINK_FLAGS /MANIFESTUAC:"level='re
 target_sources(${EXEC_NAME} PUBLIC
     ./assets/${EXEC_NAME}.rc
     ./assets/${EXEC_NAME}.ico
-    # ./assets/blob.tgz
     # TODO: test if exists
     ./assets/blob.tgz
 )
@@ -98,9 +101,11 @@ add_custom_command(TARGET ${EXEC_NAME} PRE_BUILD
 #
 message(STATUS "Has [CMAKE_BUILD_TYPE]? " ${CMAKE_BUILD_TYPE})
 message(STATUS "Has [CMAKE_CONFIG_TYPE]? " ${CMAKE_CONFIG_TYPE})
+# set(TEST_HAS_CONFIG_VAR $<CONFIG>)
+# message(STATUS "Has <Config>? " "${TEST_HAS_CONFIG_VAR}")
 
 #
-# mock-target: ...
+# mock-custom-target: ...
 #
 add_custom_target(debug-only
     COMMAND ${CMAKE_COMMAND} -E echo "Is Debug Config? $<CONFIG:Debug>"
@@ -110,9 +115,7 @@ add_custom_target(debug-only
 # Some GoogleTest (debug only)
 #
 
-option(THIS_DISABLE_DEBUG_TEST "if config is not `Debug`, then disable build tests." ON)
 # ? can not test condition $<CONFIG:Debug>
-message(STATUS "THIS_DISABLE_DEBUG_TEST? " ${THIS_DISABLE_DEBUG_TEST})
 if((CMAKE_BUILD_TYPE EQUAL "Debug") OR (NOT THIS_DISABLE_DEBUG_TEST))
     add_subdirectory(test)
 endif()

@@ -7,26 +7,24 @@ namespace freeze::detail
 	std::string to_utf8(const wchar_t* wcs, int length)
 	{
 		auto len = WideCharToMultiByte(CP_UTF8, 0, wcs, length, nullptr, 0, nullptr, nullptr);
-		char* pstr = new char[len + 1]{};
-		WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr, len, nullptr, nullptr);
-		std::string str(pstr);
-		delete[] pstr;
+		std::unique_ptr<char[]> pstr = std::make_unique<char[]>(len + 1);
+		WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr.get(), len, nullptr, nullptr);
+		std::string str(pstr.get(), len);
 		return str;
 	}
 
-	std::string to_utf8(std::wstring const& wstr)
+	std::string to_utf8(std::wstring const& wcs)
 	{
-		return to_utf8(wstr.c_str(), (int)wstr.size());
+		return to_utf8(wcs.c_str(), (int)wcs.size());
 	}
 
 	std::wstring to_utf16(std::string const& mbs)
 	{
 		auto len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, nullptr, 0);
-		wchar_t* pwstr = new wchar_t[len + 1]{};
-		MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr, len);
-		std::wstring res(pwstr);
-		delete[] pwstr;
-		return res;
+		auto pwstr = std::make_unique<wchar_t[]>(len + 1);
+		MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr.get(), len);
+		std::wstring wcs(pwstr.get(), len);
+		return wcs;
 	}
 }
 namespace freeze::detail
@@ -228,6 +226,60 @@ namespace freeze::detail
 		return std::wstring(value, value_len);
 	}
 
+	bool save_latest_ignores(std::vector<std::wstring> const& ignores)
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return false;
+		}
+		auto total_size = 0;
+		for (auto f : ignores)
+		{
+			total_size += f.size() + 1;
+		}
+		std::unique_ptr<wchar_t[]> value = std::make_unique<wchar_t[]>(total_size);
+		auto value_pos = value.get();
+		for (auto f : ignores)
+		{
+			auto _size = f.size() + 1;
+			wmemcpy_s(value_pos, _size, f.c_str(), _size);
+			value_pos += _size;
+		}
+		status = regkey.SetMultiStringValue(L"ignores", value.get());
+		return regkey_status(status);
+	}
+
+	std::vector<std::wstring> read_latest_ignores()
+	{
+		freeze::reg_key regkey;
+		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		std::unique_ptr<wchar_t[]> value = std::make_unique<wchar_t[]>(1024 * 1024);
+		unsigned long value_len = 1024 * 1024;
+		status = regkey.QueryMultiStringValue(L"ignores", value.get(), &value_len);
+		if (!regkey_status(status))
+		{
+			return {};
+		}
+		// with null-terminated string.
+		std::vector<std::wstring> ignores;
+		auto value_pos = value.get();
+		for (int i = 0; i < value_len;)
+		{
+			auto _size = wcslen(value_pos);
+			auto v = std::wstring(value_pos, _size);
+			ignores.emplace_back(v);
+			i += _size + 1;
+			value_pos += i;
+		}
+		return ignores;
+	}
+
 	bool save_token(std::wstring const& token)
 	{
 		freeze::reg_key regkey;
@@ -386,6 +438,28 @@ namespace freeze::detail
 		for (auto const& p : iter)
 		{
 			if (p.is_directory())
+			{
+				auto _folder = p.path().lexically_normal();
+				auto mbs_folder = to_utf8(_folder.c_str());
+				folders.emplace_back(mbs_folder);
+			}
+		}
+		return folders;
+	}
+
+
+	std::vector<std::string> get_files_without_subdir(fs::path const& root)
+	{
+		std::vector<std::string> folders;
+		if (root.empty() || !fs::exists(root))
+		{
+			return folders;
+		}
+
+		fs::directory_iterator iter{ root };
+		for (auto const& p : iter)
+		{
+			if (p.is_regular_file())
 			{
 				auto _folder = p.path().lexically_normal();
 				auto mbs_folder = to_utf8(_folder.c_str());

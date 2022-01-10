@@ -23,6 +23,14 @@ namespace freeze
 		{
 			reset_work_folder(true);
 		}
+		else if(cmd == "modify-ignores")
+		{
+
+		}
+		else
+		{
+			// empty.
+		}
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): done.\n");
 	}
 }

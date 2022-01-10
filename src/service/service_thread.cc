@@ -171,14 +171,14 @@ DWORD __stdcall _TimerThread(LPVOID)
 
 	LARGE_INTEGER due_time{}; // 100 nanosecond
 	due_time.QuadPart = static_cast<ULONGLONG>(-30 * time_second);
-	LONG period = 30 * 1000; // millisecond
+	LONG period = 30 * 1000; // milli-second
 	wchar_t reason_string[] = L"heart-beat";
 	REASON_CONTEXT reason{
 		POWER_REQUEST_CONTEXT_VERSION,
 		POWER_REQUEST_CONTEXT_SIMPLE_STRING,
 	};
 	reason.Reason.SimpleReasonString = reason_string;
-	ULONG delay = 0; // tolerable delay 5000
+	ULONG delay = 0; // tolerable delay 5000 milli-second
 	auto ok = ::SetWaitableTimerEx(
 		hh_timer,
 		&due_time,

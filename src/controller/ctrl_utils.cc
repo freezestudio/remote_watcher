@@ -1,6 +1,8 @@
 #include "common_dep.h"
+
 #include "ctrl_win32_dep.h"
 #include "ctrl_utils.h"
+
 #include <cassert>
 
 // out namespaces

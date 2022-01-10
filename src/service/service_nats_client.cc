@@ -9,12 +9,16 @@
 
 #define MAX_IP4_SIZE 16
 
-// current: only one command{name="modify-folder", action="path/to/folder"}
+// TODO: add ignore field.
+// 1. current: only one command{name:"modify-folder", action:"path/to/folder"}
+// 2. TODO: command{name:"modify-ignores", action: "folder1, folder2, ..."}
 freeze::detail::nats_cmd g_current_command;
 
 // current:
 // 1. {name:"list-disk"}
 // 2. {name:"select-directory", folder:"path/to/directory"}
+// 3. TODO: add select-files message {name: "select-files", folder: "path/to/directory"}
+// 4. TODO: add watch-folder messgae {name: "watch-folder"}
 std::string g_current_message;
 
 namespace freeze::detail
@@ -1150,6 +1154,8 @@ namespace freeze
 
 		// 1. {name:"list-disk"}
 		// 2. {name:"select-directory", folder:"path/to/directory"}
+		// 3. TODO: add select-files message {name: "select-files", folder: "path/to/directory"}
+		// 4. TODO: add watch-folder messgae {name: "watch-folder"}
 		auto _recv_msg = detail::parse_recv_message(_message);
 		std::string _send_msg;
 		if (_recv_msg.name == "list-disk")
@@ -1164,6 +1170,25 @@ namespace freeze
 			auto folders = detail::get_directories_without_subdir(dir);
 			DEBUG_STRING(L"notify-message[select-directory]: files-count={}\n"sv, folders.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, folders);
+		}
+		else if (_recv_msg.name == "select-files")
+		{
+			auto dir = detail::to_utf16(_recv_msg.folder);
+			DEBUG_STRING(L"notify-message[select-files]: dir={}\n"sv, dir);
+			auto files = detail::get_files_without_subdir(fs::path{ dir });
+			_send_msg = detail::make_send_message_string(_recv_msg.name, files);
+		}
+		else if (_recv_msg.name == "watch-folder")
+		{
+			auto wcs_folder = detail::read_latest_folder();
+			DEBUG_STRING(L"notify-message[watch-folder]: current watch={}\n"sv, wcs_folder);
+			auto mbs_folder = detail::to_utf8(wcs_folder);
+			std::vector<std::string> _one = { mbs_folder };
+			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
+		}
+		else
+		{
+			// empty.
 		}
 		pimpl->publish_message(_send_msg, json_type.data());
 	}
@@ -1251,13 +1276,14 @@ namespace freeze
 		}
 		else if (cmd.name == "modify-ignores")
 		{
-		}
-		else if (cmd.name == "current-folder")
-		{
+			// folders = split(cmd.action, ','); // to_utf16(...)
+			// save to regkey.
 		}
 		else
 		{
+			// empty
 		}
+
 		_response_command = cmd_name;
 		DEBUG_STRING(L"nats_client::command_handle_result(): response command is: {}!\n"sv, detail::to_utf16(_response_command));
 	}

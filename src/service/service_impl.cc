@@ -9,6 +9,7 @@
 SERVICE_STATUS_HANDLE ss_handle = nullptr;
 HANDLE hh_waitable_event = nullptr;
 DWORD cp_check_point = 0;
+constexpr auto default_wait_hint = 15000UL;
 
 #ifndef SERVICE_TEST
 /* extern */
@@ -39,7 +40,7 @@ bool init_service()
 	DEBUG_STRING(L"@rg Service: ControlHandler Register Successfully.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
-	DEBUG_STRING(L"@rg Service: Start Pending 30s.\n");
+	DEBUG_STRING(L"@rg Service: Start Pending {}s.\n"sv, default_wait_hint);
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -75,6 +76,7 @@ void stop_service()
 #ifndef SERVICE_TEST
 	// stop service
 	update_status(ss_handle, SERVICE_STOPPED);
+	DEBUG_STRING(L"@rg Service: Stop Pending {}s.\n"sv, default_wait_hint);
 #endif
 
 	cp_check_point = 0;	
@@ -180,7 +182,7 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 	else
 	{
 		service_status.dwCheckPoint = cp_check_point++;
-		service_status.dwWaitHint = 30000;
+		service_status.dwWaitHint = default_wait_hint;
 	}
 
 	auto ok = SetServiceStatus(hss, &service_status) ? true : false;
