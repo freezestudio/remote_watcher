@@ -124,6 +124,30 @@ constexpr auto sync_reason_send_command = 3L;
 constexpr auto sync_reason_send_message = 4L;
 constexpr auto sync_reason_send_payload = 5L;
 
+constexpr std::wstring reason_string(long reason)
+{
+	switch (reason)
+	{
+	default:
+		break;
+	case sync_reason_exit__thread:
+		return L"ExitThread"s;
+	case sync_reason_none__reason:
+		return L"None"s;
+	case sync_reason_recv_command:
+		return L"RecvCommand"s;
+	case sync_reason_recv_message:
+		return L"RecvMessage"s;
+	case sync_reason_send_command:
+		return L"SendCommand"s;
+	case sync_reason_send_message:
+		return L"SendMessage"s;
+	case sync_reason_send_payload:
+		return L"SendPayload"s;
+	}
+	return {};
+}
+
 namespace freeze
 {
 	class atomic_sync

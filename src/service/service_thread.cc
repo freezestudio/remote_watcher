@@ -246,7 +246,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		DEBUG_STRING(L"@rg SleepThread: Waiting Wakeup ...\n");
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
-		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
+		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason_string(reason));
 #ifndef SERVICE_TEST
 		if (!is_service_running())
 		{

@@ -1447,7 +1447,7 @@ namespace freeze
 
 	void nats_client::stop_threads()
 	{
-		DEBUG_STRING(L"nats_client::stop_threads() ...\n");
+		DEBUG_STRING(L"nats_client::stop_threads(): all threads ...\n");
 		if (_msg_thread_running)
 		{
 			_msg_thread_running = false;
