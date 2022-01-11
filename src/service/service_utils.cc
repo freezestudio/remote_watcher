@@ -6,9 +6,12 @@ namespace freeze::detail
 {
 	std::string to_utf8(const wchar_t* wcs, int length)
 	{
+		// ccWideChar (characters), if string is null-terminated, can be set to -1
+		// ccWideChar, if set to -1, function result including the terminating null character.
+		// cbMultiByte (bytes), if set to 0, function returns the required buffer size.
 		auto len = WideCharToMultiByte(CP_UTF8, 0, wcs, length, nullptr, 0, nullptr, nullptr);
-		std::unique_ptr<char[]> pstr = std::make_unique<char[]>(len + 1);
-		WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr.get(), len, nullptr, nullptr);
+		std::unique_ptr<char[]> pstr = std::make_unique<char[]>(len);
+		len = WideCharToMultiByte(CP_UTF8, 0, wcs, length, pstr.get(), len, nullptr, nullptr);
 		std::string str(pstr.get(), len);
 		return str;
 	}
@@ -20,10 +23,12 @@ namespace freeze::detail
 
 	std::wstring to_utf16(std::string const& mbs)
 	{
+		// cbMultiByte (bytes), if string is null-terminated, can be set to -1
+		// cchWideChar (characters), if this value is 0, function return the required buffer size, including terminating null character.
 		auto len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, nullptr, 0);
-		auto pwstr = std::make_unique<wchar_t[]>(len + 1);
-		MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr.get(), len);
-		std::wstring wcs(pwstr.get(), len);
+		auto pwstr = std::make_unique<wchar_t[]>(len);
+		len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr.get(), len);
+		std::wstring wcs(pwstr.get(), len - 1); // erase null-terminated
 		return wcs;
 	}
 }

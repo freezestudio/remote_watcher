@@ -520,21 +520,23 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	if (!scmanager)
 	{
 		scmanager = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+		DEBUG_STRING(L"@rg Stop Service: OpenSCManager\n");
 	}
 	if (!scmanager)
 	{
-		DEBUG_STRING(L"@rg Stop Service: OpenSCManager failed {}\n", GetLastError());
+		DEBUG_STRING(L"@rg Stop Service: OpenSCManager Failure {}\n", GetLastError());
 		return false;
 	}
 
 	if (!service)
 	{
 		service = OpenService(scmanager, SERVICE_NAME, SERVICE_ALL_ACCESS);
+		DEBUG_STRING(L"@rg Stop Service: OpenService\n");
 	}
 
 	if (!service)
 	{
-		DEBUG_STRING(L"@rg Stop Service: open service failure.\n");
+		DEBUG_STRING(L"@rg Stop Service: OpenService Failure.\n");
 		if (!is_outer)
 		{
 			::CloseServiceHandle(scmanager);
@@ -546,7 +548,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	SERVICE_STATUS sstatus;
 	if (!query_status(service, sstatus))
 	{
-		DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx failed {}\n", GetLastError());
+		DEBUG_STRING(L"@rg Stop Service: QueryServiceStatusEx Failure {}\n", GetLastError());
 		if (!is_outer)
 		{
 			::CloseServiceHandle(service);
@@ -557,7 +559,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 
 	if (sstatus.dwCurrentState == SERVICE_STOPPED)
 	{
-		DEBUG_STRING(L"@rg Stop Service: Service is Stopped.\n");
+		DEBUG_STRING(L"@rg Stop Service: Service already Stopped.\n");
 		if (!is_outer)
 		{
 			::CloseServiceHandle(service);
@@ -566,7 +568,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		return true;
 	}
 
-	// wait maybe service status is SERVICE_STOP_PENDING
+	// wait, maybe ServiceStatus is SERVICE_STOP_PENDING
 	auto current_state = sstatus.dwCurrentState;
 	DEBUG_STRING(L"@rg before Stop Service: Current Service status: {}\n"sv, _service_state(current_state));
 	auto wait_tick = GetTickCount64();
@@ -602,7 +604,7 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 				::CloseServiceHandle(service);
 				::CloseServiceHandle(scmanager);
 			}
-			DEBUG_STRING(L"@rg Stop Service: Service stopped.\n");
+			DEBUG_STRING(L"@rg Stop Service: Service Stopped [StopPending->Stopped].\n");
 			return true;
 		}
 		DEBUG_STRING(L"@rg Stop Service: Service Status: {}\n"sv, _service_state(current_state));
@@ -634,10 +636,10 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		//ERROR_SERVICE_CANNOT_ACCEPT_CTRL; // 1061L
 		//ERROR_SERVICE_NOT_ACTIVE; // 1062L
 		//ERROR_SHUTDOWN_IN_PROGRESS; // 1115L
-		DEBUG_STRING(L"@rg Stop Service: send [stop] control code failure: {}.\n"sv, err);
+		DEBUG_STRING(L"@rg Stop Service: send [SERVICE_CONTROL_STOP] control code failure: {}.\n"sv, err);
 		return false;
 	}
-	DEBUG_STRING(L"@rg Stop Service: send [stop] control code.\n");
+	DEBUG_STRING(L"@rg Stop Service: send [SERVICE_CONTROL_STOP] control code.\n");
 
 	if (!query_status(service, sstatus))
 	{
@@ -672,13 +674,13 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		current_state = sstatus.dwCurrentState;
 		if (current_state == SERVICE_STOPPED)
 		{
-			DEBUG_STRING(L"@rg Stop Service: Service Stopped.\n");
+			DEBUG_STRING(L"@rg Stop Service: Service Stopped [SERVICE_STOPPED].\n");
 			break;
 		}
 		auto duration = GetTickCount64() - wait_tick;
 		if (duration > sstatus.dwWaitHint)
 		{
-			DEBUG_STRING(L"@rg Stop Service: failure, wait 30s timeout!\n");
+			DEBUG_STRING(L"@rg Stop Service: failure, wait 15s timeout!\n");
 			break;
 		}
 	}

@@ -24,7 +24,7 @@ bool bb_sleep_thread_exit = false;
 /* extern maybe noused */
 std::vector<fs::path> g_work_ignore_folders;
 // connect to remote address.
-freeze::nats_client g_nats_client{};
+static freeze::nats_client g_nats_client{};
 // global signal for communicate-with-nats with reason.
 freeze::atomic_sync_reason global_reason_signal{};
 
@@ -33,10 +33,10 @@ fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
 	auto wcs_folder = freeze::detail::read_latest_folder();
-	DEBUG_STRING(L"@rg Try Reset WorkFolder: {}, need notify={}.\n"sv, wcs_folder, notify);
+	DEBUG_STRING(L"@rg reset_work_folder(): {}, need notify={}.\n"sv, wcs_folder, notify);
 	if (wcs_folder.empty())
 	{
-		DEBUG_STRING(L"@rg Reset WorkFolder: folder is null.\n");
+		DEBUG_STRING(L"@rg reset_work_folder(): folder is null.\n");
 		return;
 	}
 
@@ -45,13 +45,13 @@ void reset_work_folder(bool notify/* = false */)
 	auto latest_path = fs::path{ latest_folder };
 	if (!fs::exists(latest_path))
 	{
-		DEBUG_STRING(L"@rg Reset WorkFolder: {}, folder not exists.\n"sv, latest_path.c_str());
+		DEBUG_STRING(L"@rg reset_work_folder(): {}, folder not exists.\n"sv, latest_path.c_str());
 		return;
 	}
 
 	if (g_work_folder == latest_path)
 	{
-		DEBUG_STRING(L"@rg Reset WorkFolder: {}, already watched.\n"sv, latest_path.c_str());
+		DEBUG_STRING(L"@rg reset_work_folder(): {}, already watched.\n"sv, latest_path.c_str());
 		return;
 	}
 
@@ -64,7 +64,7 @@ void reset_work_folder(bool notify/* = false */)
 		if (!ret)
 		{
 			auto err = GetLastError();
-			DEBUG_STRING(L"@rg Wakup work-thread error: {}\n"sv, err);
+			DEBUG_STRING(L"@rg reset_work_folder(): Wakup work-thread error: {}\n"sv, err);
 		}
 		else
 		{
@@ -87,11 +87,11 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		watcher.set_watch_folder(g_work_folder);
 		watcher.set_ignore_folders(g_work_ignore_folders);
 		watcher.start();
-		DEBUG_STRING(L"@rg WorkerThread: Watcher started.\n");
+		DEBUG_STRING(L"@rg WorkerThread: Current folder [{}], Watcher started.\n"sv, g_work_folder.c_str());
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg WorkerThread: current folder [{}], not exists, watcher not started.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg WorkerThread: Current folder [{}], not exists, watcher not started.\n"sv, g_work_folder.c_str());
 	}
 
 	while (!bb_worker_thread_exit)
@@ -158,14 +158,14 @@ DWORD __stdcall _TimerThread(LPVOID)
 			}
 			else
 			{
-				DEBUG_STRING(L"@rg service create timer thread error: {}\n"sv, err);
+				DEBUG_STRING(L"@rg TimerThread: CreateWaitableTimerEx error: {}\n"sv, err);
 			}
 		}
 	} while (!hh_timer);
 
 	if (!hh_timer)
 	{
-		DEBUG_STRING(L"@rg service create timer failure.\n");
+		DEBUG_STRING(L"@rg TimerThread: CreateWaitableTimerEx failure.\n");
 		return 0;
 	}
 
@@ -217,17 +217,25 @@ DWORD __stdcall _SleepThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg SleepThread: Starting ...\n");
 	// TODO: check nats can connection ... (in timer-thread)
-	
+
 	auto ip = reset_ip_address();
-	if (ip <= 0)
+	if (ip > 0)
 	{
-		DEBUG_STRING(L"@rg SleepThread: error remote ip is null, {}, stop.\n"sv, reset_ip_error(ip));
+		DEBUG_STRING(L"@rg SleepThread: reset remote ip {}.\n"sv, ip);
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg SleepThread Error: remote ip is null, {}, stop.\n"sv, reset_ip_error(ip));
 		// notify other thread and service stop.
 		return 0;
 	}
 
 	auto connected = g_nats_client.connect(ip);
-	if (!connected)
+	if (connected)
+	{
+		DEBUG_STRING(L"@rg SleepThread: remote connected.\n");
+	}
+	else
 	{
 		DEBUG_STRING(L"@rg SleepThread Error: remote not connected.\n");
 		return 0;
@@ -235,7 +243,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 
 	while (!bb_sleep_thread_exit)
 	{
-		DEBUG_STRING(L"@rg SleepThread: waiting wakeup ...\n");
+		DEBUG_STRING(L"@rg SleepThread: Waiting Wakeup ...\n");
 		//wait until spec reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason);
@@ -253,23 +261,23 @@ DWORD __stdcall _SleepThread(LPVOID)
 			if (_ip <= 0)
 			{
 				DEBUG_STRING(L"@rg SleepThread: wakeup error remote ip is null, {}, stop.\n"sv, reset_ip_error(_ip));
-				// TODO: maybe stop service. or continue?
-				break;
+				continue;
 			}
 
 			auto connected = g_nats_client.connect(_ip);
 			if (!connected)
 			{
 				DEBUG_STRING(L"@rg SleepThread wakeup error: remote not connected, stop.\n");
-				// TODO: maybe stop service. or continue?
-				break;
+				continue;
 			}
 		}
+
 #ifndef SERVICE_TEST
-		// pause timer-thread (SERVICE_PAUSED=7)
+		// this want pause timer-thread (SERVICE_PAUSED=7)
 		set_service_status(SERVICE_PAUSED);
 		DEBUG_STRING(L"@rg SleepThread: wakeup Pause-TimerThread.\n");
 #endif
+
 		switch (reason)
 		{
 		default: [[fallthrough]];
@@ -296,6 +304,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
 		}
+
 #ifndef SERVICE_TEST
 		// resume timer-thread (SERVICE_RUNNING=4)
 		set_service_status(SERVICE_RUNNING);
@@ -316,19 +325,19 @@ bool init_threadpool()
 		hh_worker_thread = ::CreateThread(nullptr, 0, _WorkerThread, nullptr, 0, nullptr);
 		if (!hh_worker_thread)
 		{
-			DEBUG_STRING(L"@rg Service: Create WorkerThread failure.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread failure.\n");
 			bb_worker_thread_exit = true;
 			return false;
 		}
 		if (hh_worker_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg Service: Create WorkerThread Error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_worker_thread = nullptr;
 			bb_worker_thread_exit = true;
 			return false;
 		}
 	}
-	DEBUG_STRING(L"@rg Service: Create WorkerThread Successfully.\n");
+	DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread Successfully.\n");
 
 	bb_timer_thread_exit = false;
 	if (!hh_timer_thread)
@@ -337,18 +346,18 @@ bool init_threadpool()
 		if (!hh_timer_thread)
 		{
 			bb_timer_thread_exit = true;
-			DEBUG_STRING(L"@rg Service: Create TimerThread Failure.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create TimerThread Failure.\n");
 			return false;
 		}
 		if (hh_timer_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg Service: Create TimerThread Error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create TimerThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_timer_thread = nullptr;
 			bb_timer_thread_exit = true;
 			return false;
 		}
 	}
-	DEBUG_STRING(L"@rg Service: Create TimerThread Successfully.\n");
+	DEBUG_STRING(L"@rg init_threadpool(): Create TimerThread Successfully.\n");
 
 	bb_sleep_thread_exit = false;
 	if (!hh_sleep_thread)
@@ -357,20 +366,22 @@ bool init_threadpool()
 		if (!hh_sleep_thread)
 		{
 			bb_sleep_thread_exit = true;
-			DEBUG_STRING(L"@rg Service: Create SleepThread Failure.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Failure.\n");
 			return false;
 		}
 		if (hh_sleep_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg Service: Create SleepThread Error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_sleep_thread = nullptr;
 			bb_sleep_thread_exit = true;
 			return false;
 		}
 	}
-	DEBUG_STRING(L"@rg Service: Create SleepThread Successfully.\n");
+	DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Successfully.\n");
 
-	return true;
+	auto success = hh_worker_thread && hh_timer_thread && hh_sleep_thread;
+	auto running = !bb_worker_thread_exit && !bb_timer_thread_exit && !bb_sleep_thread_exit;
+	return success && running;
 }
 
 void stop_threadpool()
@@ -385,7 +396,7 @@ void stop_threadpool()
 	else
 	{
 		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop.\n");
-	}	
+	}
 
 	bb_timer_thread_exit = true;
 	ret = QueueUserAPC([](ULONG_PTR) {}, hh_timer_thread, 0);
@@ -423,7 +434,8 @@ void stop_threadpool()
 		CloseHandle(hh_sleep_thread);
 		hh_sleep_thread = nullptr;
 	}
-	DEBUG_STRING(L"@rg stop_threadpool(): thread pool stop done.\n");
+
+	DEBUG_STRING(L"@rg stop_threadpool(): Threadpool Stopped.\n");
 }
 
 namespace freeze

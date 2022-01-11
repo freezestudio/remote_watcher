@@ -126,6 +126,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		{
 			remote_ip = reset_ip_address();
 		}
+
 		if (remote_ip <= 0)
 		{
 			DEBUG_STRING(L"@rg ServiceMain: remote ip not set, {}!\n"sv, reset_ip_error(remote_ip));
@@ -134,14 +135,26 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 		}
 
 		reset_work_folder();
+
 		if (init_threadpool())
 		{
+			// block waitable-event
 			run_service();
+			DEBUG_STRING(L"@rg ServiceMain: Sevice will stopping ...\n");
+
+			stop_threadpool();
+			stop_service();
+		}
+		else
+		{
+			DEBUG_STRING(L"@rg ServiceMain: Init Threadpool Failure.\n");
 		}
 	}
+	else
+	{
+		DEBUG_STRING(L"@rg ServiceMain: Init Service Failure.\n");
+	}
 
-	stop_threadpool();
-	stop_service();
 
 theend:
 	DEBUG_STRING(L"@rg ServiceMain: Service Stopped.\n");

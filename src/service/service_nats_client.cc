@@ -8,6 +8,7 @@
 #include "service_nats_client.h"
 
 #define MAX_IP4_SIZE 16
+#define CONNECT_TIMEOUT 10000
 
 // TODO: add ignore field.
 // 1. current: only one command{name:"modify-folder", action:"path/to/folder"}
@@ -26,7 +27,7 @@ namespace freeze::detail
 	struct _nats_options
 	{
 	public:
-		_nats_options(/*std::nullptr_t*/)
+		_nats_options(std::nullptr_t = nullptr)
 			: _options{ nullptr }
 		{
 		}
@@ -76,17 +77,36 @@ namespace freeze::detail
 		}
 
 	public:
-		_nats_options& reset(std::string const& url, std::string const& token, std::string const& name = {})
+		void reset()
 		{
 			_destroy();
-			auto ok = _create();
-			if (!name.empty())
+		}
+
+		_nats_options& reset(std::string const& url, std::string const& token, std::string const& name = {})
+		{
+			auto ok = true;
+			//_destroy();
+
+			if (!_options)
 			{
-				_name(name);
+				ok = _create();
+				if (!ok)
+				{
+					return *this;
+				}
+
+				if (!name.empty())
+				{
+					ok = _name(name);
+				}
+
+				ok = _buffer_size(64 * 1024);
+				ok = _url(url);
+				ok = _token(token);
+				ok = _timeout(CONNECT_TIMEOUT); // default 15s
+				ok = _no_retry();
 			}
-			ok = _buffer_size(64 * 1024);
-			ok = _url(url);
-			ok = _token(token);
+
 			return *this;
 		}
 
@@ -147,7 +167,7 @@ namespace freeze::detail
 
 		bool _buffer_size(int size = 0)
 		{
-			// 0==default==32kb
+			// 0==default==32kb			
 			return natsOptions_SetIOBufSize(_options, size) == natsStatus::NATS_OK;
 		}
 
@@ -188,6 +208,18 @@ namespace freeze::detail
 				nats_url += ":4222";
 			}
 			return natsOptions_SetURL(_options, nats_url.c_str()) == natsStatus::NATS_OK;
+		}
+
+		bool _timeout(int64_t ms)
+		{
+			auto status = natsOptions_SetTimeout(_options, ms);
+			return status == NATS_OK;
+		}
+
+		bool _no_retry()
+		{
+			auto status = natsOptions_SetRetryOnFailedConnect(_options, false, nullptr, nullptr);
+			return status == NATS_OK;
 		}
 
 	private:
@@ -680,8 +712,10 @@ namespace freeze::detail
 		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
 		{
 			_destroy();
+
 			_opts.reset(url, token, name);
 			auto ok = _connect();
+
 			return *this;
 		}
 
@@ -697,7 +731,7 @@ namespace freeze::detail
 			return ok;
 		}
 
-		DWORD _maybe_heartbeat()
+		DWORD maybe_heartbeat()
 		{
 			auto _m = _nats_msg{ message_send_channel.data(), true };
 			_nats_msg _reply_msg{ nullptr };
@@ -723,6 +757,10 @@ namespace freeze::detail
 				if (!ok)
 				{
 					DEBUG_STRING(L"publish-message: publish message failure.\n");
+				}
+				else
+				{
+					DEBUG_STRING(L"publish-message: publish message success.\n");
 				}
 			}
 			else
@@ -902,13 +940,22 @@ namespace freeze::detail
 			}
 		}
 
-		_nats_connect& connect(std::string const& url, std::string const& token, std::string const& name = {})
+		bool connect(std::string const& url, std::string const& token, std::string const& name = {})
 		{
+			_destroy();
+
 			_opts.reset(url, token, name);
+			_opts.set_cnn_name();
+
 			auto ok = _connect();
-			assert(ok);
+			//assert(ok);
 			// TODO: if !ok error
-			return *this;
+			if (!ok)
+			{
+				DEBUG_STRING(L"_nats_connect::conect failure.\n");
+				_opts.reset();
+			}
+			return ok;
 		}
 
 		bool is_connected()
@@ -917,6 +964,7 @@ namespace freeze::detail
 			{
 				return false;
 			}
+
 			auto status = natsConnection_Status(_nc);
 			return status == NATS_CONN_STATUS_CONNECTED;
 		}
@@ -1019,8 +1067,9 @@ namespace freeze::detail
 	private:
 		bool _connect()
 		{
-			_opts.set_cnn_name();
+			// if _opts==nullptr then _opts=NATS_DEFAULT_URL;
 			auto status = natsConnection_Connect(&_nc, _opts);
+			// NATS_NO_SERVER
 			auto ok = status == NATS_OK;
 			if (ok)
 			{
@@ -1040,9 +1089,23 @@ namespace freeze::detail
 
 		void _destroy()
 		{
-			_disconnect();
-			natsConnection_Destroy(_nc);
-			_nc = nullptr;
+			if (_nc)
+			{
+				_disconnect();
+				natsConnection_Destroy(_nc);
+				if (_opts)
+				{
+					_opts.reset();
+				}
+				_nc = nullptr;
+			}
+			else
+			{
+				if (_opts)
+				{
+					_opts = nullptr;
+				}
+			}
 		}
 
 		bool _want_header_support()
@@ -1053,7 +1116,7 @@ namespace freeze::detail
 		}
 
 	private:
-		std::mutex _mutex;
+		//std::mutex _mutex;
 
 	private:
 		natsConnection* _nc = nullptr;
@@ -1086,16 +1149,30 @@ namespace freeze
 
 	bool nats_client::connect(DWORD ip, std::string const& token /* = {}*/)
 	{
+		std::unique_lock<std::mutex> lock(_mutex);
+
 		auto url = detail::parse_ip_address(ip);
+		DEBUG_STRING(L"nats_client::connect(): will try connect to {}\n"sv, detail::to_utf16(url));
+
 		//pimpl.swap(detail::_nats_connect(url, token));
-		pimpl->connect(url, token);
+		auto _is_connected = pimpl->connect(url, token);
+		if (!_is_connected)
+		{
+			DEBUG_STRING(L"nats_client::connect(): nats client is nullptr.\n");
+			return false;
+		}
+
 		assert(pimpl != nullptr && (bool)(*pimpl.get()));
-		auto _is_connected = pimpl->is_connected();
+		_is_connected = pimpl->is_connected();
 		if (_is_connected)
 		{
 			init_threads();
 			pimpl->subject_command();
 			pimpl->subject_recv_message();
+		}
+		else
+		{
+			DEBUG_STRING(L"nats_client::connect(): connect to {} failure.\n"sv, detail::to_utf16(url));
 		}
 		return _is_connected;
 	}
@@ -1290,74 +1367,81 @@ namespace freeze
 
 	void nats_client::init_threads()
 	{
+		stop_threads();
+
+		_msg_thread_running = true;
 		_msg_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"_msg_thread: starting ...\n");
+				DEBUG_STRING(L"message thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"_msg_thread: self_ptr=null, thread stopping ...\n");
+						DEBUG_STRING(L"message thread: self_ptr=null, stopping ...\n");
 						break;
 					}
 					self_ptr->_message_signal.wait();
-					DEBUG_STRING(L"_msg_thread: _message_signal wait ready.\n");
+					DEBUG_STRING(L"message thread: _message_signal wait ready.\n");
 					if (!(self_ptr->_msg_thread_running))
 					{
-						DEBUG_STRING(L"_msg_thread: running=false, thread stopping ...\n");
+						DEBUG_STRING(L"message thread: running=false, stopping ...\n");
 						break;
 					}
 					self_ptr->message_response();
 				}
-				DEBUG_STRING(L"_msg_thread: thread stopped.\n");
+				DEBUG_STRING(L"message thread: stopped.\n");
 			},
 			this);
+
+		_cmd_thread_running = true;
 		_cmd_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"_cmd_thread: starting ...\n");
+				DEBUG_STRING(L"command thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"_cmd_thread: self_ptr=null, thread stopping ...\n");
+						DEBUG_STRING(L"command thread: self_ptr=null, stopping ...\n");
 						break;
 					}
 					self_ptr->_command_signal.wait();
-					DEBUG_STRING(L"_cmd_thread: _command_signal wait ready.\n");
+					DEBUG_STRING(L"command thread: _command_signal wait ready.\n");
 					if (!(self_ptr->_cmd_thread_running))
 					{
-						DEBUG_STRING(L"_cmd_thread: running=false, thread stopping ....\n");
+						DEBUG_STRING(L"command thread: running=false, stopping ....\n");
 						break;
 					}
 					self_ptr->command_handle_result();
 					self_ptr->_cmd_response_signal.notify();
 				}
-				DEBUG_STRING(L"_cmd_thread: thread stopped.\n");
+				DEBUG_STRING(L"command thread: stopped.\n");
 			},
 			this);
+
+		_pal_thread_running = true;
 		_pal_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"_pal_thread: starting ...\n");
+				DEBUG_STRING(L"payload thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"_pal_thread: self_ptr=null, thread stopping ...\n");
+						DEBUG_STRING(L"payload thread: self_ptr=null, stopping ...\n");
 						break;
 					}
 					self_ptr->_payload_signal.wait();
-					DEBUG_STRING(L"_pal_thread: _payload_signal wait ready.\n");
+					DEBUG_STRING(L"payload thread: _payload_signal wait ready.\n");
 					if (!(self_ptr->_pal_thread_running))
 					{
-						DEBUG_STRING(L"_pal_thread: running=false, thread stopping ....\n");
+						DEBUG_STRING(L"payload thread: running=false, stopping ....\n");
 						break;
 					}
 					self_ptr->send_payload();
 				}
-				DEBUG_STRING(L"_pal_thread: thread stopped.\n");
+				DEBUG_STRING(L"payload thread: stopped.\n");
 			}, this);
 	}
 
@@ -1396,8 +1480,8 @@ namespace freeze
 		DEBUG_STRING(L"nats_client::stop_threads(): all thread stopped.\n");
 	}
 
-	DWORD nats_client::_maybe_heartbeat()
+	DWORD nats_client::maybe_heartbeat()
 	{
-		return pimpl->_maybe_heartbeat();
+		return pimpl->maybe_heartbeat();
 	}
 }

@@ -7,7 +7,6 @@
 #include "service_extern.h"
 
 DWORD _g_latest_time = 0;
-bool _g_need_reconnect = false;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
 #ifndef SERVICE_TEST
@@ -25,24 +24,20 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 		return;
 	}
 
-	if (_g_need_reconnect)
+	if (!nc_ptr->is_connected())
 	{
-		DEBUG_STRING(L"@rg TimerCallback: try reconnect ...\n");
-		if (!nc_ptr->is_connected())
+		auto _ip = reset_ip_address();
+		if (_ip <= 0)
 		{
-			auto _ip = reset_ip_address();
-			if (_ip <= 0)
-			{
-				DEBUG_STRING(L"@rg TimerCallback: error remote ip is null, {}.\n"sv, reset_ip_error(_ip));
-				return;
-			}
+			DEBUG_STRING(L"@rg TimerCallback: error remote ip is null, {}.\n"sv, reset_ip_error(_ip));
+			return;
+		}
 
-			auto connected = nc_ptr->connect(_ip);
-			if (!connected)
-			{
-				DEBUG_STRING(L"@rg TimerCallback error: remote not connected.\n");
-				return;
-			}
+		auto connected = nc_ptr->connect(_ip);
+		if (!connected)
+		{
+			DEBUG_STRING(L"@rg TimerCallback error: remote not connected.\n");
+			return;
 		}
 	}
 
@@ -51,7 +46,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	DEBUG_STRING(L"@rg TimerCallback: ping duration: {}\n"sv, _timeout);
 
 	_g_latest_time = dwTimerLowValue;
-	auto status = nc_ptr->_maybe_heartbeat();
+	auto status = nc_ptr->maybe_heartbeat();
 	auto status_msg = L"ok"s;
 	if (status != 0)
 	{
@@ -62,7 +57,6 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 		else if (status == NATS_NO_RESPONDERS)
 		{
 			status_msg = L"no responsers"s;
-			_g_need_reconnect = true;
 		}
 		else
 		{
@@ -71,7 +65,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	}
 	else
 	{
-		_g_need_reconnect = false;
+		// empty
 	}
 	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n"sv, status_msg);
 }

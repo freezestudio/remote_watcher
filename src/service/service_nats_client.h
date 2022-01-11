@@ -40,13 +40,27 @@ namespace freeze::detail
 	struct nats_recv_message : interactive_message
 	{
 		std::string folder;
+		// TODO: add ignores
 		// std::vector<std::string> ignores;
 	};
 
-	struct nats_send_message : interactive_message
+	struct nats_disk_message : interactive_message
+	{
+		std::vector<std::string> disks;
+	};
+
+	struct nats_folder_message : interactive_message
 	{
 		std::vector<std::string> folders;
 	};
+
+	struct nats_file_message : interactive_message
+	{
+		std::vector<std::string> files;
+	};
+
+	using nats_watch_message = nats_folder_message;
+	using nats_send_message = nats_folder_message;
 
 	inline nats_recv_message parse_recv_message(std::string const& msg)
 	{
@@ -69,32 +83,52 @@ namespace freeze::detail
 		return nrm;
 	}
 
-	inline constexpr nats_send_message make_send_message(std::string const& name, std::vector<std::string> const& folders)
+	inline std::string make_send_message_string(std::string const& name, std::vector<std::string> const& data)
 	{
-		nats_send_message nsm;
-		nsm.name = name;
-		nsm.folders = folders;
-		return nsm;
-	}
+		//enum class value_t : std::uint8_t
+		//{
+		//	null,             ///< null value
+		//	object,           ///< object (unordered set of name/value pairs)
+		//	array,            ///< array (ordered collection of values)
+		//	string,           ///< string value
+		//	boolean,          ///< boolean value
+		//	number_integer,   ///< number value (signed integer)
+		//	number_unsigned,  ///< number value (unsigned integer)
+		//	number_float,     ///< number value (floating-point)
+		//	binary,           ///< binary array (ordered collection of bytes)
+		//	discarded         ///< discarded by the parser callback function
+		//};
 
-	inline std::string from_send_message(nats_send_message const& msg)
-	{
 		std::string result;
-		if (!msg.name.empty())
+		if (!name.empty())
 		{
 			using json = nlohmann::json;
 			json j;
-			j["name"] = msg.name;
-			j["folders"] = msg.folders;
+			j["name"] = name;
+			if (name == "list-disk")
+			{
+				j["disks"] = data;
+			}
+			else if (name == "select-directory")
+			{
+				j["folders"] = data;
+			}
+			else if (name == "select-files")
+			{
+				j["files"] = data;
+			}
+			else if (name == "watch-folder")
+			{
+				j["folders"] = data;
+			}
+			else
+			{
+				// more.
+			}
+
 			result = j.dump();
 		}
 		return result;
-	}
-
-	inline std::string make_send_message_string(std::string const& name, std::vector<std::string> const& folders)
-	{
-		auto msg = make_send_message(name, folders);
-		return from_send_message(msg);
 	}
 
 	inline constexpr nats_cmd make_cmd(std::string const& name, std::string const& action)
@@ -249,7 +283,7 @@ namespace freeze
 		void message_response();
 
 	public:
-		DWORD _maybe_heartbeat();
+		DWORD maybe_heartbeat();
 
 	private:
 		void init_threads();

@@ -8,7 +8,7 @@
 #include "service_dep.h"
 
 //do not setup service, then test service.
-// #define SERVICE_TEST
+ //#define SERVICE_TEST
 
 #ifndef SERVICE_TEST
 extern freeze::service_state ss_current_status;

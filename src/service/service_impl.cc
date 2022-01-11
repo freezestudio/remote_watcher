@@ -34,24 +34,25 @@ bool init_service()
 	ss_handle = ::RegisterServiceCtrlHandlerEx(SERVICE_NAME, handler_proc_ex, nullptr);
 	if (!ss_handle)
 	{
-		DEBUG_STRING(L"@rg Service: Register ControlHandler failure, exit.\n");
+		DEBUG_STRING(L"@rg init_service(): Register ControlHandler failure, exit.\n");
 		return false;
 	}
-	DEBUG_STRING(L"@rg Service: ControlHandler Register Successfully.\n");
+	DEBUG_STRING(L"@rg init_service(): ControlHandler Register Successfully.\n");
 		
 	update_status(ss_handle, SERVICE_START_PENDING);
-	DEBUG_STRING(L"@rg Service: Start Pending {} ms.\n"sv, default_wait_hint);
+	DEBUG_STRING(L"@rg init_service(): Start Pending {} ms.\n"sv, default_wait_hint);
 #endif
 
 	hh_waitable_event = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!hh_waitable_event)
 	{
-		DEBUG_STRING(L"@rg Service: Create waitable handle failure, exit.\n");
+		DEBUG_STRING(L"@rg init_service(): Create waitable handle failure, exit.\n");
 
 		update_status(ss_handle, SERVICE_STOP_PENDING);
-		DEBUG_STRING(L"@rg Service: CreateEvent Failure. Stop Pending...\n");
+		DEBUG_STRING(L"@rg init_service(): CreateEvent Failure. Stop Pending...\n");
 		return false;
 	}
+
     return true;
 }
 
@@ -60,7 +61,7 @@ void run_service()
 #ifndef SERVICE_TEST
 	// service running
 	update_status(ss_handle, SERVICE_RUNNING);
-	DEBUG_STRING(L"@rg Service: Started.\n");
+	DEBUG_STRING(L"@rg run_service(): Started.\n");
 #endif
 
 	while (true)
@@ -68,7 +69,8 @@ void run_service()
 		::WaitForSingleObject(hh_waitable_event, INFINITE);
 		break;
 	}
-	DEBUG_STRING(L"@rg Service: Stopping ...\n");
+
+	DEBUG_STRING(L"@rg run_service(): Start End.\n");
 }
 
 void stop_service()
@@ -76,7 +78,7 @@ void stop_service()
 #ifndef SERVICE_TEST
 	// stop service
 	update_status(ss_handle, SERVICE_STOPPED);
-	DEBUG_STRING(L"@rg Service: Stop Pending {}s.\n"sv, default_wait_hint);
+	DEBUG_STRING(L"@rg stop_service(): Stop Pending {} ms.\n"sv, default_wait_hint);
 #endif
 
 	cp_check_point = 0;	
@@ -86,7 +88,7 @@ void stop_service()
 		hh_waitable_event = nullptr;
 	}
 
-	DEBUG_STRING(L"@rg Service: Service stopped.\n");
+	DEBUG_STRING(L"@rg stop_service(): Service Stopped.\n");
 }
 
 
@@ -100,19 +102,19 @@ DWORD __stdcall handler_proc_ex(
 	{
 	case SERVICE_CONTROL_PAUSE:
 		// pause service
-		DEBUG_STRING(L"@rg Recv [pause] control code.\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [pause] control code.\n");
 		update_status(ss_handle, SERVICE_PAUSE_PENDING);
-		DEBUG_STRING(L"@rg Recv [pause] control code: do-something ...\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [pause] control code: do-something ...\n");
 		update_status(ss_handle, SERVICE_PAUSED);
-		DEBUG_STRING(L"@rg Recv [pause] control code: Service Paused.\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [pause] control code: Service Paused.\n");
 		break;
 	case SERVICE_CONTROL_CONTINUE:
 		// resume service
-		DEBUG_STRING(L"@rg Recv [resume] control code.\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [resume] control code.\n");
 		update_status(ss_handle, SERVICE_CONTINUE_PENDING);
-		DEBUG_STRING(L"@rg Recv [resume] control code: do-something...\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [resume] control code: do-something...\n");
 		update_status(ss_handle, SERVICE_RUNNING);
-		DEBUG_STRING(L"@rg Recv [resume] control code: Service Running.\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [resume] control code: Service Running.\n");
 		break;
 	case SERVICE_CONTROL_INTERROGATE:
 		// report current status, should simply return NO_ERROR
@@ -120,16 +122,16 @@ DWORD __stdcall handler_proc_ex(
 	case SERVICE_CONTROL_PARAMCHANGE:
 		// startup parameters changed
 		break;
-		// case SERVICE_CONTROL_PRESHUTDOWN:
-		// pre-shutdown
-		// break;
+	// case SERVICE_CONTROL_PRESHUTDOWN:
+	//     pre-shutdown
+	//     break;
 	case SERVICE_CONTROL_SHUTDOWN:
 		// shutdown, return NO_ERROR;
 		[[fallthrough]];
 	case SERVICE_CONTROL_STOP:
 		// stop service, return NO_ERROR;
 		SetEvent(hh_waitable_event);
-		DEBUG_STRING(L"@rg Recv [stop] control code.\n");
+		DEBUG_STRING(L"@rg handler_proc_ex(): Recv [stop] control code.\n");
 		update_status(ss_handle, SERVICE_STOP_PENDING);
 		// SERVICE_STOPPED
 		break;
@@ -186,11 +188,13 @@ bool update_status(SERVICE_STATUS_HANDLE hss, DWORD state, DWORD error_code)
 	}
 
 	auto ok = SetServiceStatus(hss, &service_status) ? true : false;
+
 #ifndef SERVICE_TEST
 	if(ok)
 	{
 		set_service_status(state);
 	}
 #endif
+
 	return ok;
 }
