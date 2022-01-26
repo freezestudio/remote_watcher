@@ -17,7 +17,7 @@ int64_t reset_ip_address(std::wstring const& wcs_ip)
 	if (!g_wcs_ip.empty())
 	{
 		auto _ip = freeze::detail::make_ip_address(g_wcs_ip);
-		if (_ip)
+		if (freeze::detail::check_ip_address(_ip))
 		{
 			return static_cast<int64_t>(_ip); // old ip success
 		}
@@ -45,8 +45,11 @@ int64_t reset_ip_address(std::wstring const& wcs_ip)
 		ip = freeze::detail::make_ip_address(str_ip);
 	}
 
-	if (ip == 0)
+	if (!freeze::detail::check_ip_address(ip))
 	{
+		// 4,294,967,295
+		//constexpr auto _max = (std::numeric_limits<uint32_t>::max)();
+		//constexpr auto _max = static_cast<uint32_t>(-1);
 		return 0; // str->num convert error!
 	}
 
@@ -127,7 +130,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 			remote_ip = reset_ip_address();
 		}
 
-		if (remote_ip <= 0)
+		if (remote_ip < 0 || !freeze::detail::check_ip_address(static_cast<uint32_t>(remote_ip)))
 		{
 			DEBUG_STRING(L"@rg ServiceMain: remote ip not set, {}!\n"sv, reset_ip_error(remote_ip));
 			stop_service();

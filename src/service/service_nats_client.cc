@@ -194,6 +194,11 @@ namespace freeze::detail
 
 		bool _url(std::string const& url)
 		{
+			if (url.empty())
+			{
+				return natsOptions_SetURL(_options, "nats://0.0.0.0:4222") == natsStatus::NATS_OK;
+			}
+
 			std::string nats_url;
 			if (!url.starts_with("nats://"))
 			{
@@ -1259,8 +1264,17 @@ namespace freeze
 		{
 			auto wcs_folder = detail::read_latest_folder();
 			DEBUG_STRING(L"notify-message[watch-folder]: current watch={}\n"sv, wcs_folder);
-			auto mbs_folder = detail::to_utf8(wcs_folder);
-			std::vector<std::string> _one = { mbs_folder };
+
+			std::vector<std::string> _one;
+			if (wcs_folder.empty())
+			{
+				_one.emplace_back(""s);
+			}
+			else
+			{
+				auto mbs_folder = detail::to_utf8(wcs_folder);
+				_one.emplace_back(mbs_folder);
+			}			
 			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
 		}
 		else

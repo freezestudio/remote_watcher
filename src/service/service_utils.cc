@@ -32,19 +32,24 @@ namespace freeze::detail
 		return wcs;
 	}
 }
+
 namespace freeze::detail
 {
 	uint32_t make_ip_address(std::wstring const& ip)
 	{
 		if (ip.empty())
 		{
-			return 0;
+			return EMPTY_IP;
 		}
+
+		// TODO: 1. check has '.' 3 times.
+		// TODO: 2. check is string number.
 		auto ip4len = ip.size();
-		if (ip4len > 16)
+		if (ip4len > 16ull)
 		{
-			return 0;
+			return BAD_LEN_IP;
 		}
+
 		wchar_t cb[4][4]{};
 		int index = 0;
 		int sub_index = 0;
@@ -55,7 +60,7 @@ namespace freeze::detail
 				auto len = wcslen(cb[index]);
 				if (len <= 0 || len > 3)
 				{
-					return 0;
+					return BAD_IP;
 				}
 				index++;
 				sub_index = 0;
@@ -65,7 +70,7 @@ namespace freeze::detail
 			cb[index][sub_index++] = c;
 			if (sub_index > 3)
 			{
-				return 0;
+				return BAD_IP;
 			}
 		}
 
@@ -75,7 +80,7 @@ namespace freeze::detail
 			b[i] = _wtoi(cb[i]);
 			if (b[i] < 0 || b[i]>255)
 			{
-				return 0;
+				return BAD_IP;
 			}
 		}
 		// MAKEIPADDRESS
@@ -89,6 +94,11 @@ namespace freeze::detail
 		auto ip3 = (((ip) >> 8) & 0xff);
 		auto ip4 = ((ip) & 0xff);
 		return std::format("{}.{}.{}.{}"sv, ip1, ip2, ip3, ip4).c_str();
+	}
+
+	bool check_ip_address(uint32_t ip)
+	{
+		return ((ip!=EMPTY_IP)&&(ip!=BAD_LEN_IP)&&(ip!=BAD_IP));
 	}
 }
 

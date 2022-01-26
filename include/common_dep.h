@@ -15,16 +15,33 @@
 #include <format>
 #include <filesystem>
 
+// track
+#define ALLOW_TRACK
+
 #define SERVICE_NAME L"rgmsvc"
 
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(ALLOW_TRACK)
+#ifndef DEBUG_STRING
 #define DEBUG_STRING(msg, ...) \
 do { \
     auto _msg_ = std::format(msg, __VA_ARGS__); \
     OutputDebugString(_msg_.c_str()); \
 }while(false)
+#endif
 #else
+#if defined(DEBUG) || defined(_DEBUG)
+#ifndef DEBUG_STRING
+#define DEBUG_STRING(msg, ...) \
+do { \
+    auto _msg_ = std::format(msg, __VA_ARGS__); \
+    OutputDebugString(_msg_.c_str()); \
+}while(false)
+#endif
+#else
+#ifndef DEBUG_STRING
 #define DEBUG_STRING(msg, ...)
+#endif
+#endif
 #endif
 
 #endif

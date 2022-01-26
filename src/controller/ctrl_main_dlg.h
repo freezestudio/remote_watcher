@@ -117,8 +117,11 @@ public:
 		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
 		if (addr == 0)
 		{
-			MessageBox(L"ip address failure.", L"monitor", MB_ICONWARNING | MB_OK);
-			return;
+			auto ret = MessageBox(L"ip address is empty,\nthis will use the local ip address.", L"monitor", MB_ICONWARNING | MB_YESNO);
+			if (ret == IDNO)
+			{
+				return;
+			}
 		}
 
 		if (install_service(mAutoStart))
@@ -226,8 +229,11 @@ public:
 		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
 		if (addr == 0)
 		{
-			MessageBox(L"ip address failure.", L"monitor", MB_ICONWARNING | MB_OK);
-			return FALSE;
+			auto ret = MessageBox(L"ip address is empty,\nthis will use the local ip address.", L"monitor", MB_ICONWARNING | MB_YESNO);
+			if (ret == IDNO)
+			{
+				return FALSE;
+			}
 		}
 
 		auto ok = start_service(ip);

@@ -15,6 +15,10 @@ namespace fs = std::filesystem;
 using namespace std::literals;
 using volume_type = std::tuple<std::string, std::string, std::string>;
 
+inline constexpr auto EMPTY_IP = static_cast<uint32_t>(-1);
+inline constexpr auto BAD_LEN_IP = static_cast<uint32_t>(-2);
+inline constexpr auto BAD_IP = static_cast<uint32_t>(-3);
+
 #if defined(_DEBUG) || defined(DEBUG)
 template <typename... Args>
 void debug_output(std::wstring_view const &fmt, Args &&...args)
@@ -41,6 +45,7 @@ namespace freeze::detail
 {
     uint32_t make_ip_address(std::wstring const&);
     std::string parse_ip_address(uint32_t);
+	bool check_ip_address(uint32_t);
 }
 
 namespace freeze::detail
