@@ -219,15 +219,15 @@ DWORD __stdcall _SleepThread(LPVOID)
 	// TODO: check nats can connection ... (in timer-thread)
 
 	auto ip = reset_ip_address();
-	if (ip > 0)
-	{
-		DEBUG_STRING(L"@rg SleepThread: reset remote ip {}.\n"sv, ip);
-	}
-	else
+	if (ip < 0)
 	{
 		DEBUG_STRING(L"@rg SleepThread Error: remote ip is null, {}, stop.\n"sv, reset_ip_error(ip));
 		// notify other thread and service stop.
 		return 0;
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg SleepThread: reset remote ip {}.\n"sv, ip);
 	}
 
 	auto connected = g_nats_client.connect(ip);
@@ -258,7 +258,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		if (!g_nats_client.is_connected())
 		{
 			auto _ip = reset_ip_address();
-			if (_ip <= 0)
+			if (_ip < 0)
 			{
 				DEBUG_STRING(L"@rg SleepThread: wakeup error remote ip is null, {}, stop.\n"sv, reset_ip_error(_ip));
 				continue;

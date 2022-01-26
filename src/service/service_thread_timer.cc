@@ -27,7 +27,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	if (!nc_ptr->is_connected())
 	{
 		auto _ip = reset_ip_address();
-		if (_ip <= 0)
+		if (_ip < 0)
 		{
 			DEBUG_STRING(L"@rg TimerCallback: error remote ip is null, {}.\n"sv, reset_ip_error(_ip));
 			return;

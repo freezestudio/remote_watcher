@@ -14,6 +14,6 @@ LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 
 STRINGTABLE
 BEGIN
-   IDS_DISPLAY   "FolderMointService"
+   IDS_DISPLAY   "FolderMonitService"
    IDS_DESC      "Watch a Folder, Send event to remote."
 END

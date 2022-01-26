@@ -196,7 +196,8 @@ namespace freeze::detail
 		{
 			if (url.empty())
 			{
-				return natsOptions_SetURL(_options, "nats://0.0.0.0:4222") == natsStatus::NATS_OK;
+				DEBUG_STRING(L"_nats_options::_url: {}\n"sv, detail::to_utf16(NATS_DEFAULT_URL));
+				return natsOptions_SetURL(_options, NATS_DEFAULT_URL) == natsStatus::NATS_OK;
 			}
 
 			std::string nats_url;
@@ -212,6 +213,7 @@ namespace freeze::detail
 			{
 				nats_url += ":4222";
 			}
+			DEBUG_STRING(L"_nats_options::_url: {}\n"sv, detail::to_utf16(nats_url));
 			return natsOptions_SetURL(_options, nats_url.c_str()) == natsStatus::NATS_OK;
 		}
 
@@ -732,7 +734,12 @@ namespace freeze::detail
 			{
 				return false;
 			}
-			ok = natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+			auto status = natsConnection_PublishMsg(_nc, _m);
+			if (status != NATS_OK)
+			{
+				DEBUG_STRING(L"_nats_connect::ack_command: error {}\n"sv, static_cast<uint32_t>(status));
+			}
+			ok = status == NATS_OK;
 			return ok;
 		}
 
@@ -761,7 +768,7 @@ namespace freeze::detail
 				ok = status == NATS_OK;
 				if (!ok)
 				{
-					DEBUG_STRING(L"publish-message: publish message failure.\n");
+					DEBUG_STRING(L"publish-message: publish message failure {}.\n"sv, static_cast<uint32_t>(status));
 				}
 				else
 				{
@@ -780,7 +787,12 @@ namespace freeze::detail
 			//std::lock_guard<std::mutex> lock(_mutex);
 			auto _m = _nats_msg{ command_channel.data() };
 			_m.set_cmd(cmd);
-			return natsConnection_PublishMsg(_nc, _m) == NATS_OK;
+			auto status = natsConnection_PublishMsg(_nc, _m);
+			if (status != NATS_OK)
+			{
+				DEBUG_STRING(L"_nats_connect::publish_command: error {}\n"sv, static_cast<uint32_t>(status));
+			}
+			return status == NATS_OK;
 		}
 
 		bool publish_payload(fs::path const& folder, fs::path const& file)
@@ -859,6 +871,7 @@ namespace freeze::detail
 		{
 			if (!_nc)
 			{
+				DEBUG_STRING(L"_nats_connect::subject_recv_message: error [nc] is null.\n");
 				return false;
 			}
 
@@ -884,6 +897,7 @@ namespace freeze::detail
 		{
 			if (!_nc)
 			{
+				DEBUG_STRING(L"_nats_connect::subject_command: error [nc] is null.\n");
 				return false;
 			}
 
@@ -1052,7 +1066,7 @@ namespace freeze::detail
 			}
 
 			auto wstr = detail::to_utf16(msg);
-			DEBUG_STRING(L"on-message: {}\n"sv, wstr.c_str());
+			DEBUG_STRING(L"_nats_connect::on-message: {}\n"sv, wstr.c_str());
 
 			global_reason_signal.notify_reason(sync_reason_recv_message);
 		}
@@ -1064,7 +1078,7 @@ namespace freeze::detail
 
 			auto wcs_name = detail::to_utf16(cmd.name);
 			auto wcs_action = detail::to_utf16(cmd.action);
-			DEBUG_STRING(L"on-command: name={}, action={}\n"sv, wcs_name, wcs_action);
+			DEBUG_STRING(L"_nats_connect::on-command: name={}, action={}\n"sv, wcs_name, wcs_action);
 
 			global_reason_signal.notify_reason(sync_reason_recv_command);
 		}
@@ -1072,9 +1086,15 @@ namespace freeze::detail
 	private:
 		bool _connect()
 		{
+			//NATS_DEFAULT_URL; "nats://localhost:4222"
 			// if _opts==nullptr then _opts=NATS_DEFAULT_URL;
 			auto status = natsConnection_Connect(&_nc, _opts);
 			// NATS_NO_SERVER
+			if (status != NATS_OK)
+			{
+				DEBUG_STRING(L"_nats_connect::_connect: error {}.\n"sv, static_cast<uint32_t>(status));
+			}
+
 			auto ok = status == NATS_OK;
 			if (ok)
 			{
@@ -1117,6 +1137,10 @@ namespace freeze::detail
 		{
 			//NATS_NO_SERVER_SUPPORT;
 			auto status = natsConnection_HasHeaderSupport(_nc);
+			if (status != NATS_OK)
+			{
+				DEBUG_STRING(L"_nats_connect::_want_header_support: error {}.\n"sv, static_cast<uint32_t>(status));
+			}
 			return status == NATS_OK;
 		}
 
@@ -1156,14 +1180,19 @@ namespace freeze
 	{
 		std::unique_lock<std::mutex> lock(_mutex);
 
-		auto url = detail::parse_ip_address(ip);
-		DEBUG_STRING(L"nats_client::connect(): will try connect to {}\n"sv, detail::to_utf16(url));
+		auto url = std::string{};
+		if (ip > 0)
+		{
+			url = detail::parse_ip_address(ip);
+		}
+		DEBUG_STRING(L"nats_client::connect(): will try connect to {}\n"sv,
+			url.empty() ? L"0.0.0.0" : detail::to_utf16(url));
 
 		//pimpl.swap(detail::_nats_connect(url, token));
 		auto _is_connected = pimpl->connect(url, token);
 		if (!_is_connected)
 		{
-			DEBUG_STRING(L"nats_client::connect(): nats client is nullptr.\n");
+			DEBUG_STRING(L"nats_client::connect(): nats client is null.\n");
 			return false;
 		}
 
@@ -1172,6 +1201,8 @@ namespace freeze
 		if (_is_connected)
 		{
 			init_threads();
+
+			// TODO: fix if return false
 			pimpl->subject_command();
 			pimpl->subject_recv_message();
 		}
@@ -1198,16 +1229,18 @@ namespace freeze
 
 	void nats_client::notify_message()
 	{
+		// notify message thread resume.
 		_message_signal.notify();
 	}
 
 	std::string nats_client::notify_command()
 	{
+		// notify command thread resume.
 		_command_signal.notify();
 
-		DEBUG_STRING(L"nats_client::notify_command(): wait command response ...\n");
+		DEBUG_STRING(L"nats_client::notify_command(): command response waiting ...\n");
 		_cmd_response_signal.wait();
-		DEBUG_STRING(L"nats_client::notify_command(): wait command response ready.\n");
+		DEBUG_STRING(L"nats_client::notify_command(): command response ready.\n");
 
 		auto res = std::exchange(_response_command, {});
 		DEBUG_STRING(L"nats_client::notify_command(): command response: {}\n", detail::to_utf16(res));
@@ -1217,6 +1250,7 @@ namespace freeze
 	void nats_client::notify_payload(fs::path const& root)
 	{
 		_watch_path = root;
+		// notify payload thred resume.
 		_payload_signal.notify();
 	}
 
@@ -1274,7 +1308,7 @@ namespace freeze
 			{
 				auto mbs_folder = detail::to_utf8(wcs_folder);
 				_one.emplace_back(mbs_folder);
-			}			
+			}
 			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
 		}
 		else
