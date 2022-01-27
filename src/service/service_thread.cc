@@ -6,6 +6,7 @@
 
 // file time: 100 nanosecond.
 constexpr auto time_second = 10000000L;
+constexpr auto timer_period = 2 * 60 * 1000L;
 
 // work thread handle.
 HANDLE hh_worker_thread = nullptr;
@@ -171,7 +172,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 
 	LARGE_INTEGER due_time{}; // 100 nanosecond
 	due_time.QuadPart = static_cast<ULONGLONG>(-30 * time_second);
-	LONG period = 30 * 1000; // milli-second
+	LONG period = timer_period; // milli-second
 	wchar_t reason_string[] = L"heart-beat";
 	REASON_CONTEXT reason{
 		POWER_REQUEST_CONTEXT_VERSION,
