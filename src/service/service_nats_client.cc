@@ -441,8 +441,8 @@ namespace freeze::detail
 						DEBUG_STRING(L"_nats_msg::set_payload() error: open file {}.\n", full_path_file.c_str());
 						goto fail;
 					}
-					assert(read_count == *len);
-					if (read_count != *len)
+					assert(*len == read_count);
+					if ((*len) != read_count)
 					{
 						ifs.close();
 						DEBUG_STRING(L"_nats_msg::set_payload() error: read file {} size.\n", full_path_file.c_str());
@@ -782,6 +782,7 @@ namespace freeze::detail
 			return ok;
 		}
 
+		// unused.
 		bool publish_command(nats_cmd const& cmd)
 		{
 			//std::lock_guard<std::mutex> lock(_mutex);
@@ -1066,9 +1067,12 @@ namespace freeze::detail
 			}
 
 			auto wstr = detail::to_utf16(msg);
-			DEBUG_STRING(L"_nats_connect::on-message: {}\n"sv, wstr.c_str());
+			DEBUG_STRING(L"_nats_connect::on_recv_message(): {}\n"sv, wstr.c_str());
 
+			// notify global SleepThread run.
 			global_reason_signal.notify_reason(sync_reason_recv_message);
+			DEBUG_STRING(L"_nats_connect::on_recv_message(): SleepThread run[sync_reason_recv_message] notified!\n");
+			// next, should call nats_client::notify_message();
 		}
 
 		void on_command(/*std::string const& reply,*/ nats_cmd const& cmd)
@@ -1078,9 +1082,11 @@ namespace freeze::detail
 
 			auto wcs_name = detail::to_utf16(cmd.name);
 			auto wcs_action = detail::to_utf16(cmd.action);
-			DEBUG_STRING(L"_nats_connect::on-command: name={}, action={}\n"sv, wcs_name, wcs_action);
+			DEBUG_STRING(L"_nats_connect::on_command: name={}, action={}\n"sv, wcs_name, wcs_action);
 
+			// notify global SleepThread run.
 			global_reason_signal.notify_reason(sync_reason_recv_command);
+			DEBUG_STRING(L"_nats_connect::on_command(): SleepThread run[sync_reason_recv_command] notified!\n");
 		}
 
 	private:
@@ -1192,7 +1198,7 @@ namespace freeze
 		auto _is_connected = pimpl->connect(url, token);
 		if (!_is_connected)
 		{
-			DEBUG_STRING(L"nats_client::connect(): nats client is null.\n");
+			DEBUG_STRING(L"nats_client::connect(): failure, nats client is null.\n");
 			return false;
 		}
 
@@ -1201,7 +1207,7 @@ namespace freeze
 		if (_is_connected)
 		{
 			init_threads();
-
+			DEBUG_STRING(L"nats_client::connect(): subject command and message.\n");
 			// TODO: fix if return false
 			pimpl->subject_command();
 			pimpl->subject_recv_message();
@@ -1229,14 +1235,19 @@ namespace freeze
 
 	void nats_client::notify_message()
 	{
-		// notify message thread resume.
+		// notify message-thread resume.
 		_message_signal.notify();
+
+		DEBUG_STRING(L"nats_client::notify_message(): message-thread notified!\n");
+		// should, next call nats_client::message_response().
+		// should, SleepThread wait.
 	}
 
 	std::string nats_client::notify_command()
 	{
-		// notify command thread resume.
+		// notify command-thread resume.
 		_command_signal.notify();
+		DEBUG_STRING(L"nats_client::notify_command(): command-thread notified!\n");
 
 		DEBUG_STRING(L"nats_client::notify_command(): command response waiting ...\n");
 		_cmd_response_signal.wait();
@@ -1250,22 +1261,22 @@ namespace freeze
 	void nats_client::notify_payload(fs::path const& root)
 	{
 		_watch_path = root;
-		// notify payload thred resume.
+		// notify payload-thread resume.
 		_payload_signal.notify();
 	}
 
 	void nats_client::message_response()
 	{
-		DEBUG_STRING(L"notify-message: {}\n"sv, detail::to_utf16(g_current_message));
+		DEBUG_STRING(L"nats_client::message_response(): {}\n"sv, detail::to_utf16(g_current_message));
 		// std::unique_lock<std::mutex> lock(_mutex);
 		if (g_current_message.empty())
 		{
-			DEBUG_STRING(L"notify-message: message is empty!\n");
+			DEBUG_STRING(L"nats_client::message_response(): message is empty!\n");
 			return;
 		}
 		std::string _message = std::exchange(g_current_message, {});
 		assert(g_current_message.empty());
-		DEBUG_STRING(L"notify-message: exchange{}\n"sv, detail::to_utf16(_message));
+		DEBUG_STRING(L"nats_client::message_response(): exchange{}\n"sv, detail::to_utf16(_message));
 		// lock.unlock();
 
 		// 1. {name:"list-disk"}
@@ -1273,38 +1284,44 @@ namespace freeze
 		// 3. TODO: add select-files message {name: "select-files", folder: "path/to/directory"}
 		// 4. TODO: add watch-folder messgae {name: "watch-folder"}
 		auto _recv_msg = detail::parse_recv_message(_message);
+		// assert(((!!(_recv_msg.name)) && (!(_recv_msg.name.empty()))));
+		DEBUG_STRING(L"nats_client::message_response(): {} handling ...\n"sv, detail::to_utf16(_recv_msg.name));
+
 		std::string _send_msg;
-		if (_recv_msg.name == "list-disk")
+		if (_recv_msg.name == MSG_LIST_DISK)
 		{
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: call get_harddisks() ...\n");
 			auto disk_names = detail::get_harddisks();
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: disk count={}\n"sv, disk_names.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
 		}
-		else if (_recv_msg.name == "select-directory")
+		else if (_recv_msg.name == MSG_LIST_DIR)
 		{
 			auto dir = detail::to_utf16(_recv_msg.folder);
-			DEBUG_STRING(L"notify-message[select-directory]: dir={}\n"sv, dir);
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-directory]: dir={}\n"sv, dir);
+
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-directory]: call get_directories_without_subdir(dir) ...\n");
 			auto folders = detail::get_directories_without_subdir(dir);
-			DEBUG_STRING(L"notify-message[select-directory]: files-count={}\n"sv, folders.size());
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-directory]: folders-count={}\n"sv, folders.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, folders);
 		}
-		else if (_recv_msg.name == "select-files")
+		else if (_recv_msg.name == MSG_LIST_FILE)
 		{
 			auto dir = detail::to_utf16(_recv_msg.folder);
-			DEBUG_STRING(L"notify-message[select-files]: dir={}\n"sv, dir);
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: dir={}\n"sv, dir);
+
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: call get_files_without_subdir(dir) ...\n");
 			auto files = detail::get_files_without_subdir(fs::path{ dir });
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: files-count={}\n"sv, files.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, files);
 		}
-		else if (_recv_msg.name == "watch-folder")
+		else if (_recv_msg.name == MSG_FOLDER)
 		{
 			auto wcs_folder = detail::read_latest_folder();
-			DEBUG_STRING(L"notify-message[watch-folder]: current watch={}\n"sv, wcs_folder);
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[watch-folder]: current watch folder: {}\n"sv, wcs_folder);
 
 			std::vector<std::string> _one;
-			if (wcs_folder.empty())
-			{
-				_one.emplace_back(""s);
-			}
-			else
+			if (!wcs_folder.empty())
 			{
 				auto mbs_folder = detail::to_utf8(wcs_folder);
 				_one.emplace_back(mbs_folder);
@@ -1314,8 +1331,18 @@ namespace freeze
 		else
 		{
 			// empty.
+			DEBUG_STRING(L"nats_client::message_response(): unknown message {}.\n"sv, detail::to_utf16(_recv_msg.name));
 		}
-		pimpl->publish_message(_send_msg, json_type.data());
+
+		if(!_send_msg.empty())
+		{
+			pimpl->publish_message(_send_msg, json_type.data());
+			DEBUG_STRING(L"nats_client::message_response(): response done.\n"sv);
+		}
+		else
+		{
+			DEBUG_STRING(L"nats_client::message_response(): not response!\n"sv);
+		}
 	}
 
 	void nats_client::send_payload()
@@ -1328,23 +1355,23 @@ namespace freeze
 			auto watch_tree_ptr = watch_tree_instace(this->_watch_path);
 			if (!watch_tree_ptr)
 			{
-				DEBUG_STRING(L"nats_client::send_payload(): watch-tree is null.\n");
+				DEBUG_STRING(L"nats_client::send_payload(): watch-tree is null, payload not send.\n");
 				return;
 			}
-			DEBUG_STRING(L"nats_client::send_payload(): read watch-tree files={}.\n", watch_tree_ptr->current_count());
+			DEBUG_STRING(L"nats_client::send_payload(): read watch-tree files count={}.\n", watch_tree_ptr->current_count());
 
 			auto files = watch_tree_ptr->get_all();
 			DEBUG_STRING(L"nats_client::send_payload(): move-files count={}.\n"sv, files.size());
 
 			watch_tree_ptr->clear();
-			DEBUG_STRING(L"nats_client::send_payload(): assert watch-tree=0: {}.\n"sv, watch_tree_ptr->current_count());
+			DEBUG_STRING(L"nats_client::send_payload(): expect watch-tree=0, actual watch-tree={}.\n"sv, watch_tree_ptr->current_count());
 			//lock.unlock();
 
 			DEBUG_STRING(L"nats_client::send_payload(): assert move-files>0: {}.\n"sv, files.size());
 			auto root_str = this->_watch_path.c_str();
 			for (auto file : files)
 			{
-				DEBUG_STRING(L"nats client will publish: {}\n"sv, file.c_str());
+				DEBUG_STRING(L"nats_client::send_payload() publish: {}\n"sv, file.c_str());
 				pimpl->publish_payload(root_str, file);
 			}
 		}
@@ -1371,12 +1398,11 @@ namespace freeze
 
 		g_current_command.name = {};
 		g_current_command.action = {};
-
 		// lock.unlock();
 
 		std::string cmd_name = cmd.name;
 		DEBUG_STRING(L"nats_client::command_handle_result(): command {}!\n"sv, detail::to_utf16(cmd_name));
-		if (cmd.name == "modify-folder")
+		if (cmd.name == CMD_FOLDER)
 		{
 			auto folder = detail::to_utf16(cmd.action);
 			DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}!\n"sv, folder);
@@ -1399,7 +1425,7 @@ namespace freeze
 				DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}, empty!\n"sv, folder);
 			}
 		}
-		else if (cmd.name == "modify-ignores")
+		else if (cmd.name == CMD_IGNORE)
 		{
 			// folders = split(cmd.action, ','); // to_utf16(...)
 			// save to regkey.
@@ -1407,6 +1433,7 @@ namespace freeze
 		else
 		{
 			// empty
+			DEBUG_STRING(L"nats_client::command_handle_result(): unknown command.\n");
 		}
 
 		_response_command = cmd_name;
@@ -1420,82 +1447,85 @@ namespace freeze
 		_msg_thread_running = true;
 		_msg_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"message thread: starting ...\n");
+				DEBUG_STRING(L"[nats_client] message thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"message thread: self_ptr=null, stopping ...\n");
+						DEBUG_STRING(L"[nats_client] message thread: self_ptr=null, stopping ...\n");
 						break;
 					}
+					DEBUG_STRING(L"[nats_client] message thread: waiting...\n");
 					self_ptr->_message_signal.wait();
-					DEBUG_STRING(L"message thread: _message_signal wait ready.\n");
+					DEBUG_STRING(L"[nats_client] message thread: _message_signal wait ready.\n");
 					if (!(self_ptr->_msg_thread_running))
 					{
-						DEBUG_STRING(L"message thread: running=false, stopping ...\n");
+						DEBUG_STRING(L"[nats_client] message thread: running=false, stopping ...\n");
 						break;
 					}
 					self_ptr->message_response();
 				}
-				DEBUG_STRING(L"message thread: stopped.\n");
+				DEBUG_STRING(L"[nats_client] message thread: stopped.\n");
 			},
 			this);
 
 		_cmd_thread_running = true;
 		_cmd_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"command thread: starting ...\n");
+				DEBUG_STRING(L"[nats_client] command thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"command thread: self_ptr=null, stopping ...\n");
+						DEBUG_STRING(L"[nats_client] command thread: self_ptr=null, stopping ...\n");
 						break;
 					}
+					DEBUG_STRING(L"[nats_client] command thread: waiting...\n");
 					self_ptr->_command_signal.wait();
-					DEBUG_STRING(L"command thread: _command_signal wait ready.\n");
+					DEBUG_STRING(L"[nats_client] command thread: _command_signal wait ready.\n");
 					if (!(self_ptr->_cmd_thread_running))
 					{
-						DEBUG_STRING(L"command thread: running=false, stopping ....\n");
+						DEBUG_STRING(L"[nats_client] command thread: running=false, stopping ....\n");
 						break;
 					}
 					self_ptr->command_handle_result();
 					self_ptr->_cmd_response_signal.notify();
 				}
-				DEBUG_STRING(L"command thread: stopped.\n");
+				DEBUG_STRING(L"[nats_client] command thread: stopped.\n");
 			},
 			this);
 
 		_pal_thread_running = true;
 		_pal_thread = std::thread([](auto&& self)
 			{
-				DEBUG_STRING(L"payload thread: starting ...\n");
+				DEBUG_STRING(L"[nats_client] payload thread: starting ...\n");
 				while (true)
 				{
 					auto self_ptr = reinterpret_cast<nats_client*>(self);
 					if (!self_ptr)
 					{
-						DEBUG_STRING(L"payload thread: self_ptr=null, stopping ...\n");
+						DEBUG_STRING(L"[nats_client] payload thread: self_ptr=null, stopping ...\n");
 						break;
 					}
+					DEBUG_STRING(L"[nats_client] payload thread: waiting...\n");
 					self_ptr->_payload_signal.wait();
-					DEBUG_STRING(L"payload thread: _payload_signal wait ready.\n");
+					DEBUG_STRING(L"[nats_client] payload thread: _payload_signal wait ready.\n");
 					if (!(self_ptr->_pal_thread_running))
 					{
-						DEBUG_STRING(L"payload thread: running=false, stopping ....\n");
+						DEBUG_STRING(L"[nats_client] payload thread: running=false, stopping ....\n");
 						break;
 					}
 					self_ptr->send_payload();
 				}
-				DEBUG_STRING(L"payload thread: stopped.\n");
+				DEBUG_STRING(L"[nats_client] payload thread: stopped.\n");
 			}, this);
 	}
 
 	void nats_client::stop_threads()
 	{
-		DEBUG_STRING(L"nats_client::stop_threads(): all threads ...\n");
+		DEBUG_STRING(L"nats_client::stop_threads(): stop all threads ...\n");
 		if (_msg_thread_running)
 		{
 			_msg_thread_running = false;

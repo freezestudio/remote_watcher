@@ -1,0 +1,31 @@
+# 主要代码执行流程
+
+## 启动服务
+
+## 停止服务
+
+## 接收消息
+
+```shell
+# 1. _nats_connect::on_recv_message(msg);
+# 2. _SleepThread() wakeup;
+# 3. maybe_send_message();
+# 4. nats_client::notify_message();
+# 5. _SleepThread() sleep;
+# 6. nats_client->message-thread wakeup;
+# 7. nats_client::message_response();
+# 8. nats_client->message-thread waiting;
+```
+
+## 接收命令
+
+```shell
+# 1. _nats_connect::on_command(cmd);
+# 2. _SleepThread() wakeup;
+# 3. maybe_response_command();
+# 4. nats_client::notify_command();
+# 5. nats_client->command-thread wakeup;
+# 6. nats_client::command_handle_result();
+# 7. nats_client->command-thread waiting;
+# 8. _SleepThread() sleep;
+```

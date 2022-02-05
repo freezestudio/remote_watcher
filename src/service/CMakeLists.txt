@@ -50,11 +50,11 @@ if(SERVICE_BUILD_TYPE)
         COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_SOURCE_DIR}/tools 
             ${CMAKE_COMMAND} -E tar cz "${PROJECT_SOURCE_DIR}/assets/blob.tgz" -- 
                 "${SERVICE_EXE_NAME}"
-                "KERNEL32.dll"
-                "ADVAPI32.dll"
+                # "KERNEL32.dll" # ignore
+                # "ADVAPI32.dll" # ignore
                 "MSVCP140.dll"
                 "MSVCP140_ATOMIC_WAIT.dll"
-                "WS2_32.dll"
+                # "WS2_32.dll" # ignore
                 "VCRUNTIME140.dll"
                 "VCRUNTIME140_1.dll"
                 "api-ms-win-crt-runtime-l1-1-0.dll"

@@ -51,6 +51,7 @@ namespace freeze
 		std::lock_guard<std::mutex> lock(mutex);
 		if (files.size() > 0)
 		{
+			// notify global SleepThread run.
 			global_reason_signal.notify_reason(sync_reason_send_payload);
 		}
 	}

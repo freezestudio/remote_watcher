@@ -7,6 +7,14 @@
 #include "nats.h"
 #include "json.hpp"
 
+#define LABEL_NAME(label) label
+#define MSG_LIST_DISK LABEL_NAME("list-disk")
+#define MSG_LIST_DIR LABEL_NAME("select-directory")
+#define MSG_LIST_FILE LABEL_NAME("select-files")
+#define MSG_FOLDER LABEL_NAME("watch-folder")
+#define CMD_FOLDER LABEL_NAME("modify-folder")
+#define CMD_IGNORE LABEL_NAME("modify-ignores")
+
 namespace freeze::detail
 {
 	struct _nats_connect;
@@ -62,7 +70,7 @@ namespace freeze::detail
 	using nats_watch_message = nats_folder_message;
 	using nats_send_message = nats_folder_message;
 
-	inline nats_recv_message parse_recv_message(std::string const& msg)
+	inline nats_recv_message parse_recv_message(std::string const &msg)
 	{
 		nats_recv_message nrm;
 		if (!msg.empty())
@@ -71,7 +79,7 @@ namespace freeze::detail
 			using json = nlohmann::json;
 			auto j = json::parse(msg);
 			std::string name = j["name"];
-			std::string folder;
+			std::string folder = "";
 			auto iter = j.find("folder");
 			if (iter != j.end())
 			{
@@ -80,12 +88,17 @@ namespace freeze::detail
 			nrm.name = name;
 			nrm.folder = folder;
 		}
+		else
+		{
+			nrm.name = "";
+			nrm.folder = "";
+		}
 		return nrm;
 	}
 
-	inline std::string make_send_message_string(std::string const& name, std::vector<std::string> const& data)
+	inline std::string make_send_message_string(std::string const &name, std::vector<std::string> const &data)
 	{
-		//enum class value_t : std::uint8_t
+		// enum class value_t : std::uint8_t
 		//{
 		//	null,             ///< null value
 		//	object,           ///< object (unordered set of name/value pairs)
@@ -97,27 +110,27 @@ namespace freeze::detail
 		//	number_float,     ///< number value (floating-point)
 		//	binary,           ///< binary array (ordered collection of bytes)
 		//	discarded         ///< discarded by the parser callback function
-		//};
+		// };
 
 		std::string result;
+		using json = nlohmann::json;
+		json j;
+		j["name"] = name;
 		if (!name.empty())
 		{
-			using json = nlohmann::json;
-			json j;
-			j["name"] = name;
-			if (name == "list-disk")
+			if (name == MSG_LIST_DISK)
 			{
 				j["disks"] = data;
 			}
-			else if (name == "select-directory")
+			else if (name == MSG_LIST_DIR)
 			{
 				j["folders"] = data;
 			}
-			else if (name == "select-files")
+			else if (name == MSG_LIST_FILE)
 			{
 				j["files"] = data;
 			}
-			else if (name == "watch-folder")
+			else if (name == MSG_FOLDER)
 			{
 				j["folders"] = data;
 			}
@@ -125,13 +138,12 @@ namespace freeze::detail
 			{
 				// more.
 			}
-
-			result = j.dump();
 		}
+		result = j.dump();
 		return result;
 	}
 
-	inline constexpr nats_cmd make_cmd(std::string const& name, std::string const& action)
+	inline constexpr nats_cmd make_cmd(std::string const &name, std::string const &action)
 	{
 		nats_cmd nc;
 		nc.name = name;
@@ -139,7 +151,7 @@ namespace freeze::detail
 		return nc;
 	}
 
-	inline nats_cmd to_cmd(char const* str, std::size_t len)
+	inline nats_cmd to_cmd(char const *str, std::size_t len)
 	{
 		nats_cmd nc;
 		if (str != nullptr && len > 0)
@@ -158,16 +170,16 @@ namespace freeze::detail
 
 			nc.name = j["name"];
 			nc.action = j["action"];
-		}		
+		}
 		return nc;
 	}
 
-	inline nats_cmd to_cmd(std::string const& str)
+	inline nats_cmd to_cmd(std::string const &str)
 	{
 		return to_cmd(str.c_str(), str.size());
 	}
 
-	inline std::string from_cmd(nats_cmd const& cmd)
+	inline std::string from_cmd(nats_cmd const &cmd)
 	{
 		std::string result;
 		if (!cmd.name.empty())
@@ -181,7 +193,7 @@ namespace freeze::detail
 		return result;
 	}
 
-	inline nats_cmd_ack to_cmd_ack(char const* ack, std::size_t len)
+	inline nats_cmd_ack to_cmd_ack(char const *ack, std::size_t len)
 	{
 		nats_cmd_ack _nca;
 		if (ack != nullptr && len > 0)
@@ -191,16 +203,16 @@ namespace freeze::detail
 			_nca.name = j["name"];
 			_nca.result = j["result"];
 			_nca.action = j["action"];
-		}		
+		}
 		return _nca;
 	}
 
-	inline nats_cmd_ack to_cmd_ack(std::string const& ack)
+	inline nats_cmd_ack to_cmd_ack(std::string const &ack)
 	{
 		return to_cmd_ack(ack.c_str(), ack.size());
 	}
 
-	inline std::string from_cmd_ack(nats_cmd_ack const& ack)
+	inline std::string from_cmd_ack(nats_cmd_ack const &ack)
 	{
 		std::string result;
 		if (!ack.name.empty())
@@ -215,7 +227,7 @@ namespace freeze::detail
 		return result;
 	}
 
-	inline nats_pal_ack to_pal_ack(char const* ack, std::size_t len)
+	inline nats_pal_ack to_pal_ack(char const *ack, std::size_t len)
 	{
 		nats_pal_ack _npa;
 		if (ack != nullptr && len > 0)
@@ -229,12 +241,12 @@ namespace freeze::detail
 		return _npa;
 	}
 
-	inline nats_pal_ack to_pal_ack(std::string const& ack)
+	inline nats_pal_ack to_pal_ack(std::string const &ack)
 	{
 		return to_pal_ack(ack.c_str(), ack.size());
 	}
 
-	inline std::string from_pal_ack(nats_pal_ack const& ack)
+	inline std::string from_pal_ack(nats_pal_ack const &ack)
 	{
 		std::string result;
 		if (!ack.name.empty())
@@ -267,15 +279,15 @@ namespace freeze
 		~nats_client();
 
 	public:
-		void change_ip(DWORD ip, std::string const& = {});
-		bool connect(DWORD ip, std::string const& = {});
+		void change_ip(DWORD ip, std::string const & = {});
+		bool connect(DWORD ip, std::string const & = {});
 		void close();
 		bool is_connected();
 
 	public:
 		void notify_message();
 		std::string notify_command();
-		void notify_payload(fs::path const&);
+		void notify_payload(fs::path const &);
 
 	public:
 		void send_payload();
@@ -297,9 +309,9 @@ namespace freeze
 		std::thread _cmd_thread;
 		std::thread _pal_thread;
 
-		bool _msg_thread_running{ true };
-		bool _cmd_thread_running{ true };
-		bool _pal_thread_running{ true };
+		bool _msg_thread_running{true};
+		bool _cmd_thread_running{true};
+		bool _pal_thread_running{true};
 
 		atomic_sync _message_signal{};
 		atomic_sync _command_signal{};

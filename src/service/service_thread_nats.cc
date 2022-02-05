@@ -19,11 +19,11 @@ namespace freeze
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
 		auto cmd = nc.notify_command();
-		if (cmd == "modify-folder")
+		if (cmd == CMD_FOLDER)
 		{
 			reset_work_folder(true);
 		}
-		else if(cmd == "modify-ignores")
+		else if(cmd == CMD_IGNORE)
 		{
 
 		}

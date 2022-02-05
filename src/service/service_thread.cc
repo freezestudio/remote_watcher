@@ -6,7 +6,7 @@
 
 // file time: 100 nanosecond.
 constexpr auto time_second = 10000000L;
-constexpr auto timer_period = 2 * 60 * 1000L;
+constexpr auto timer_period = 5 * 60 * 1000L;
 
 // work thread handle.
 HANDLE hh_worker_thread = nullptr;
@@ -95,18 +95,19 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		DEBUG_STRING(L"@rg WorkerThread: Current folder [{}], not exists, watcher not started.\n"sv, g_work_folder.c_str());
 	}
 
+	// thread sleep ...
 	while (!bb_worker_thread_exit)
 	{
-		DEBUG_STRING(L"@rg WorkerThread: Sleep, waiting wakeup ...\n");
+		DEBUG_STRING(L"@rg WorkerThread: Sleep, Waiting Wakeup ...\n");
 		// want wakeup from modify-folder command.
 		SleepEx(INFINITE, TRUE);
-		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup.\n");
+		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, running...\n");
 
 #ifndef SERVICE_TEST
 		// maybe service paused.
 		if (get_service_status() != freeze::service_state::running)
 		{
-			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, but Service not running.\n");
+			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, but [rgmsvc] Service not running.\n");
 			continue;
 		}
 #endif
@@ -120,8 +121,9 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg WorkerThread: when wakeup, the folder: {}, maybe is null.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the folder: {}, maybe is null.\n"sv, g_work_folder.c_str());
 		}
+		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, Done.\n");
 	}
 
 	DEBUG_STRING(L"@rg WorkerThread: try stop watcher ...\n");
@@ -228,7 +230,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg SleepThread: reset remote ip {}.\n"sv, ip);
+		DEBUG_STRING(L"@rg SleepThread: Reset to RemoteIp: {}.\n"sv, ip);
 	}
 
 	auto connected = g_nats_client.connect(ip);
@@ -238,20 +240,22 @@ DWORD __stdcall _SleepThread(LPVOID)
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg SleepThread Error: remote not connected.\n");
+		DEBUG_STRING(L"@rg SleepThread Error: remote not connected, stop.\n");
 		return 0;
 	}
 
+	// thread sleep ...
 	while (!bb_sleep_thread_exit)
 	{
 		DEBUG_STRING(L"@rg SleepThread: Waiting Wakeup ...\n");
-		//wait until spec reason changed.
+
+		//wait until some reason changed.
 		auto reason = global_reason_signal.wait_reason();
-		DEBUG_STRING(L"@rg SleepThread: wakeup reason: {}.\n"sv, reason_string(reason));
+		DEBUG_STRING(L"@rg SleepThread: Wakeup Reason: {}.\n"sv, reason_string(reason));
 #ifndef SERVICE_TEST
 		if (!is_service_running())
 		{
-			DEBUG_STRING(L"@rg SleepThread: wakeup, maybe service paused.\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup, but service maybe paused, continue.\n");
 			continue;
 		}
 #endif
@@ -261,14 +265,14 @@ DWORD __stdcall _SleepThread(LPVOID)
 			auto _ip = reset_ip_address();
 			if (_ip < 0)
 			{
-				DEBUG_STRING(L"@rg SleepThread: wakeup error remote ip is null, {}, stop.\n"sv, reset_ip_error(_ip));
+				DEBUG_STRING(L"@rg SleepThread: Wakeup error remote ip is null, {}, continue.\n"sv, reset_ip_error(_ip));
 				continue;
 			}
 
 			auto connected = g_nats_client.connect(_ip);
 			if (!connected)
 			{
-				DEBUG_STRING(L"@rg SleepThread wakeup error: remote not connected, stop.\n");
+				DEBUG_STRING(L"@rg SleepThread Wakeup error: remote not connected, continue.\n");
 				continue;
 			}
 		}
@@ -276,31 +280,31 @@ DWORD __stdcall _SleepThread(LPVOID)
 #ifndef SERVICE_TEST
 		// this want pause timer-thread (SERVICE_PAUSED=7)
 		set_service_status(SERVICE_PAUSED);
-		DEBUG_STRING(L"@rg SleepThread: wakeup Pause-TimerThread.\n");
+		DEBUG_STRING(L"@rg SleepThread: Wakeup Pause-TimerThread.\n");
 #endif
 
 		switch (reason)
 		{
 		default: [[fallthrough]];
 		case sync_reason_none__reason:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_none__reason(0).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_none__reason(0).\n");
 			break;
 		case sync_reason_recv_command:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_command(1).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_command(1).\n");
 			freeze::maybe_response_command(g_nats_client);
 			break;
 		case sync_reason_recv_message:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_recv_message(2).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_message(2).\n");
 			freeze::maybe_send_message(g_nats_client);
 			break;
 		case sync_reason_send_command:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_command(3).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_send_command(3).\n");
 			break;
 		case sync_reason_send_message:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_message(4).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_send_message(4).\n");
 			break;
 		case sync_reason_send_payload:
-			DEBUG_STRING(L"@rg SleepThread: wakup: sync_reason_send_payload(5).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_send_payload(5).\n");
 			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
@@ -309,7 +313,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 #ifndef SERVICE_TEST
 		// resume timer-thread (SERVICE_RUNNING=4)
 		set_service_status(SERVICE_RUNNING);
-		DEBUG_STRING(L"@rg SleepThread: wakeup Resume-TimerThread.\n");
+		DEBUG_STRING(L"@rg SleepThread: Wakeup Resume-TimerThread.\n");
 #endif
 	}
 
@@ -412,6 +416,7 @@ void stop_threadpool()
 	}
 
 	bb_sleep_thread_exit = true;
+	// notify SleepThread run.
 	global_reason_signal.notify_reason(sync_reason_exit__thread);
 	DEBUG_STRING(L"@rg stop_threadpool(): notify SleepThread stop.\n");
 

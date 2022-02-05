@@ -20,7 +20,7 @@ HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SERVICE_NAME:
   Type               REG_WORD      0x00000010
 
   \Parameters:
-    ServiceDll             REG_SZ        d:\Program Files\xxx\yyy.dll
+    ServiceDll             REG_SZ        full\path\to\xxx\yyy.dll
     ServiceDllUnloadOnStop REG_DWORD     0x00000001
     ServiceMain            REG_SZ        ServiceMain
 ```
