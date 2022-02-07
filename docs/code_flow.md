@@ -29,3 +29,7 @@
 # 7. nats_client->command-thread waiting;
 # 8. _SleepThread() sleep;
 ```
+## 发送文件
+
+```shell
+```

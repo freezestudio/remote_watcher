@@ -283,6 +283,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 		DEBUG_STRING(L"@rg SleepThread: Wakeup Pause-TimerThread.\n");
 #endif
 
+		// TODO: timeout if blocking
 		switch (reason)
 		{
 		default: [[fallthrough]];
