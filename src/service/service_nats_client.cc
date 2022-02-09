@@ -1326,6 +1326,7 @@ namespace freeze
 			std::vector<std::string> _one;
 			if (!wcs_folder.empty())
 			{
+				// TODO: erase \u0000
 				auto mbs_folder = detail::to_utf8(wcs_folder);
 				_one.emplace_back(mbs_folder);
 			}
@@ -1404,28 +1405,28 @@ namespace freeze
 		// lock.unlock();
 
 		std::string cmd_name = cmd.name;
-		DEBUG_STRING(L"nats_client::command_handle_result(): command {}!\n"sv, detail::to_utf16(cmd_name));
+		DEBUG_STRING(L"nats_client::command_handle_result(): command-name={}\n"sv, detail::to_utf16(cmd_name));
 		if (cmd.name == CMD_FOLDER)
 		{
 			auto folder = detail::to_utf16(cmd.action);
-			DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}!\n"sv, folder);
+			DEBUG_STRING(L"nats_client::command_handle_result(): will modify-folder={}!\n"sv, folder);
 			if (!folder.empty())
 			{
 				if (fs::exists(fs::path{folder}))
 				{
 					if (detail::save_latest_folder(folder))
 					{
-						DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}, success!\n"sv, folder);
+						DEBUG_STRING(L"nats_client::command_handle_result(): save latest modify-folder={}, success!\n"sv, folder);
 					}
 				}
 				else
 				{
-					DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}, not exists!\n"sv, folder);
+					DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder={}, not exists!\n"sv, folder);
 				}
 			}
 			else
 			{
-				DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder {}, empty!\n"sv, folder);
+				DEBUG_STRING(L"nats_client::command_handle_result(): modify-folder={}, empty!\n"sv, folder);
 			}
 		}
 		else if (cmd.name == CMD_IGNORE)

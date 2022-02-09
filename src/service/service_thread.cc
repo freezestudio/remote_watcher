@@ -34,7 +34,7 @@ fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
 	auto wcs_folder = freeze::detail::read_latest_folder();
-	DEBUG_STRING(L"@rg reset_work_folder(): {}, need notify={}.\n"sv, wcs_folder, notify);
+	DEBUG_STRING(L"@rg reset_work_folder(): latest={}, is notify={}.\n"sv, wcs_folder, notify);
 	if (wcs_folder.empty())
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): folder is null.\n");
@@ -46,13 +46,13 @@ void reset_work_folder(bool notify/* = false */)
 	auto latest_path = fs::path{ latest_folder };
 	if (!fs::exists(latest_path))
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): {}, folder not exists.\n"sv, latest_path.c_str());
+		DEBUG_STRING(L"@rg reset_work_folder(): error, folder={}, not exists.\n"sv, latest_path.c_str());
 		return;
 	}
 
 	if (g_work_folder == latest_path)
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): {}, already watched.\n"sv, latest_path.c_str());
+		DEBUG_STRING(L"@rg reset_work_folder(): error, folder={}, already watched.\n"sv, latest_path.c_str());
 		return;
 	}
 
@@ -60,16 +60,16 @@ void reset_work_folder(bool notify/* = false */)
 	g_work_folder = latest_path;
 	if (notify)
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): Want Wakeup work-thread ...\n");
+		DEBUG_STRING(L"@rg reset_work_folder(): Want Wakeup _WorkThread ...\n");
 		auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
 		if (!ret)
 		{
 			auto err = GetLastError();
-			DEBUG_STRING(L"@rg reset_work_folder(): Wakup work-thread error: {}\n"sv, err);
+			DEBUG_STRING(L"@rg reset_work_folder(): Wakup _WorkThread error: {}\n"sv, err);
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg reset_work_folder(): work-thread will Wakup.\n");
+			DEBUG_STRING(L"@rg reset_work_folder(): _WorkThread will Wakup.\n");
 		}
 	}
 }
@@ -88,11 +88,11 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		watcher.set_watch_folder(g_work_folder);
 		watcher.set_ignore_folders(g_work_ignore_folders);
 		watcher.start();
-		DEBUG_STRING(L"@rg WorkerThread: Current folder [{}], Watcher started.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg WorkerThread: Current folder={}, Watcher started.\n"sv, g_work_folder.c_str());
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg WorkerThread: Current folder [{}], not exists, watcher not started.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg WorkerThread: Current folder={}, not exists, watcher not started.\n"sv, g_work_folder.c_str());
 	}
 
 	// thread sleep ...
@@ -118,10 +118,11 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			watcher.set_watch_folder(g_work_folder);
 			watcher.set_ignore_folders(g_work_ignore_folders);
 			watcher.start();
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the folder: {}, maybe is null.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the folder={}, maybe is null.\n"sv, g_work_folder.c_str());
 		}
 		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, Done.\n");
 	}
