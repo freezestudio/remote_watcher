@@ -4,7 +4,7 @@
 
 namespace freeze::detail
 {
-	std::string to_utf8(const wchar_t* wcs, int length)
+	std::string to_utf8(const wchar_t *wcs, int length)
 	{
 		// ccWideChar (characters), if string is null-terminated, can be set to -1
 		// ccWideChar, if set to -1, function result including the terminating null character.
@@ -16,12 +16,12 @@ namespace freeze::detail
 		return str;
 	}
 
-	std::string to_utf8(std::wstring const& wcs)
+	std::string to_utf8(std::wstring const &wcs)
 	{
 		return to_utf8(wcs.c_str(), (int)wcs.size());
 	}
 
-	std::wstring to_utf16(std::string const& mbs)
+	std::wstring to_utf16(std::string const &mbs)
 	{
 		// cbMultiByte (bytes), if string is null-terminated, can be set to -1
 		// cchWideChar (characters), if this value is 0, function return the required buffer size, including terminating null character.
@@ -35,7 +35,7 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
-	uint32_t make_ip_address(std::wstring const& ip)
+	uint32_t make_ip_address(std::wstring const &ip)
 	{
 		if (ip.empty())
 		{
@@ -78,7 +78,7 @@ namespace freeze::detail
 		for (int i = 0; i < 4; ++i)
 		{
 			b[i] = _wtoi(cb[i]);
-			if (b[i] < 0 || b[i]>255)
+			if (b[i] < 0 || b[i] > 255)
 			{
 				return BAD_IP;
 			}
@@ -92,29 +92,29 @@ namespace freeze::detail
 		auto ip1 = (((ip) >> 24) & 0xff);
 		auto ip2 = (((ip) >> 16) & 0xff);
 		auto ip3 = (((ip) >> 8) & 0xff);
-		auto ip4 = ((ip) & 0xff);
+		auto ip4 = ((ip)&0xff);
 		return std::format("{}.{}.{}.{}"sv, ip1, ip2, ip3, ip4).c_str();
 	}
 
 	bool check_ip_address(uint32_t ip)
 	{
-		return ((ip!=EMPTY_IP)&&(ip!=BAD_LEN_IP)&&(ip!=BAD_IP));
+		return ((ip != EMPTY_IP) && (ip != BAD_LEN_IP) && (ip != BAD_IP));
 	}
 }
 
 namespace freeze::detail
 {
-	fs::path to_normal(fs::path const& path)
+	fs::path to_normal(fs::path const &path)
 	{
 		return path.lexically_normal();
 	}
 
-	bool check_exists(fs::path const& path)
+	bool check_exists(fs::path const &path)
 	{
 		return !path.empty() && fs::exists(path);
 	}
 
-	bool normal_check_exists(fs::path const& path)
+	bool normal_check_exists(fs::path const &path)
 	{
 		return check_exists(to_normal(path));
 	}
@@ -127,9 +127,15 @@ namespace freeze::detail
 		std::wstring s;
 		switch (t)
 		{
-		case response_type::result: s = L"result"s; break;
-		case response_type::status: s = L"status"s; break;
-		case response_type::overlapped: s = L"overlapped"s; break;
+		case response_type::result:
+			s = L"result"s;
+			break;
+		case response_type::status:
+			s = L"status"s;
+			break;
+		case response_type::overlapped:
+			s = L"overlapped"s;
+			break;
 		default:
 			break;
 		}
@@ -141,11 +147,19 @@ namespace freeze::detail
 		std::wstring s;
 		switch (notify)
 		{
-		case FILE_ACTION_ADDED: [[fallthrough]];
-		case FILE_ACTION_RENAMED_NEW_NAME:s = L"create"s; break;
-		case FILE_ACTION_REMOVED: [[fallthrough]];
-		case FILE_ACTION_RENAMED_OLD_NAME:s = L"remove"s; break;
-		case FILE_ACTION_MODIFIED:s = L"modify"s; break;
+		case FILE_ACTION_ADDED:
+			[[fallthrough]];
+		case FILE_ACTION_RENAMED_NEW_NAME:
+			s = L"create"s;
+			break;
+		case FILE_ACTION_REMOVED:
+			[[fallthrough]];
+		case FILE_ACTION_RENAMED_OLD_NAME:
+			s = L"remove"s;
+			break;
+		case FILE_ACTION_MODIFIED:
+			s = L"modify"s;
+			break;
 		default:
 			break;
 		}
@@ -155,27 +169,35 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
-	static bool regkey_status(uint32_t status)
+	static bool regkey_status(uint32_t status, LPCWSTR fn = nullptr)
 	{
 		if (ERROR_SUCCESS == status)
 		{
 			return true;
 		}
 
-		if (wchar_t* pBuffer = nullptr;
+		if (wchar_t *pBuffer = nullptr;
 			FormatMessage(
-				FORMAT_MESSAGE_FROM_SYSTEM |    //
-				FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
-				FORMAT_MESSAGE_ALLOCATE_BUFFER, //
-				nullptr,                        // lpSource
-				status,                         // dwMessageId
-				0,                              // dwLanguageId
-				(wchar_t*)&pBuffer,               // lpBuffer
-				0,                              // nSize
-				nullptr                         // Arguments
-			) > 0)
+				FORMAT_MESSAGE_FROM_SYSTEM |		//
+					FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
+					FORMAT_MESSAGE_ALLOCATE_BUFFER, //
+				nullptr,							// lpSource
+				status,								// dwMessageId
+				0,									// dwLanguageId
+				(wchar_t *)&pBuffer,				// lpBuffer
+				0,									// nSize
+				nullptr								// Arguments
+				) > 0)
 		{
-			DEBUG_STRING(L"RegKey Status Error: {}\n"sv, pBuffer);
+			if (fn)
+			{
+				DEBUG_STRING(L"RegKey: {} Status Error: {}\n"sv, fn, pBuffer);
+			}
+			else
+			{
+				DEBUG_STRING(L"RegKey Status Error: {}\n"sv, pBuffer);
+			}
+
 			LocalFree(pBuffer);
 		}
 		return false;
@@ -210,30 +232,30 @@ namespace freeze::detail
 		return value;
 	}
 
-	bool save_latest_folder(std::wstring const& folder)
+	bool save_latest_folder(std::wstring const &folder)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
-		if (!regkey_status(status))
+		if (!regkey_status(status, L"save_latest_folder"))
 		{
 			return false;
 		}
 		status = regkey.SetStringValue(L"latest", folder.c_str());
-		return regkey_status(status);
+		return regkey_status(status, L"save_latest_folder");
 	}
 
 	std::wstring read_latest_folder()
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
-		if (!regkey_status(status))
+		if (!regkey_status(status, L"read_latest_folder"))
 		{
 			return {};
 		}
 		wchar_t value[MAX_PATH]{};
 		unsigned long value_len = MAX_PATH;
 		status = regkey.QueryStringValue(L"latest", value, &value_len);
-		if (!regkey_status(status))
+		if (!regkey_status(status, L"read_latest_folder"))
 		{
 			return {};
 		}
@@ -241,7 +263,7 @@ namespace freeze::detail
 		return std::wstring(value, value_len);
 	}
 
-	bool save_latest_ignores(std::vector<std::wstring> const& ignores)
+	bool save_latest_ignores(std::vector<std::wstring> const &ignores)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
@@ -295,7 +317,7 @@ namespace freeze::detail
 		return ignores;
 	}
 
-	bool save_token(std::wstring const& token)
+	bool save_token(std::wstring const &token)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
@@ -327,7 +349,6 @@ namespace freeze::detail
 	}
 }
 
-
 namespace freeze::detail
 {
 	std::vector<std::string> get_harddisks()
@@ -343,7 +364,7 @@ namespace freeze::detail
 		{
 			if (bset[i])
 			{
-				disks.emplace_back(std::string{ static_cast<char>(idx) });
+				disks.emplace_back(std::string{static_cast<char>(idx)});
 			}
 			idx++;
 		}
@@ -380,13 +401,27 @@ namespace freeze::detail
 		{
 		default:
 			break;
-		case DRIVE_UNKNOWN:type_name = "unknown"s; break;
-		case DRIVE_NO_ROOT_DIR:type_name = "noroot"s; break;
-		case DRIVE_REMOVABLE:type_name = "removable"s; break;
-		case DRIVE_FIXED:type_name = "fixed"s; break;
-		case DRIVE_REMOTE:type_name = "network"s; break;
-		case DRIVE_CDROM:type_name = "cdrom"s; break;
-		case DRIVE_RAMDISK:type_name = "ram"s; break;
+		case DRIVE_UNKNOWN:
+			type_name = "unknown"s;
+			break;
+		case DRIVE_NO_ROOT_DIR:
+			type_name = "noroot"s;
+			break;
+		case DRIVE_REMOVABLE:
+			type_name = "removable"s;
+			break;
+		case DRIVE_FIXED:
+			type_name = "fixed"s;
+			break;
+		case DRIVE_REMOTE:
+			type_name = "network"s;
+			break;
+		case DRIVE_CDROM:
+			type_name = "cdrom"s;
+			break;
+		case DRIVE_RAMDISK:
+			type_name = "ram"s;
+			break;
 		}
 		return type_name;
 	}
@@ -441,7 +476,7 @@ namespace freeze::detail
 		return volume_type_names;
 	}
 
-	std::vector<std::string> get_directories_without_subdir(fs::path const& root)
+	std::vector<std::string> get_directories_without_subdir(fs::path const &root)
 	{
 		std::vector<std::string> folders;
 		if (root.empty() || !fs::exists(root))
@@ -449,8 +484,8 @@ namespace freeze::detail
 			return folders;
 		}
 
-		fs::directory_iterator iter{ root };
-		for (auto const& p : iter)
+		fs::directory_iterator iter{root};
+		for (auto const &p : iter)
 		{
 			if (p.is_directory())
 			{
@@ -462,8 +497,7 @@ namespace freeze::detail
 		return folders;
 	}
 
-
-	std::vector<std::string> get_files_without_subdir(fs::path const& root)
+	std::vector<std::string> get_files_without_subdir(fs::path const &root)
 	{
 		std::vector<std::string> folders;
 		if (root.empty() || !fs::exists(root))
@@ -471,8 +505,8 @@ namespace freeze::detail
 			return folders;
 		}
 
-		fs::directory_iterator iter{ root };
-		for (auto const& p : iter)
+		fs::directory_iterator iter{root};
+		for (auto const &p : iter)
 		{
 			if (p.is_regular_file())
 			{
@@ -484,4 +518,3 @@ namespace freeze::detail
 		return folders;
 	}
 }
-

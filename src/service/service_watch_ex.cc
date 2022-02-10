@@ -39,7 +39,7 @@ namespace freeze
 			if (!detail::save_latest_folder(path_str))
 			{
 				DEBUG_STRING(
-					L"folder_watchor_base::set_weatch_folder() error: save latest folder: {}.\n"sv,
+					L"folder_watchor_base::set_weatch_folder() error: save latest folder: {} failure.\n"sv,
 					generic_folder.c_str());
 			}
 			if (folder_handle)
@@ -81,13 +81,14 @@ namespace freeze
 
 		running = true;
 		DEBUG_STRING(
-			L"folder_watchor_base::set_watch_folder(): {}, running={}.\n"sv,
+			L"folder_watchor_base::set_watch_folder(): folder={}, running={}.\n"sv,
 			this->folder.c_str(), running);
 		return true;
 	}
 
 	fs::path folder_watchor_base::get_watch_folder() const
 	{
+		DEBUG_STRING(L"folder_watchor_base::get_watch_folder(): folder={}\n"sv, folder.c_str());
 		return folder;
 	}
 
@@ -680,42 +681,42 @@ namespace freeze
 
 namespace freeze
 {
-	watcher_win::watcher_win(folder_watchor_base& watchor)
+	watcher_win32::watcher_win32(folder_watchor_base& watchor)
 		: watchor{ watchor }
 	{
-		DEBUG_STRING(L"watcher_win::watcher_win(): Constructor ...\n");
+		DEBUG_STRING(L"watcher_win32::watcher_win32(): Constructor ...\n");
 	}
 
-	watcher_win::~watcher_win()
+	watcher_win32::~watcher_win32()
 	{
 		stop();
 	}
 
-	void watcher_win::start()
+	void watcher_win32::start()
 	{
-		DEBUG_STRING(L"watcher_win::start(): Starting...\n");
+		DEBUG_STRING(L"watcher_win32::start(): Starting...\n");
 		if (!watchor.set_watch_folder(folder, ignore_folders))
 		{
-			DEBUG_STRING(L"watcher_win::start() error: underline watchor set watch folder failure.\n");
+			DEBUG_STRING(L"watcher_win32::start() error: underline-watchor set watch folder failure.\n");
 			return;
 		}
 		watchor.start();
-		DEBUG_STRING(L"watcher_win::start(): Started.\n");
+		DEBUG_STRING(L"watcher_win32::start(): Started.\n");
 	}
 
-	void watcher_win::stop()
+	void watcher_win32::stop()
 	{
-		DEBUG_STRING(L"watcher_win::stop(): Stopping ...\n");
+		DEBUG_STRING(L"watcher_win32::stop(): Stopping ...\n");
 		watchor.stop();
-		DEBUG_STRING(L"watcher_win::stop(): Stopped.\n");
+		DEBUG_STRING(L"watcher_win32::stop(): Stopped.\n");
 	}
 
-	void watcher_win::set_watch_folder(fs::path const& folder)
+	void watcher_win32::set_watch_folder(fs::path const& folder)
 	{
 		this->folder = folder;
 	}
 
-	void watcher_win::set_ignore_folders(std::vector<fs::path> const& ignores)
+	void watcher_win32::set_ignore_folders(std::vector<fs::path> const& ignores)
 	{
 		this->ignore_folders = ignores;
 	}

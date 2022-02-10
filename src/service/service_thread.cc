@@ -33,8 +33,10 @@ freeze::atomic_sync_reason global_reason_signal{};
 fs::path g_work_folder;
 void reset_work_folder(bool notify/* = false */)
 {
+	// TODO: maybe need lock
 	auto wcs_folder = freeze::detail::read_latest_folder();
-	DEBUG_STRING(L"@rg reset_work_folder(): latest={}, is notify={}.\n"sv, wcs_folder, notify);
+	DEBUG_STRING(L"@rg reset_work_folder(): read latest={}, notify-to-WorkThread={}.\n"sv, wcs_folder, notify);
+
 	if (wcs_folder.empty())
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): folder is null.\n");
@@ -52,24 +54,26 @@ void reset_work_folder(bool notify/* = false */)
 
 	if (g_work_folder == latest_path)
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): error, folder={}, already watched.\n"sv, latest_path.c_str());
+		DEBUG_STRING(L"@rg reset_work_folder(): folder={}, already watched, ignore.\n"sv, latest_path.c_str());
 		return;
 	}
 
 	// TODO: add write lock (want using atomic)
 	g_work_folder = latest_path;
+	DEBUG_STRING(L"@rg reset_work_folder(): set g_work_folder={}.\n"sv, g_work_folder.c_str());
+
 	if (notify)
 	{
-		DEBUG_STRING(L"@rg reset_work_folder(): Want Wakeup _WorkThread ...\n");
+		DEBUG_STRING(L"@rg reset_work_folder(): Will Wakeup _WorkThread ...\n");
 		auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
-		if (!ret)
+		if (ret)
 		{
-			auto err = GetLastError();
-			DEBUG_STRING(L"@rg reset_work_folder(): Wakup _WorkThread error: {}\n"sv, err);
+			DEBUG_STRING(L"@rg reset_work_folder(): Wakeup _WorkThread done.\n");
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg reset_work_folder(): _WorkThread will Wakup.\n");
+			auto err = GetLastError();
+			DEBUG_STRING(L"@rg reset_work_folder(): Wakeup _WorkThread error: {}\n"sv, err);
 		}
 	}
 }
@@ -78,21 +82,22 @@ void reset_work_folder(bool notify/* = false */)
 DWORD __stdcall _WorkerThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg WorkerThread: Starting ...\n");
+
 	auto underline_watch = freeze::folder_watchor_apc{};
 	// auto underline_watch = freeze::folder_watchor_status{};
 	// auto underline_watch = freeze::folder_watchor_result{};
-	auto watcher = freeze::watcher_win{ underline_watch };
+	auto watcher = freeze::watcher_win32{ underline_watch };
 
 	if (freeze::detail::check_exists(g_work_folder))
 	{
 		watcher.set_watch_folder(g_work_folder);
 		watcher.set_ignore_folders(g_work_ignore_folders);
 		watcher.start();
-		DEBUG_STRING(L"@rg WorkerThread: Current folder={}, Watcher started.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg WorkerThread: watch-folder={}, Watcher started.\n"sv, g_work_folder.c_str());
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg WorkerThread: Current folder={}, not exists, watcher not started.\n"sv, g_work_folder.c_str());
+		DEBUG_STRING(L"@rg WorkerThread: watch-folder={}, not exists, watcher not started.\n"sv, g_work_folder.c_str());
 	}
 
 	// thread sleep ...
@@ -101,6 +106,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		DEBUG_STRING(L"@rg WorkerThread: Sleep, Waiting Wakeup ...\n");
 		// want wakeup from modify-folder command.
 		SleepEx(INFINITE, TRUE);
+
 		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, running...\n");
 
 #ifndef SERVICE_TEST
@@ -111,18 +117,18 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
-
+		// task: change watch folder
 		if (freeze::detail::check_exists(g_work_folder))
 		{
 			watcher.stop();
 			watcher.set_watch_folder(g_work_folder);
 			watcher.set_ignore_folders(g_work_ignore_folders);
 			watcher.start();
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch-folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
 		}
 		else
 		{
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the folder={}, maybe is null.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the watch-folder={}, maybe is null.\n"sv, g_work_folder.c_str());
 		}
 		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, Done.\n");
 	}

@@ -21,6 +21,7 @@ namespace freeze
 		auto cmd = nc.notify_command();
 		if (cmd == CMD_FOLDER)
 		{
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): try reset work folder...\n");
 			reset_work_folder(true);
 		}
 		else if(cmd == CMD_IGNORE)

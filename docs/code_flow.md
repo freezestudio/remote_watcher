@@ -27,9 +27,21 @@
 # 5. nats_client->command-thread wakeup;
 # 6. nats_client::command_handle_result();
 # 7. nats_client->command-thread waiting;
-# 8. _SleepThread() sleep;
+# 8. (optional) _WorkThread() wakeup -> _WorkThread() sleep;
+# 9. _SleepThread() sleep;
 ```
 ## 发送文件
 
 ```shell
+# 1. watcher_win32::start();
+# 2. folder_watchor_base::start();
+# 3. folder_watchor_base::watch();
+# 4. folder_watchor_base::thread loop, send payload;
+# 5. _SleepThread() wakeup;
+# 6. maybe_send_payload();
+# 7. nats_client::notify_payload();
+# 8. nats_client::payload-thread wakeup;
+# 9. nats_client::send_payload(); -> publish_payload();
+# 10. nats_client::payload-thread sleep;
+# 11. _SleepThread() sleep;
 ```

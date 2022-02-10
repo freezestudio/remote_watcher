@@ -1245,6 +1245,7 @@ namespace freeze
 		_command_signal.notify();
 		DEBUG_STRING(L"nats_client::notify_command(): command-thread notified!\n");
 
+		// wait until command-thread complete.
 		DEBUG_STRING(L"nats_client::notify_command(): command response waiting ...\n");
 		_cmd_response_signal.wait();
 		DEBUG_STRING(L"nats_client::notify_command(): command response ready.\n");
@@ -1414,6 +1415,7 @@ namespace freeze
 			{
 				if (fs::exists(fs::path{folder}))
 				{
+					// TODO: maybe need lock
 					if (detail::save_latest_folder(folder))
 					{
 						DEBUG_STRING(L"nats_client::command_handle_result(): save latest modify-folder={}, success!\n"sv, folder);

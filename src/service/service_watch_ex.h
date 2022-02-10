@@ -12,7 +12,7 @@ namespace freeze
 {
 	class watchable;
 	class watcher_base;
-	class watcher_win;
+	class watcher_win32;
 	// class folder_watchor;
 	class folder_watchor_base;
 }
@@ -142,11 +142,11 @@ namespace freeze
 
 namespace freeze
 {
-	class watcher_win : public watcher_base
+	class watcher_win32 : public watcher_base
 	{
 	public:
-		watcher_win(folder_watchor_base&);
-		~watcher_win();
+		watcher_win32(folder_watchor_base&);
+		~watcher_win32();
 
 	public:
 		virtual void start() override;
