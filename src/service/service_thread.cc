@@ -24,8 +24,10 @@ bool bb_sleep_thread_exit = false;
 
 /* extern maybe noused */
 std::vector<fs::path> g_work_ignore_folders;
+
 // connect to remote address.
 static freeze::nats_client g_nats_client{};
+
 // global signal for communicate-with-nats with reason.
 freeze::atomic_sync_reason global_reason_signal{};
 
@@ -298,8 +300,9 @@ DWORD __stdcall _SleepThread(LPVOID)
 			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_none__reason(0).\n");
 			break;
 		case sync_reason_recv_command:
-			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_command(1).\n");
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_command(1), waiting...\n");
 			freeze::maybe_response_command(g_nats_client);
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_command(1) done.\n");
 			break;
 		case sync_reason_recv_message:
 			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_recv_message(2).\n");

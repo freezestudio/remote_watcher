@@ -22,6 +22,11 @@ freeze::detail::nats_cmd g_current_command;
 // 4. TODO: add watch-folder messgae {name: "watch-folder"}
 std::string g_current_message;
 
+// extern
+freeze::atomic_sync g_cmd_response_signal;
+// extern
+std::string g_cmd_response = std::string{};
+
 namespace freeze::detail
 {
 	struct _nats_options
@@ -1162,7 +1167,10 @@ namespace freeze::detail
 namespace freeze
 {
 	nats_client::nats_client()
-		: pimpl{std::make_unique<detail::_nats_connect>()}, _message_signal{}, _command_signal{}, _payload_signal{}, _cmd_response_signal{}
+		: pimpl{std::make_unique<detail::_nats_connect>()}
+		, _message_signal{}
+		, _command_signal{}
+		, _payload_signal{}
 	{
 		DEBUG_STRING(L"nats_client::nats_client(): constructor.\n");
 	}
@@ -1239,20 +1247,15 @@ namespace freeze
 		// should, SleepThread wait.
 	}
 
-	std::string nats_client::notify_command()
+	void nats_client::notify_command()
 	{
 		// notify command-thread resume.
 		_command_signal.notify();
 		DEBUG_STRING(L"nats_client::notify_command(): command-thread notified!\n");
 
-		// wait until command-thread complete.
-		DEBUG_STRING(L"nats_client::notify_command(): command response waiting ...\n");
-		_cmd_response_signal.wait();
-		DEBUG_STRING(L"nats_client::notify_command(): command response ready.\n");
-
-		auto res = std::exchange(_response_command, {});
-		DEBUG_STRING(L"nats_client::notify_command(): command response: {}\n", detail::to_utf16(res));
-		return res;
+		// DEBUG_STRING(L"nats_client::notify_command(): _cmd_response_signal waiting...\n");
+		// _cmd_response_signal.wait();
+		// DEBUG_STRING(L"nats_client::notify_command(): _cmd_response_signal wait ready.\n");
 	}
 
 	void nats_client::notify_payload(fs::path const &root)
@@ -1270,7 +1273,7 @@ namespace freeze
 	{
 		// TODO: try...catch...
 		// ...
-		
+
 		DEBUG_STRING(L"nats_client::message_response(): {}\n"sv, detail::to_utf16(g_current_message));
 		// std::unique_lock<std::mutex> lock(_mutex);
 		if (g_current_message.empty())
@@ -1393,7 +1396,10 @@ namespace freeze
 		if (g_current_command.name.empty())
 		{
 			DEBUG_STRING(L"nats_client::command_handle_result(): command is empty!\n");
-			_response_command = {};
+			g_cmd_response = {};
+
+			g_cmd_response_signal.notify();
+			DEBUG_STRING(L"nats_client::command_handle_result(): response empty, _cmd_response_signal notified.\n");
 			return;
 		}
 
@@ -1442,8 +1448,10 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::command_handle_result(): unknown command.\n");
 		}
 
-		_response_command = cmd_name;
-		DEBUG_STRING(L"nats_client::command_handle_result(): response command is: {}!\n"sv, detail::to_utf16(_response_command));
+		g_cmd_response = cmd_name;
+		DEBUG_STRING(L"nats_client::command_handle_result(): response command is: {}!\n"sv, detail::to_utf16(g_cmd_response));
+		g_cmd_response_signal.notify();
+		DEBUG_STRING(L"nats_client::command_handle_result(): _cmd_response_signal notified.\n");
 	}
 
 	void nats_client::init_threads()
@@ -1496,7 +1504,6 @@ namespace freeze
 						break;
 					}
 					self_ptr->command_handle_result();
-					self_ptr->_cmd_response_signal.notify();
 				}
 				DEBUG_STRING(L"[nats_client] command thread: stopped.\n"); },
 								  this);

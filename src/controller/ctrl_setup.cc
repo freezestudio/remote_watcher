@@ -330,6 +330,7 @@ bool uninstall_service()
 		return false;
 	}
 
+	DEBUG_STRING(L"@rg Uninstall Service: Successfully.\n");
 	return true;
 }
 

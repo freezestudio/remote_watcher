@@ -178,6 +178,7 @@ public:
 				mEnableUninstall = FALSE;
 				SetDlgItemText(IDC_STATUS, L"uninstalled!");
 				// TODO: remove HKEY_CURRENT_USER\Software\richgolden\rgmsvc
+				// TODO: remove HKEY_USERS\.DEFAULT\Software\richgolden\rgmsvc
 			}
 			else
 			{

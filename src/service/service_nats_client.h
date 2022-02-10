@@ -262,6 +262,11 @@ namespace freeze::detail
 	}
 }
 
+// wait for command response value
+extern freeze::atomic_sync g_cmd_response_signal;
+// command response value
+extern std::string g_cmd_response;
+
 namespace freeze
 {
 	constexpr auto message_recv_channel = "message-channel-1"sv;
@@ -286,7 +291,7 @@ namespace freeze
 
 	public:
 		void notify_message();
-		std::string notify_command();
+		void notify_command();
 		void notify_payload(fs::path const &);
 
 	public:
@@ -309,17 +314,14 @@ namespace freeze
 		std::thread _cmd_thread;
 		std::thread _pal_thread;
 
-		bool _msg_thread_running{true};
-		bool _cmd_thread_running{true};
-		bool _pal_thread_running{true};
-
 		atomic_sync _message_signal{};
 		atomic_sync _command_signal{};
 		atomic_sync _payload_signal{};
 
 	private:
-		atomic_sync _cmd_response_signal{};
-		std::string _response_command;
+		bool _msg_thread_running{true};
+		bool _cmd_thread_running{true};
+		bool _pal_thread_running{true};
 
 	private:
 		mutable std::mutex _mutex;

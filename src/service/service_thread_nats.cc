@@ -3,30 +3,37 @@
 
 namespace freeze
 {
-	void maybe_send_message(nats_client& nc)
+	void maybe_send_message(nats_client &nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() ...\n");
 		nc.notify_message();
 	}
 
-	void maybe_send_payload(nats_client& nc, fs::path const& root)
+	void maybe_send_payload(nats_client &nc, fs::path const &root)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() ...\n");
 		nc.notify_payload(root);
 	}
 
-	void maybe_response_command(nats_client& nc)
+	void maybe_response_command(nats_client &nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
-		auto cmd = nc.notify_command();
-		if (cmd == CMD_FOLDER)
+		g_cmd_response = {};
+		nc.notify_command();
+		g_cmd_response_signal.wait();
+
+		// test only
+		char msg[256] = {};
+		sprintf_s(msg, "@rg Service-Thread-nats: maybe_response_command(): response=%s, or null\n", g_cmd_response.c_str());
+		OutputDebugStringA(msg);
+
+		if (g_cmd_response == CMD_FOLDER)
 		{
 			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): try reset work folder...\n");
 			reset_work_folder(true);
 		}
-		else if(cmd == CMD_IGNORE)
+		else if (g_cmd_response == CMD_IGNORE)
 		{
-
 		}
 		else
 		{
@@ -39,63 +46,50 @@ namespace freeze
 namespace freeze
 {
 	rgm_nats_channel::rgm_nats_channel()
-		: _signal{}
-		, _running{true}
+		: _signal{}, _running{true}
 	{
-
 	}
 	rgm_nats_channel::~rgm_nats_channel()
 	{
-		
 	}
 
-    void rgm_nats_channel::publish()
+	void rgm_nats_channel::publish()
 	{
-
 	}
 
-    void rgm_nats_channel::subject()
+	void rgm_nats_channel::subject()
 	{
-
 	}
-	
-    void rgm_nats_channel::notify()
-	{
 
+	void rgm_nats_channel::notify()
+	{
 	}
 }
 
 namespace freeze
 {
 	rgm_nats::rgm_nats()
-		: _signal{}
-		, _signal_reason{}
+		: _signal{}, _signal_reason{}
 	{
-
 	}
 
 	rgm_nats::~rgm_nats()
 	{
-
 	}
 
 	void rgm_nats::start()
 	{
-
 	}
 
 	void rgm_nats::stop()
 	{
-
 	}
 
 	void rgm_nats::pause()
 	{
-
 	}
 
 	void rgm_nats::resume()
 	{
-
 	}
 }

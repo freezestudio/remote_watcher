@@ -289,6 +289,7 @@ namespace freeze
 	};
 }
 
+// TODO: maybe need refactoring.
 extern freeze::atomic_sync_reason global_reason_signal;
 
 #endif
