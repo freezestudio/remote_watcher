@@ -18,27 +18,31 @@ namespace freeze
 	void maybe_response_command(nats_client &nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
+
 		g_cmd_response = {};
 		nc.notify_command();
-		g_cmd_response_signal.wait();
+
+		// error: want wait, but failure.
+		// g_cmd_response_signal.wait();
 
 		// test only
-		char msg[256] = {};
-		sprintf_s(msg, "@rg Service-Thread-nats: maybe_response_command(): response=%s, or null\n", g_cmd_response.c_str());
-		OutputDebugStringA(msg);
+		// char msg[256] = {};
+		// sprintf_s(msg, "@rg Service-Thread-nats: maybe_response_command(): g_cmd_response_signal wait ready, response=%s, or null\n", g_cmd_response.c_str());
+		// OutputDebugStringA(msg);
 
-		if (g_cmd_response == CMD_FOLDER)
-		{
-			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): try reset work folder...\n");
-			reset_work_folder(true);
-		}
-		else if (g_cmd_response == CMD_IGNORE)
-		{
-		}
-		else
-		{
-			// empty.
-		}
+		// if (g_cmd_response == CMD_FOLDER)
+		// {
+		// 	DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): try reset work folder...\n");
+		// 	reset_work_folder(true);
+		// }
+		// else if (g_cmd_response == CMD_IGNORE)
+		// {
+		// }
+		// else
+		// {
+		// 	// empty.
+		// }
+
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): done.\n");
 	}
 }
@@ -49,6 +53,7 @@ namespace freeze
 		: _signal{}, _running{true}
 	{
 	}
+
 	rgm_nats_channel::~rgm_nats_channel()
 	{
 	}

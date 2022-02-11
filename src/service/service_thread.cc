@@ -33,7 +33,7 @@ freeze::atomic_sync_reason global_reason_signal{};
 
 /*extern*/
 fs::path g_work_folder;
-void reset_work_folder(bool notify/* = false */)
+void reset_work_folder(bool notify /* = false */)
 {
 	// TODO: maybe need lock
 	auto wcs_folder = freeze::detail::read_latest_folder();
@@ -47,7 +47,7 @@ void reset_work_folder(bool notify/* = false */)
 
 	auto mbs_folder = freeze::detail::to_utf8(wcs_folder);
 	auto latest_folder = freeze::detail::to_utf16(mbs_folder);
-	auto latest_path = fs::path{ latest_folder };
+	auto latest_path = fs::path{latest_folder};
 	if (!fs::exists(latest_path))
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): error, folder={}, not exists.\n"sv, latest_path.c_str());
@@ -88,7 +88,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	auto underline_watch = freeze::folder_watchor_apc{};
 	// auto underline_watch = freeze::folder_watchor_status{};
 	// auto underline_watch = freeze::folder_watchor_result{};
-	auto watcher = freeze::watcher_win32{ underline_watch };
+	auto watcher = freeze::watcher_win32{underline_watch};
 
 	if (freeze::detail::check_exists(g_work_folder))
 	{
@@ -149,7 +149,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	do
 	{
 		hh_timer = ::CreateWaitableTimerEx(
-			nullptr,                            // LPSECURITY_ATTRIBUTES
+			nullptr, // LPSECURITY_ATTRIBUTES
 			_timer_name,
 			CREATE_WAITABLE_TIMER_MANUAL_RESET, // manual reset
 			TIMER_ALL_ACCESS);
@@ -198,8 +198,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 		_TimerCallback,
 		(LPVOID)(&g_nats_client), // lpArgToCompletionRoutine
 		&reason,
-		delay
-	);
+		delay);
 	if (!ok)
 	{
 		auto err = GetLastError();
@@ -258,7 +257,7 @@ DWORD __stdcall _SleepThread(LPVOID)
 	{
 		DEBUG_STRING(L"@rg SleepThread: Waiting Wakeup ...\n");
 
-		//wait until some reason changed.
+		// wait until some reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: Wakeup Reason: {}.\n"sv, reason_string(reason));
 #ifndef SERVICE_TEST
@@ -295,7 +294,8 @@ DWORD __stdcall _SleepThread(LPVOID)
 		// TODO: timeout if blocking
 		switch (reason)
 		{
-		default: [[fallthrough]];
+		default:
+			[[fallthrough]];
 		case sync_reason_none__reason:
 			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_none__reason(0).\n");
 			break;
@@ -318,6 +318,17 @@ DWORD __stdcall _SleepThread(LPVOID)
 			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_send_payload(5).\n");
 			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
+			break;
+		// response command
+		case sync_reason_cmd_error:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_error(-2).\n");
+			break;
+		case sync_reason_cmd_empty:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_empty(10).\n");
+			break;
+		case sync_reason_cmd_folder:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_folder(11).\n");
+			reset_work_folder(true);
 			break;
 		}
 
@@ -458,10 +469,7 @@ void stop_threadpool()
 namespace freeze
 {
 	rgm_service::rgm_service()
-		: _service_status_handle{ nullptr }
-		, _service_status{}
-		, _check_point{ 0 }
-		, _signal{}
+		: _service_status_handle{nullptr}, _service_status{}, _check_point{0}, _signal{}
 	{
 		_service_status.dwServiceType = SERVICE_WIN32;
 		_service_status.dwServiceSpecificExitCode = 0;
@@ -473,7 +481,6 @@ namespace freeze
 
 	rgm_service::~rgm_service()
 	{
-
 	}
 
 	bool rgm_service::initialize()
@@ -481,8 +488,7 @@ namespace freeze
 		_service_status_handle = ::RegisterServiceCtrlHandlerEx(
 			SERVICE_NAME,
 			rgm_service::control_code_handle_ex,
-			(LPVOID)(this)
-		);
+			(LPVOID)(this));
 		if (!_service_status_handle)
 		{
 			return false;
@@ -548,9 +554,9 @@ namespace freeze
 		else
 		{
 			_service_status.dwControlsAccepted = service_accept::param_change |
-				service_accept::pause_continue |
-				service_accept::shutdown |
-				service_accept::stop;
+												 service_accept::pause_continue |
+												 service_accept::shutdown |
+												 service_accept::stop;
 		}
 
 		if (state == service_state::running or state == service_state::stopped)
@@ -565,13 +571,15 @@ namespace freeze
 		}
 
 		return ::SetServiceStatus(
-			_service_status_handle, &_service_status) ? true : false;
+				   _service_status_handle, &_service_status)
+				   ? true
+				   : false;
 	}
 
 	DWORD __stdcall rgm_service::control_code_handle_ex(
 		DWORD code, DWORD event_type, LPVOID lpevdata, LPVOID lpcontext)
 	{
-		auto self = reinterpret_cast<rgm_service*>(lpcontext);
+		auto self = reinterpret_cast<rgm_service *>(lpcontext);
 		if (!self)
 		{
 			return ERROR_INVALID_HANDLE;

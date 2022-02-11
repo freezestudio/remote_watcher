@@ -263,7 +263,7 @@ namespace freeze::detail
 }
 
 // wait for command response value
-extern freeze::atomic_sync g_cmd_response_signal;
+// extern freeze::atomic_sync g_cmd_response_signal;
 // command response value
 extern std::string g_cmd_response;
 

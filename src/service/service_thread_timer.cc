@@ -41,11 +41,11 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 		}
 	}
 
-	auto _timeout = static_cast<DWORD>((dwTimerLowValue - _g_latest_time) * 1e-7);
 	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
+	auto _timeout = static_cast<DWORD>((dwTimerLowValue - _g_latest_time) * 1e-7);
+	_g_latest_time = dwTimerLowValue;
 	DEBUG_STRING(L"@rg TimerCallback: ping duration: {}\n"sv, _timeout);
 
-	_g_latest_time = dwTimerLowValue;
 	auto status = nc_ptr->maybe_heartbeat();
 	auto status_msg = L"ok"s;
 	if (status != 0)

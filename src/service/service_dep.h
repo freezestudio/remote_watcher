@@ -124,6 +124,11 @@ constexpr auto sync_reason_send_command = 3L;
 constexpr auto sync_reason_send_message = 4L;
 constexpr auto sync_reason_send_payload = 5L;
 
+constexpr auto sync_reason_cmd_error = -2L;
+constexpr auto sync_reason_cmd_empty = 10L;
+constexpr auto sync_reason_cmd_folder = 11L;
+constexpr auto sync_reason_cmd_igonre = 12L;
+
 constexpr std::wstring reason_string(long reason)
 {
 	switch (reason)
@@ -155,7 +160,7 @@ namespace freeze
 	public:
 		atomic_sync()
 		{
-			//_flag.clear();
+			// _flag.clear();
 		}
 
 		~atomic_sync()
@@ -169,13 +174,13 @@ namespace freeze
 		atomic_sync& operator=(atomic_sync&&) = delete;
 
 	public:
-		void wait()
+		void wait() noexcept
 		{
 			_flag.wait(false);
 			_flag.clear();
 		}
 
-		void notify(bool all = false)
+		void notify(bool all = false) noexcept
 		{
 			_flag.test_and_set();
 			if (all)
@@ -186,6 +191,11 @@ namespace freeze
 			{
 				_flag.notify_one();
 			}
+		}
+
+		void reset() noexcept
+		{
+			// _flag.clear();
 		}
 
 	private:
