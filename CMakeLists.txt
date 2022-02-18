@@ -93,7 +93,7 @@ target_link_libraries(${EXEC_NAME} zlibstatic)
 # custom command: check blob
 #
 add_custom_command(TARGET ${EXEC_NAME} PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Before build ${EXEC_NAME}: check blob ..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Before build ${EXEC_NAME}: check assets/blob ..."
 )
 
 #
