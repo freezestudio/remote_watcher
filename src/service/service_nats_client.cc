@@ -33,31 +33,31 @@ namespace freeze::detail
 	{
 	public:
 		_nats_options(std::nullptr_t = nullptr)
-			: _options{nullptr}
+			: _options{ nullptr }
 		{
 		}
 
 		_nats_options(
-			std::string const &url,
-			std::string const &user,
-			std::string const &pwd,
-			std::string const &name) : _nats_options(name)
+			std::string const& url,
+			std::string const& user,
+			std::string const& pwd,
+			std::string const& name) : _nats_options(name)
 		{
 			_url(url);
 			_user_pwd(user, pwd);
 		}
 
 		_nats_options(
-			std::string const &url,
-			std::string const &token,
-			std::string const &name) : _nats_options(name)
+			std::string const& url,
+			std::string const& token,
+			std::string const& name) : _nats_options(name)
 		{
 			_url(url);
 			_token(token);
 		}
 
-		explicit _nats_options(std::string const &name)
-			: _options{nullptr}
+		explicit _nats_options(std::string const& name)
+			: _options{ nullptr }
 		{
 			_create();
 
@@ -68,15 +68,15 @@ namespace freeze::detail
 			_buffer_size(64 * 1024);
 		}
 
-		_nats_options(_nats_options const &) = default;
-		_nats_options &operator=(_nats_options const &) = default;
+		_nats_options(_nats_options const&) = default;
+		_nats_options& operator=(_nats_options const&) = default;
 
 		~_nats_options()
 		{
 			_destroy();
 		}
 
-		operator natsOptions *() const
+		operator natsOptions* () const
 		{
 			return _options;
 		}
@@ -87,7 +87,7 @@ namespace freeze::detail
 			_destroy();
 		}
 
-		_nats_options &reset(std::string const &url, std::string const &token, std::string const &name = {})
+		_nats_options& reset(std::string const& url, std::string const& token, std::string const& name = {})
 		{
 			auto ok = true;
 			//_destroy();
@@ -116,22 +116,22 @@ namespace freeze::detail
 		}
 
 	public:
-		bool set_url(std::string const &url)
+		bool set_url(std::string const& url)
 		{
 			return _url(url);
 		}
 
-		bool set_pass(std::string const &user, std::string const &pwd)
+		bool set_pass(std::string const& user, std::string const& pwd)
 		{
 			return _user_pwd(user, pwd);
 		}
 
-		bool set_token(std::string const &token)
+		bool set_token(std::string const& token)
 		{
 			return _token(token);
 		}
 
-		bool set_cnn_name(std::string const &name = {})
+		bool set_cnn_name(std::string const& name = {})
 		{
 			return _name(name);
 		}
@@ -152,7 +152,7 @@ namespace freeze::detail
 			}
 		}
 
-		bool _name(std::string const &name)
+		bool _name(std::string const& name)
 		{
 			std::string _cnn_name = name;
 			if (name.empty())
@@ -176,12 +176,12 @@ namespace freeze::detail
 			return natsOptions_SetIOBufSize(_options, size) == natsStatus::NATS_OK;
 		}
 
-		bool _user_pwd(std::string const &user, std::string const &pwd)
+		bool _user_pwd(std::string const& user, std::string const& pwd)
 		{
 			return natsOptions_SetUserInfo(_options, user.c_str(), pwd.c_str()) == natsStatus::NATS_OK;
 		}
 
-		bool _token(std::string const &token)
+		bool _token(std::string const& token)
 		{
 			auto _token = token;
 			if (token.empty())
@@ -197,7 +197,7 @@ namespace freeze::detail
 			return natsOptions_SetToken(_options, _token.c_str()) == natsStatus::NATS_OK;
 		}
 
-		bool _url(std::string const &url)
+		bool _url(std::string const& url)
 		{
 			if (url.empty())
 			{
@@ -212,8 +212,8 @@ namespace freeze::detail
 			}
 			nats_url += url;
 
-			auto _find = std::find_if(std::cbegin(url), std::cend(url), [](auto &&c)
-									  { return c == ':'; });
+			auto _find = std::find_if(std::cbegin(url), std::cend(url), [](auto&& c)
+				{ return c == ':'; });
 			if (_find == url.end())
 			{
 				nats_url += ":4222";
@@ -235,13 +235,13 @@ namespace freeze::detail
 		}
 
 	private:
-		natsOptions *_options = nullptr;
+		natsOptions* _options = nullptr;
 	};
 
 	struct _nats_msg
 	{
-		explicit _nats_msg(natsMsg *m)
-			: _msg{m}
+		explicit _nats_msg(natsMsg* m)
+			: _msg{ m }
 		{
 			if (m)
 			{
@@ -249,8 +249,8 @@ namespace freeze::detail
 			}
 		}
 
-		explicit _nats_msg(std::string const &sub, bool heartbeat = false)
-			: _sub{sub}
+		explicit _nats_msg(std::string const& sub, bool heartbeat = false)
+			: _sub{ sub }
 		{
 			// as heartbeat package
 			if (heartbeat)
@@ -259,8 +259,8 @@ namespace freeze::detail
 			}
 		}
 
-		_nats_msg(std::string const &sub, std::string const &m)
-			: _sub{sub}
+		_nats_msg(std::string const& sub, std::string const& m)
+			: _sub{ sub }
 		{
 			_create_text(m);
 		}
@@ -270,12 +270,12 @@ namespace freeze::detail
 			_destroy();
 		}
 
-		operator natsMsg *() const
+		operator natsMsg* () const
 		{
 			return _msg;
 		}
 
-		natsMsg **put()
+		natsMsg** put()
 		{
 			return &_msg;
 		}
@@ -331,7 +331,7 @@ namespace freeze::detail
 			return detail::to_pal_ack(ack);
 		}
 
-		bool set_msg(std::string const &msg, std::string const &_type)
+		bool set_msg(std::string const& msg, std::string const& _type)
 		{
 			_destroy();
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, msg.c_str(), msg.size()) == NATS_OK;
@@ -339,7 +339,7 @@ namespace freeze::detail
 			{
 				return false;
 			}
-			const char *value = nullptr;
+			const char* value = nullptr;
 			auto status = natsMsgHeader_Get(_msg, "type", &value);
 			if (status == NATS_OK)
 			{
@@ -369,7 +369,7 @@ namespace freeze::detail
 			return ok;
 		}
 
-		bool set_cmd(nats_cmd const &cmd)
+		bool set_cmd(nats_cmd const& cmd)
 		{
 			_destroy();
 			auto _s = from_cmd(cmd);
@@ -390,7 +390,7 @@ namespace freeze::detail
 			return ok;
 		}
 
-		bool set_cmd_ack(std::string const &reply, nats_cmd_ack const &ack)
+		bool set_cmd_ack(std::string const& reply, nats_cmd_ack const& ack)
 		{
 			_destroy();
 			auto _s = from_cmd_ack(ack);
@@ -412,7 +412,7 @@ namespace freeze::detail
 		 * @brief read image data to buffer.
 		 * @return uint8_t buffer need count.
 		 */
-		uintmax_t set_payload(uint8_t *data, uintmax_t *len, fs::path const &folder, fs::path const &file)
+		uintmax_t set_payload(uint8_t* data, uintmax_t* len, fs::path const& folder, fs::path const& file)
 		{
 			auto full_path_file = (folder / file).lexically_normal();
 			if (!fs::exists(full_path_file))
@@ -437,7 +437,7 @@ namespace freeze::detail
 				ifs.open(full_path_file, std::ios::binary | std::ios::in);
 				if (ifs.is_open())
 				{
-					auto &_self = ifs.read(reinterpret_cast<char *>(data), *len);
+					auto& _self = ifs.read(reinterpret_cast<char*>(data), *len);
 					auto read_count = ifs.gcount();
 					auto ok = !!_self;
 					if (!ok)
@@ -456,7 +456,7 @@ namespace freeze::detail
 					ifs.close();
 
 					_destroy();
-					ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char *>(data), *len) == NATS_OK;
+					ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char*>(data), *len) == NATS_OK;
 					if (!ok)
 					{
 						DEBUG_STRING(L"_nats_msg::set_payload() error: create file {} message.\n", full_path_file.c_str());
@@ -521,14 +521,14 @@ namespace freeze::detail
 			return natsMsg_Ack(_msg, nullptr) == NATS_OK;
 		}
 
-		bool _create_empty(std::string const &reply = {})
+		bool _create_empty(std::string const& reply = {})
 		{
 			_destroy();
 			auto rep = reply.empty() ? nullptr : reply.c_str();
 			return natsMsg_Create(&_msg, _sub.c_str(), rep, nullptr, 0) == NATS_OK;
 		}
 
-		bool _create_text(std::string const &m)
+		bool _create_text(std::string const& m)
 		{
 			_destroy();
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, m.data(), m.size()) == NATS_OK;
@@ -545,7 +545,7 @@ namespace freeze::detail
 			return ok;
 		}
 
-		std::string _create_reply_text(std::string const &reply, std::string const &m)
+		std::string _create_reply_text(std::string const& reply, std::string const& m)
 		{
 			_destroy();
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), reply.c_str(), m.data(), m.size()) == NATS_OK;
@@ -567,19 +567,19 @@ namespace freeze::detail
 			return reply;
 		}
 
-		bool _set_header(std::string key, std::string const &value)
+		bool _set_header(std::string key, std::string const& value)
 		{
 			return natsMsgHeader_Set(_msg, key.c_str(), value.c_str()) == NATS_OK;
 		}
 
-		bool _add_header(std::string key, std::string const &value)
+		bool _add_header(std::string key, std::string const& value)
 		{
 			return natsMsgHeader_Add(_msg, key.c_str(), value.c_str()) == NATS_OK;
 		}
 
 		bool _clear_headers()
 		{
-			const char **keys = nullptr;
+			const char** keys = nullptr;
 			int count = 0;
 			auto status = natsMsgHeader_Keys(_msg, &keys, &count);
 			if (status == NATS_NOT_FOUND)
@@ -602,7 +602,7 @@ namespace freeze::detail
 				}
 			}
 
-			free((void *)keys);
+			free((void*)keys);
 			return ok;
 		}
 
@@ -617,17 +617,17 @@ namespace freeze::detail
 
 	private:
 		std::string _sub;
-		natsMsg *_msg = nullptr;
+		natsMsg* _msg = nullptr;
 	};
 
 	struct _nats_sub
 	{
-		explicit _nats_sub(natsSubscription *sub)
-			: _sub{sub}
+		explicit _nats_sub(natsSubscription* sub)
+			: _sub{ sub }
 		{
 		}
 
-		natsSubscription **put()
+		natsSubscription** put()
 		{
 			return &_sub;
 		}
@@ -640,13 +640,13 @@ namespace freeze::detail
 
 		_nats_msg next_msg(int64_t timeout)
 		{
-			natsMsg *m;
+			natsMsg* m;
 			auto ok = natsSubscription_NextMsg(&m, _sub, timeout) == NATS_OK;
 			if (ok)
 			{
-				return _nats_msg{m};
+				return _nats_msg{ m };
 			}
-			return _nats_msg{static_cast<natsMsg *>(nullptr)};
+			return _nats_msg{ static_cast<natsMsg*>(nullptr) };
 		}
 
 	private:
@@ -656,7 +656,7 @@ namespace freeze::detail
 		}
 
 	private:
-		natsSubscription *_sub;
+		natsSubscription* _sub;
 	};
 
 	struct _nats_connect
@@ -664,24 +664,24 @@ namespace freeze::detail
 		// TODO: make default name = {nats-pcname-pid}
 	public:
 		_nats_connect(/*std::nullopt_t*/) noexcept
-			: _opts{}, _nc{nullptr}
+			: _opts{}, _nc{ nullptr }
 		{
 		}
 
 		_nats_connect(
-			std::string const &url,
-			std::string const &user,
-			std::string const &pwd,
-			std::string const &name = {}) noexcept
+			std::string const& url,
+			std::string const& user,
+			std::string const& pwd,
+			std::string const& name = {}) noexcept
 			: _opts(url, user, pwd, name)
 		{
 			_connect();
 		}
 
 		_nats_connect(
-			std::string const &url,
-			std::string const &token,
-			std::string const &name = {}) noexcept
+			std::string const& url,
+			std::string const& token,
+			std::string const& name = {}) noexcept
 			: _opts(url, token, name)
 		{
 			_connect();
@@ -708,7 +708,7 @@ namespace freeze::detail
 			_destroy();
 		}
 
-		void change_ip(uint32_t ip, std::string const &token /*= {}*/)
+		void change_ip(uint32_t ip, std::string const& token /*= {}*/)
 		{
 			auto str_ip = detail::parse_ip_address(ip);
 			if (is_connected())
@@ -721,7 +721,7 @@ namespace freeze::detail
 			}
 		}
 
-		_nats_connect &reset(std::string const &url, std::string const &token, std::string const &name = {})
+		_nats_connect& reset(std::string const& url, std::string const& token, std::string const& name = {})
 		{
 			_destroy();
 
@@ -731,9 +731,9 @@ namespace freeze::detail
 			return *this;
 		}
 
-		bool ack_command(std::string const &reply, nats_cmd_ack const &ack)
+		bool ack_command(std::string const& reply, nats_cmd_ack const& ack)
 		{
-			auto _m = _nats_msg{command_channel.data()};
+			auto _m = _nats_msg{ command_channel.data() };
 			auto ok = _m.set_cmd_ack(reply, ack);
 			if (!ok)
 			{
@@ -750,8 +750,8 @@ namespace freeze::detail
 
 		DWORD maybe_heartbeat()
 		{
-			auto _m = _nats_msg{std::string(message_send_channel.data()), true};
-			_nats_msg _reply_msg{static_cast<natsMsg *>(nullptr)};
+			auto _m = _nats_msg{ std::string(message_send_channel.data()), true };
+			_nats_msg _reply_msg{ static_cast<natsMsg*>(nullptr) };
 			auto status = natsConnection_RequestMsg(_reply_msg.put(), _nc, _m, 3000);
 			if (!_reply_msg)
 			{
@@ -762,10 +762,10 @@ namespace freeze::detail
 		}
 
 	public:
-		bool publish_message(std::string const &msg, std::string const &_type = std::string(text_type))
+		bool publish_message(std::string const& msg, std::string const& _type = std::string(text_type))
 		{
 			// std::lock_guard<std::mutex> lock(_mutex);
-			auto _m = _nats_msg{std::string(message_send_channel.data()), false};
+			auto _m = _nats_msg{ std::string(message_send_channel.data()), false };
 			auto ok = _m.set_msg(msg, _type);
 			if (ok)
 			{
@@ -788,10 +788,10 @@ namespace freeze::detail
 		}
 
 		// unused.
-		bool publish_command(nats_cmd const &cmd)
+		bool publish_command(nats_cmd const& cmd)
 		{
 			// std::lock_guard<std::mutex> lock(_mutex);
-			auto _m = _nats_msg{std::string(command_channel.data()), false};
+			auto _m = _nats_msg{ std::string(command_channel.data()), false };
 			_m.set_cmd(cmd);
 			auto status = natsConnection_PublishMsg(_nc, _m);
 			if (status != NATS_OK)
@@ -801,12 +801,12 @@ namespace freeze::detail
 			return status == NATS_OK;
 		}
 
-		bool publish_payload(fs::path const &folder, fs::path const &file)
+		bool publish_payload(fs::path const& folder, fs::path const& file)
 		{
 			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}, {}\n"sv, folder.c_str(), file.c_str());
 			// std::lock_guard<std::mutex> lock(_mutex);
-			_nats_msg data_msg{payload_channel.data()};
-			uint8_t *buffer = nullptr;
+			_nats_msg data_msg{ payload_channel.data() };
+			uint8_t* buffer = nullptr;
 			uintmax_t buffer_size = 0;
 			auto ret_count = data_msg.set_payload(buffer, &buffer_size, folder, file);
 			if (ret_count == 0)
@@ -822,7 +822,7 @@ namespace freeze::detail
 				return false;
 			}
 
-			_nats_msg reply_msg{static_cast<natsMsg *>(nullptr)};
+			_nats_msg reply_msg{ static_cast<natsMsg*>(nullptr) };
 			auto status = natsConnection_RequestMsg(reply_msg.put(), _nc, data_msg, 2 * 60 * 1000);
 			auto ok = status == NATS_OK;
 			if (!ok)
@@ -841,8 +841,10 @@ namespace freeze::detail
 					using json = nlohmann::json;
 					auto j = json::parse(_json_msg);
 					std::string _mbs_name = j["name"];
+
+					// test only
 					auto _wcs_name = detail::to_utf16(_mbs_name);
-					ok = fs::path{_wcs_name} == file;
+					ok = fs::path{ _wcs_name } == file;
 					DEBUG_STRING(L"_nats_connect::publish_payload() reply message: {}, result={}.\n"sv, _wcs_name, ok);
 				}
 				else
@@ -860,7 +862,7 @@ namespace freeze::detail
 					DEBUG_STRING(L"_nats_connect::publish_payload() error: response-msg failure.\n");
 				}
 			}
-			catch (const std::exception &e)
+			catch (const std::exception& e)
 			{
 				// OutputDebugStringA(e.what());
 				auto wcs = detail::to_utf16(std::string(e.what()));
@@ -873,6 +875,41 @@ namespace freeze::detail
 			return ok;
 		}
 
+		bool publish_file(fs::path const& file_path, fs::path const& file_name)
+		{
+			DEBUG_STRING(L"_nats_connect::publish_file(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
+			// std::lock_guard<std::mutex> lock(_mutex);
+
+			_nats_msg data_msg{ synfile_channel.data() };
+
+			uint8_t* buffer = nullptr;
+			uintmax_t buffer_size = 0;
+			auto ret_count = data_msg.set_payload(buffer, &buffer_size, file_path, file_name);
+			if (ret_count == 0)
+			{
+				DEBUG_STRING(L"_nats_connect::publish_file() error: zero data.\n");
+				return false;
+			}
+
+			buffer = new uint8_t[ret_count]{};
+			ret_count = data_msg.set_payload(buffer, &buffer_size, file_path, file_name);
+			if (ret_count == 0)
+			{
+				DEBUG_STRING(L"_nats_connect::publish_payload() error: data is null.\n");
+				return false;
+			}
+
+			_nats_msg reply_msg{ static_cast<natsMsg*>(nullptr) };
+			auto status = natsConnection_RequestMsg(reply_msg.put(), _nc, data_msg, 2 * 60 * 1000);
+			auto ok = status == NATS_OK;
+			if (!ok)
+			{
+				DEBUG_STRING(L"_nats_connect::publish_payload() error: request-msg failure {}.\n"sv, (DWORD)status);
+			}
+			delete[] buffer;
+			return ok;
+		}
+
 		bool subject_recv_message()
 		{
 			if (!_nc)
@@ -881,13 +918,13 @@ namespace freeze::detail
 				return false;
 			}
 
-			_nats_sub _sub{static_cast<natsSubscription *>(nullptr)};
+			_nats_sub _sub{ static_cast<natsSubscription*>(nullptr) };
 			auto status = natsConnection_Subscribe(
 				_sub.put(), _nc, message_recv_channel.data(),
-				[](natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
+				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
-					_nats_msg m{msg};
-					auto self = reinterpret_cast<_nats_connect *>(closure);
+					_nats_msg m{ msg };
+					auto self = reinterpret_cast<_nats_connect*>(closure);
 					g_current_message = m.get_msg();
 					if (!g_current_message.empty())
 					{
@@ -907,13 +944,13 @@ namespace freeze::detail
 				return false;
 			}
 
-			_nats_sub _sub{static_cast<natsSubscription *>(nullptr)};
+			_nats_sub _sub{ static_cast<natsSubscription*>(nullptr) };
 			// cb(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
 			auto status = natsConnection_Subscribe(
 				_sub.put(), _nc, command_channel.data(),
-				[](natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
+				[](natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure)
 				{
-					auto self = reinterpret_cast<_nats_connect *>(closure);
+					auto self = reinterpret_cast<_nats_connect*>(closure);
 					if (!self)
 					{
 						DEBUG_STRING(L"_nats_connect::subject_command()::lambda error: self instance is null.\n");
@@ -925,7 +962,7 @@ namespace freeze::detail
 						return;
 					}
 
-					_nats_msg m{static_cast<natsMsg *>(msg)};
+					_nats_msg m{ static_cast<natsMsg*>(msg) };
 					auto cmd = m.get_cmd();
 					detail::nats_cmd_ack _ack;
 					if (cmd.name.empty())
@@ -965,7 +1002,7 @@ namespace freeze::detail
 			}
 		}
 
-		bool connect(std::string const &url, std::string const &token, std::string const &name = {})
+		bool connect(std::string const& url, std::string const& token, std::string const& name = {})
 		{
 			_destroy();
 
@@ -1052,7 +1089,7 @@ namespace freeze::detail
 
 		std::string error_message()
 		{
-			const char *error = nullptr;
+			const char* error = nullptr;
 			auto status = natsConnection_GetLastError(_nc, &error);
 			if (status != NATS_OK)
 			{
@@ -1064,7 +1101,7 @@ namespace freeze::detail
 		}
 
 	public:
-		void on_recv_message(std::string const &msg)
+		void on_recv_message(std::string const& msg)
 		{
 			if (msg.empty())
 			{
@@ -1080,7 +1117,7 @@ namespace freeze::detail
 			// next, should call nats_client::notify_message();
 		}
 
-		void on_command(/*std::string const& reply,*/ nats_cmd const &cmd)
+		void on_command(/*std::string const& reply,*/ nats_cmd const& cmd)
 		{
 			g_current_command.name = cmd.name;
 			g_current_command.action = cmd.action;
@@ -1159,7 +1196,7 @@ namespace freeze::detail
 		// std::mutex _mutex;
 
 	private:
-		natsConnection *_nc = nullptr;
+		natsConnection* _nc = nullptr;
 		_nats_options _opts;
 	};
 }
@@ -1167,10 +1204,11 @@ namespace freeze::detail
 namespace freeze
 {
 	nats_client::nats_client()
-		: pimpl{std::make_unique<detail::_nats_connect>()}
+		: pimpl{ std::make_unique<detail::_nats_connect>() }
 		, _message_signal{}
 		, _command_signal{}
 		, _payload_signal{}
+		, _synfile_signal{}
 	{
 		DEBUG_STRING(L"nats_client::nats_client(): constructor.\n");
 	}
@@ -1181,12 +1219,12 @@ namespace freeze
 		close();
 	}
 
-	void nats_client::change_ip(DWORD ip, std::string const &token /*= {}*/)
+	void nats_client::change_ip(DWORD ip, std::string const& token /*= {}*/)
 	{
 		pimpl->change_ip(ip, token);
 	}
 
-	bool nats_client::connect(DWORD ip, std::string const &token /* = {}*/)
+	bool nats_client::connect(DWORD ip, std::string const& token /* = {}*/)
 	{
 		std::unique_lock<std::mutex> lock(_mutex);
 
@@ -1196,7 +1234,7 @@ namespace freeze
 			url = detail::parse_ip_address(ip);
 		}
 		DEBUG_STRING(L"nats_client::connect(): will try connect to {}\n"sv,
-					 url.empty() ? L"0.0.0.0" : detail::to_utf16(url));
+			url.empty() ? L"0.0.0.0" : detail::to_utf16(url));
 
 		// pimpl.swap(detail::_nats_connect(url, token));
 		auto _is_connected = pimpl->connect(url, token);
@@ -1260,7 +1298,7 @@ namespace freeze
 		// DEBUG_STRING(L"nats_client::notify_command(): _cmd_response_signal wait ready.\n");
 	}
 
-	void nats_client::notify_payload(fs::path const &root)
+	void nats_client::notify_payload(fs::path const& root)
 	{
 		_watch_path = root;
 		// notify payload-thread resume.
@@ -1272,12 +1310,26 @@ namespace freeze
 		// should, SleepThread wait.
 	}
 
+	void nats_client::notify_files(fs::path const& root, std::vector<fs::path> const& ignores)
+	{
+		if (ignores.size() > 0) {
+			std::vector<fs::path>{}.swap(_sync_igonres);
+			_sync_igonres = ignores;
+		}
+		_sync_path = root;
+		_synfile_signal.notify();
+
+		// should, next call nats_client::sync_files().
+		// should, SleepThread wait.
+	}
+
 	void nats_client::message_response()
 	{
 		// TODO: try...catch...
+		// TODO: lock
 		// ...
 
-		DEBUG_STRING(L"nats_client::message_response(): {}\n"sv, detail::to_utf16(g_current_message));
+		DEBUG_STRING(L"nats_client::message_response(): message={}\n"sv, detail::to_utf16(g_current_message));
 		// std::unique_lock<std::mutex> lock(_mutex);
 		if (g_current_message.empty())
 		{
@@ -1286,7 +1338,7 @@ namespace freeze
 		}
 		std::string _message = std::exchange(g_current_message, {});
 		assert(g_current_message.empty());
-		DEBUG_STRING(L"nats_client::message_response(): exchange{}\n"sv, detail::to_utf16(_message));
+		DEBUG_STRING(L"nats_client::message_response(): exchange={}\n"sv, detail::to_utf16(_message));
 		// lock.unlock();
 
 		// 1. {name:"list-disk"}
@@ -1301,7 +1353,7 @@ namespace freeze
 		if (_recv_msg.name == MSG_LIST_DISK)
 		{
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: call get_harddisks() ...\n");
-			auto disk_names = detail::get_harddisks();
+			auto disk_names = detail::get_harddisks_ex();
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: disk count={}\n"sv, disk_names.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
 		}
@@ -1321,7 +1373,7 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: dir={}\n"sv, dir);
 
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: call get_files_without_subdir(dir) ...\n");
-			auto files = detail::get_files_without_subdir(fs::path{dir});
+			auto files = detail::get_files_without_subdir(fs::path{ dir });
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: files-count={}\n"sv, files.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, files);
 		}
@@ -1338,6 +1390,20 @@ namespace freeze
 				_one.emplace_back(mbs_folder);
 			}
 			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
+		}
+		else if (_recv_msg.name == MSG_TREE_INFO)
+		{
+			auto root = detail::to_utf16(_recv_msg.folder);
+			std::vector<fs::path> ignores;
+			if (_recv_msg.ignores.size() > 0)
+			{
+				for (auto const& item : _recv_msg.ignores)
+				{
+					ignores.emplace_back(detail::to_utf16(item));
+				}
+			}
+			auto tree_info = detail::get_dirtree_info(root, ignores);
+			_send_msg = detail::make_send_message_string(_recv_msg.name, tree_info);
 		}
 		else
 		{
@@ -1358,10 +1424,9 @@ namespace freeze
 
 	void nats_client::send_payload()
 	{
-		DEBUG_STRING(L"nats_client::send_payload(): from root path: {}.\n"sv, this->_watch_path.c_str());
-
 		try
 		{
+			DEBUG_STRING(L"nats_client::send_payload(): from root path: {}.\n"sv, this->_watch_path.c_str());
 			// std::unique_lock<std::mutex> lock(_mutex);
 			auto watch_tree_ptr = watch_tree_instace(this->_watch_path);
 			if (!watch_tree_ptr)
@@ -1386,10 +1451,26 @@ namespace freeze
 				pimpl->publish_payload(root_str, file);
 			}
 		}
-		catch (const std::exception &e)
+		catch (const std::exception& e)
 		{
 			auto err_msg = e.what();
 			DEBUG_STRING(L"nats_client::send_payload() error: {}"sv, detail::to_utf16(err_msg));
+		}
+	}
+
+	void nats_client::sync_files()
+	{
+		try
+		{
+			auto dir_informations = freeze::detail::get_dirtree_info(_sync_path, _sync_igonres);
+			for (auto info : dir_informations)
+			{
+				pimpl->publish_file(info.file_path, info.file_name);
+			}
+		}
+		catch (const std::exception&)
+		{
+
 		}
 	}
 
@@ -1427,7 +1508,7 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::command_handle_result(): will modify-folder={}!\n"sv, folder);
 			if (!folder.empty())
 			{
-				if (fs::exists(fs::path{folder}))
+				if (fs::exists(fs::path{ folder }))
 				{
 					// TODO: maybe need lock
 					if (detail::save_latest_folder(folder))
@@ -1460,7 +1541,7 @@ namespace freeze
 
 		g_cmd_response = cmd_name;
 		DEBUG_STRING(L"nats_client::command_handle_result(): response command is: {}!\n"sv, detail::to_utf16(g_cmd_response));
-		
+
 		// g_cmd_response_signal.notify();
 		// g_cmd_response_signal.reset();
 		// DEBUG_STRING(L"nats_client::command_handle_result(): g_cmd_response_signal notified.\n");
@@ -1474,8 +1555,8 @@ namespace freeze
 		stop_threads();
 
 		_msg_thread_running = true;
-		_msg_thread = std::thread([](auto &&self)
-								  {
+		_msg_thread = std::thread([](auto&& self)
+			{
 				DEBUG_STRING(L"[nats_client] message thread: starting ...\n");
 				while (true)
 				{
@@ -1496,11 +1577,11 @@ namespace freeze
 					self_ptr->message_response();
 				}
 				DEBUG_STRING(L"[nats_client] message thread: stopped.\n"); },
-								  this);
+			this);
 
 		_cmd_thread_running = true;
-		_cmd_thread = std::thread([](auto &&self)
-								  {
+		_cmd_thread = std::thread([](auto&& self)
+			{
 				DEBUG_STRING(L"[nats_client] command thread: starting ...\n");
 				while (true)
 				{
@@ -1521,11 +1602,11 @@ namespace freeze
 					self_ptr->command_handle_result();
 				}
 				DEBUG_STRING(L"[nats_client] command thread: stopped.\n"); },
-								  this);
+			this);
 
 		_pal_thread_running = true;
-		_pal_thread = std::thread([](auto &&self)
-								  {
+		_pal_thread = std::thread([](auto&& self)
+			{
 				DEBUG_STRING(L"[nats_client] payload thread: starting ...\n");
 				while (true)
 				{
@@ -1546,7 +1627,32 @@ namespace freeze
 					self_ptr->send_payload();
 				}
 				DEBUG_STRING(L"[nats_client] payload thread: stopped.\n"); },
-								  this);
+			this);
+
+		_syn_thread_running = true;
+		_syn_thread = std::thread([](auto&& self)
+			{
+				DEBUG_STRING(L"[nats_client] synfile thread: starting ...\n");
+				while (true)
+				{
+					auto self_ptr = reinterpret_cast<nats_client*>(self);
+					if (!self_ptr)
+					{
+						DEBUG_STRING(L"[nats_client] synfile thread: self_ptr=null, stopping ...\n");
+						break;
+					}
+					DEBUG_STRING(L"[nats_client] synfile thread: waiting...\n");
+					self_ptr->_synfile_signal.wait();
+					DEBUG_STRING(L"[nats_client] synfile thread: _synfile_signal wait ready.\n");
+					if (!(self_ptr->_syn_thread_running))
+					{
+						DEBUG_STRING(L"[nats_client] synfile thread: running=false, stopping ....\n");
+						break;
+					}
+					self_ptr->sync_files();
+				}
+				DEBUG_STRING(L"[nats_client] synfile thread: stopped.\n"); },
+			this);
 	}
 
 	void nats_client::stop_threads()
@@ -1582,6 +1688,17 @@ namespace freeze
 			if (_pal_thread.joinable())
 			{
 				_pal_thread.join();
+			}
+		}
+
+		if (_syn_thread_running)
+		{
+			_syn_thread_running = false;
+			_synfile_signal.notify();
+			// _payload_signal.reset();
+			if (_syn_thread.joinable())
+			{
+				_syn_thread.join();
 			}
 		}
 		DEBUG_STRING(L"nats_client::stop_threads(): all thread stopped.\n");

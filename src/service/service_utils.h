@@ -10,10 +10,12 @@
 #include <utility>
 #include <filesystem>
 #include <tuple>
+#include <regex>
 
 namespace fs = std::filesystem;
 using namespace std::literals;
 using volume_type = std::tuple<std::string, std::string, std::string>;
+//using disk_type = std::tuple<std::string, std::string>;
 
 inline constexpr auto EMPTY_IP = static_cast<uint32_t>(-1);
 inline constexpr auto BAD_LEN_IP = static_cast<uint32_t>(-2);
@@ -81,11 +83,23 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
+	struct tree_information
+	{
+		std::string file_path;
+		std::string file_name;
+		uint64_t file_size; // bytes
+	};
+}
+
+namespace freeze::detail
+{
 	std::vector<std::string> get_harddisks();
+	std::vector<std::string> get_harddisks_ex();
 	std::vector<std::string> get_harddisk_names();
 	std::vector<volume_type> get_volume_names();
 	std::vector<std::string> get_directories_without_subdir(fs::path const&);
 	std::vector<std::string> get_files_without_subdir(fs::path const&);
+	std::vector<tree_information> get_dirtree_info(fs::path const&, std::vector<fs::path> const&);
 }
 
 #endif

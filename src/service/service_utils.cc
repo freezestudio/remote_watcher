@@ -4,7 +4,7 @@
 
 namespace freeze::detail
 {
-	std::string to_utf8(const wchar_t *wcs, int length)
+	std::string to_utf8(const wchar_t* wcs, int length)
 	{
 		// ccWideChar (characters), if string is null-terminated, can be set to -1
 		// ccWideChar, if set to -1, function result including the terminating null character.
@@ -16,12 +16,12 @@ namespace freeze::detail
 		return str;
 	}
 
-	std::string to_utf8(std::wstring const &wcs)
+	std::string to_utf8(std::wstring const& wcs)
 	{
 		return to_utf8(wcs.c_str(), (int)wcs.size());
 	}
 
-	std::wstring to_utf16(std::string const &mbs)
+	std::wstring to_utf16(std::string const& mbs)
 	{
 		// cbMultiByte (bytes), if string is null-terminated, can be set to -1
 		// cchWideChar (characters), if this value is 0, function return the required buffer size, including terminating null character.
@@ -35,7 +35,7 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
-	uint32_t make_ip_address(std::wstring const &ip)
+	uint32_t make_ip_address(std::wstring const& ip)
 	{
 		if (ip.empty())
 		{
@@ -92,7 +92,7 @@ namespace freeze::detail
 		auto ip1 = (((ip) >> 24) & 0xff);
 		auto ip2 = (((ip) >> 16) & 0xff);
 		auto ip3 = (((ip) >> 8) & 0xff);
-		auto ip4 = ((ip)&0xff);
+		auto ip4 = ((ip) & 0xff);
 		return std::format("{}.{}.{}.{}"sv, ip1, ip2, ip3, ip4).c_str();
 	}
 
@@ -104,17 +104,17 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
-	fs::path to_normal(fs::path const &path)
+	fs::path to_normal(fs::path const& path)
 	{
 		return path.lexically_normal();
 	}
 
-	bool check_exists(fs::path const &path)
+	bool check_exists(fs::path const& path)
 	{
 		return !path.empty() && fs::exists(path);
 	}
 
-	bool normal_check_exists(fs::path const &path)
+	bool normal_check_exists(fs::path const& path)
 	{
 		return check_exists(to_normal(path));
 	}
@@ -176,18 +176,18 @@ namespace freeze::detail
 			return true;
 		}
 
-		if (wchar_t *pBuffer = nullptr;
+		if (wchar_t* pBuffer = nullptr;
 			FormatMessage(
 				FORMAT_MESSAGE_FROM_SYSTEM |		//
-					FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
-					FORMAT_MESSAGE_ALLOCATE_BUFFER, //
+				FORMAT_MESSAGE_IGNORE_INSERTS | // dwFlags
+				FORMAT_MESSAGE_ALLOCATE_BUFFER, //
 				nullptr,							// lpSource
 				status,								// dwMessageId
 				0,									// dwLanguageId
-				(wchar_t *)&pBuffer,				// lpBuffer
+				(wchar_t*)&pBuffer,				// lpBuffer
 				0,									// nSize
 				nullptr								// Arguments
-				) > 0)
+			) > 0)
 		{
 			if (fn)
 			{
@@ -232,7 +232,7 @@ namespace freeze::detail
 		return value;
 	}
 
-	bool save_latest_folder(std::wstring const &folder)
+	bool save_latest_folder(std::wstring const& folder)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
@@ -263,7 +263,7 @@ namespace freeze::detail
 		return std::wstring(value, value_len);
 	}
 
-	bool save_latest_ignores(std::vector<std::wstring> const &ignores)
+	bool save_latest_ignores(std::vector<std::wstring> const& ignores)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
@@ -317,7 +317,7 @@ namespace freeze::detail
 		return ignores;
 	}
 
-	bool save_token(std::wstring const &token)
+	bool save_token(std::wstring const& token)
 	{
 		freeze::reg_key regkey;
 		auto status = regkey.Create(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
@@ -351,53 +351,10 @@ namespace freeze::detail
 
 namespace freeze::detail
 {
-	std::vector<std::string> get_harddisks()
-	{
-		auto bitmask = GetLogicalDrives();
-		auto bit_true_size = std::popcount(bitmask);
-		constexpr auto disk_count = 'Z' + 1 - 'A';
-		std::bitset<disk_count> bset(bitmask);
-
-		std::vector<std::string> disks;
-		auto idx = 0x41; // 'A'
-		for (auto i = 0; i < disk_count; ++i)
-		{
-			if (bset[i])
-			{
-				disks.emplace_back(std::string{static_cast<char>(idx)});
-			}
-			idx++;
-		}
-		return disks;
-	}
-
-	std::vector<std::string> get_harddisk_names()
-	{
-		auto bitmask = GetLogicalDrives();
-		auto disk_count = std::popcount(bitmask);
-
-		std::unique_ptr<wchar_t[]> buffer = std::make_unique<wchar_t[]>(1);
-		auto need_len = GetLogicalDriveStrings(1, buffer.get());
-		buffer = std::make_unique<wchar_t[]>(need_len + 1);
-		need_len = GetLogicalDriveStrings(need_len + 1, buffer.get());
-
-		std::vector<std::string> disk_names;
-		auto name = buffer.get();
-		for (auto i = 0; i < disk_count; ++i)
-		{
-			auto wcs = std::wstring(name);
-			auto mbs = to_utf8(wcs);
-			disk_names.push_back(mbs);
-			while (*name++ != L'\0')
-				;
-		}
-		return disk_names;
-	}
-
-	std::string _drive_type(UINT dt)
+	std::string _drive_type(UINT drive_type)
 	{
 		std::string type_name;
-		switch (dt)
+		switch (drive_type)
 		{
 		default:
 			break;
@@ -424,6 +381,77 @@ namespace freeze::detail
 			break;
 		}
 		return type_name;
+	}
+
+	std::vector<std::string> get_harddisks()
+	{
+		auto bitmask = GetLogicalDrives();
+		auto bit_true_size = std::popcount(bitmask);
+		constexpr auto disk_count = 'Z' + 1 - 'A';
+		std::bitset<disk_count> bset(bitmask);
+
+		std::vector<std::string> disks;
+		auto idx = 0x41; // 'A'
+		for (auto i = 0; i < disk_count; ++i)
+		{
+			if (bset[i])
+			{
+				disks.emplace_back(std::string{ static_cast<char>(idx) });
+			}
+			idx++;
+		}
+		return disks;
+	}
+
+	std::vector<std::string> get_harddisks_ex()
+	{
+		auto bitmask = GetLogicalDrives();
+		auto disk_count = std::popcount(bitmask);
+
+		std::unique_ptr<wchar_t[]> buffer = std::make_unique<wchar_t[]>(1);
+		auto need_len = GetLogicalDriveStrings(1, buffer.get());
+		buffer = std::make_unique<wchar_t[]>(need_len + 1);
+		need_len = GetLogicalDriveStrings(need_len + 1, buffer.get());
+
+		std::vector<std::string> disk_names;
+		auto name = buffer.get();
+		for (auto i = 0; i < disk_count; ++i)
+		{
+			auto wcs = std::wstring(name);
+			auto drive_type = GetDriveType(wcs.c_str());
+			if (drive_type == DRIVE_FIXED)
+			{
+				auto mbs = to_utf8(wcs.substr(0, 1));
+				disk_names.push_back(mbs);
+			}
+
+			while (*name++ != L'\0')
+				;
+		}
+		return disk_names;
+	}
+
+	std::vector<std::string> get_harddisk_names()
+	{
+		auto bitmask = GetLogicalDrives();
+		auto disk_count = std::popcount(bitmask);
+
+		std::unique_ptr<wchar_t[]> buffer = std::make_unique<wchar_t[]>(1);
+		auto need_len = GetLogicalDriveStrings(1, buffer.get());
+		buffer = std::make_unique<wchar_t[]>(need_len + 1);
+		need_len = GetLogicalDriveStrings(need_len + 1, buffer.get());
+
+		std::vector<std::string> disk_names;
+		auto name = buffer.get();
+		for (auto i = 0; i < disk_count; ++i)
+		{
+			auto wcs = std::wstring(name);
+			auto mbs = to_utf8(wcs);
+			disk_names.push_back(mbs);
+			while (*name++ != L'\0')
+				;
+		}
+		return disk_names;
 	}
 
 	std::vector<volume_type> get_volume_names()
@@ -476,7 +504,7 @@ namespace freeze::detail
 		return volume_type_names;
 	}
 
-	std::vector<std::string> get_directories_without_subdir(fs::path const &root)
+	std::vector<std::string> get_directories_without_subdir(fs::path const& root)
 	{
 		std::vector<std::string> folders;
 		if (root.empty() || !fs::exists(root))
@@ -484,8 +512,8 @@ namespace freeze::detail
 			return folders;
 		}
 
-		fs::directory_iterator iter{root};
-		for (auto const &p : iter)
+		fs::directory_iterator iter{ root };
+		for (auto const& p : iter)
 		{
 			if (p.is_directory())
 			{
@@ -497,7 +525,7 @@ namespace freeze::detail
 		return folders;
 	}
 
-	std::vector<std::string> get_files_without_subdir(fs::path const &root)
+	std::vector<std::string> get_files_without_subdir(fs::path const& root)
 	{
 		std::vector<std::string> folders;
 		if (root.empty() || !fs::exists(root))
@@ -505,8 +533,8 @@ namespace freeze::detail
 			return folders;
 		}
 
-		fs::directory_iterator iter{root};
-		for (auto const &p : iter)
+		fs::directory_iterator iter{ root };
+		for (auto const& p : iter)
 		{
 			if (p.is_regular_file())
 			{
@@ -516,5 +544,55 @@ namespace freeze::detail
 			}
 		}
 		return folders;
+	}
+
+	std::vector<tree_information> get_dirtree_info(fs::path const& root, std::vector<fs::path> const& ignores)
+	{
+		std::vector<tree_information> tree;
+		if (root.empty() || !fs::exists(root))
+		{
+			return tree;
+		}
+
+		auto is_include = [](auto vec, auto p) {
+			for (auto i : vec)
+			{
+				if (i == p)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+		auto equals = [](auto path_like) {
+			std::regex suf("\\.(tif{1,2}|dcm)$", std::regex::ECMAScript | std::regex::icase);
+			return std::regex_search(path_like, suf);
+		};
+
+		fs::recursive_directory_iterator iter{ root };
+		for (auto const& it : iter) {
+			if (is_include(ignores, it.path()))
+			{
+				iter.disable_recursion_pending();
+			}
+			auto _path = it.path();
+
+			auto mbs_path = to_utf8(_path.c_str());
+			//std::cout << iter.depth() << ": path=" << mbs_path << std::endl;
+
+			if (it.is_regular_file())
+			{
+				if (equals(mbs_path))
+				{
+					auto path_name = to_utf8(_path.parent_path().c_str());
+					auto file_name = to_utf8(_path.filename().c_str());
+					auto file_size = it.file_size();
+					auto info = tree_information{ path_name, file_name, file_size };
+					tree.emplace_back(info);
+				}
+			}
+		}
+		return tree;
 	}
 }
