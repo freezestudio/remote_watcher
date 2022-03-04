@@ -319,12 +319,16 @@ DWORD __stdcall _SleepThread(LPVOID)
 			// if reason is folder changed event emitted.
 			freeze::maybe_send_payload(g_nats_client, g_work_folder);
 			break;
-		// response command
-		case sync_reason_cmd_error:
-			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_error(-2).\n");
+		case sync_reason_send_synfile:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_send_synfile(6).\n");
+			freeze::maybe_send_synfile(g_nats_client);
 			break;
-		case sync_reason_cmd_empty:
-			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_empty(10).\n");
+		// response command
+		case sync_reason_cmd__error:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd__error(-2).\n");
+			break;
+		case sync_reason_cmd__empty:
+			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd__empty(10).\n");
 			break;
 		case sync_reason_cmd_folder:
 			DEBUG_STRING(L"@rg SleepThread: Wakeup: sync_reason_cmd_folder(11).\n");

@@ -123,9 +123,10 @@ constexpr auto sync_reason_recv_message = 2L;
 constexpr auto sync_reason_send_command = 3L;
 constexpr auto sync_reason_send_message = 4L;
 constexpr auto sync_reason_send_payload = 5L;
+constexpr auto sync_reason_send_synfile = 6L;
 
-constexpr auto sync_reason_cmd_error = -2L;
-constexpr auto sync_reason_cmd_empty = 10L;
+constexpr auto sync_reason_cmd__error = -2L;
+constexpr auto sync_reason_cmd__empty = 10L;
 constexpr auto sync_reason_cmd_folder = 11L;
 constexpr auto sync_reason_cmd_igonre = 12L;
 
@@ -149,6 +150,16 @@ constexpr std::wstring reason_string(long reason)
 		return L"SendMessage"s;
 	case sync_reason_send_payload:
 		return L"SendPayload"s;
+	case sync_reason_send_synfile:
+		return L"SendSyncFile"s;
+	case sync_reason_cmd__error:
+		return L"CommandError"s;
+	case sync_reason_cmd__empty:
+		return L"CommandEmpty"s;
+	case sync_reason_cmd_folder:
+		return L"CommandFolder"s;
+	case sync_reason_cmd_igonre:
+		return L"CommandIgnore"s;
 	}
 	return {};
 }

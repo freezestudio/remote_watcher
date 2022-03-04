@@ -15,6 +15,11 @@ namespace freeze
 		nc.notify_payload(root);
 	}
 
+	void maybe_send_synfile(nats_client& nc)
+	{
+		nc.notify_files();
+	}
+
 	void maybe_response_command(nats_client &nc)
 	{
 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
