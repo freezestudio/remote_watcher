@@ -881,7 +881,7 @@ namespace freeze::detail
 			DEBUG_STRING(L"_nats_connect::publish_file(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
 			// std::lock_guard<std::mutex> lock(_mutex);
 
-			_nats_msg data_msg{synfile_channel.data()};
+			_nats_msg data_msg{synfile_send_channel.data()};
 
 			uint8_t *buffer = nullptr;
 			uintmax_t buffer_size = 0;
@@ -910,7 +910,7 @@ namespace freeze::detail
 
 			// try test reply message
 			// response = {name, size, result: true}
-			
+
 			delete[] buffer;
 			return ok;
 		}
@@ -926,6 +926,32 @@ namespace freeze::detail
 			_nats_sub _sub{static_cast<natsSubscription *>(nullptr)};
 			auto status = natsConnection_Subscribe(
 				_sub.put(), _nc, message_recv_channel.data(),
+				[](natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
+				{
+					_nats_msg m{msg};
+					auto self = reinterpret_cast<_nats_connect *>(closure);
+					// TODO: maybe need read/write lock
+					g_current_message = m.get_msg();
+					if (!g_current_message.empty())
+					{
+						self->on_recv_message(g_current_message);
+					}
+				},
+				this);
+			return status == NATS_OK;
+		}
+
+		bool subject_syncfile_message()
+		{
+			if (!_nc)
+			{
+				DEBUG_STRING(L"_nats_connect::subject_syncfile_message: error [nc] is null.\n");
+				return false;
+			}
+
+			_nats_sub _sub{static_cast<natsSubscription *>(nullptr)};
+			auto status = natsConnection_Subscribe(
+				_sub.put(), _nc, synfile_recv_channel.data(),
 				[](natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
 				{
 					_nats_msg m{msg};
@@ -1263,6 +1289,7 @@ namespace freeze
 			// TODO: fix if return false
 			pimpl->subject_command();
 			pimpl->subject_recv_message();
+			pimpl->subject_syncfile_message();
 		}
 		else
 		{

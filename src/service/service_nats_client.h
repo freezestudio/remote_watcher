@@ -91,7 +91,7 @@ namespace freeze::detail
 			auto iiter = j.find("ignores");
 			if (iiter != j.end())
 			{
-				for (auto s : j["ignores"])
+				for (auto const& s : j["ignores"])
 				{
 					ignores.push_back(s);
 				}
@@ -172,7 +172,7 @@ namespace freeze::detail
 		//   {{"file_path","path-b"}, {"file_name", "name-b"}, {"file_size", 22}},
 		// };
 		jt["info"] = json::array();
-		for (auto _i : vec_info)
+		for (auto const& _i : vec_info)
 		{
 			jt["info"].push_back(json::object({{"file_path", _i.file_path}, {"file_name", _i.file_name}, {"file_size", _i.file_size}}));
 		}
@@ -310,7 +310,8 @@ namespace freeze
 	constexpr auto message_send_channel = "message-channel-2"sv;
 	constexpr auto command_channel = "command-channel"sv;
 	constexpr auto payload_channel = "payload-channel"sv;
-	constexpr auto synfile_channel = "synfile-channel"sv;
+	constexpr auto synfile_recv_channel = "synfile-channel-1"sv;
+	constexpr auto synfile_send_channel = "synfile-channel-2"sv;
 	constexpr auto json_type = "json"sv;
 	constexpr auto data_type = "data"sv; // unused
 	constexpr auto text_type = "text"sv;
