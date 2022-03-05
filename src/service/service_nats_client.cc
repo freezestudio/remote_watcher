@@ -3,7 +3,6 @@
 //
 #include <atomic>
 
-#include "service_utils.h"
 #include "service_watch_tree.h"
 #include "service_nats_client.h"
 
@@ -1180,6 +1179,7 @@ namespace freeze::detail
 			// NATS_NO_SERVER
 			if (status != NATS_OK)
 			{
+				// NATS_NO_SERVER 6
 				DEBUG_STRING(L"_nats_connect::_connect: error {}.\n"sv, static_cast<uint32_t>(status));
 			}
 

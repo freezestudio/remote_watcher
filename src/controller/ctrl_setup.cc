@@ -347,6 +347,9 @@ bool start_service(LPCWSTR ip)
 		return false;
 	}
 
+	// auto success = start_transport();
+	// if(!success) ...
+
 	// open service
 	auto hsc = ::OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
@@ -544,6 +547,9 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 		}
 		return false;
 	}
+
+	// auto success = stop_transport();
+	// if(!success) ...
 
 	// query current service status
 	SERVICE_STATUS sstatus;

@@ -68,6 +68,8 @@ if(SERVICE_BUILD_TYPE)
                 "api-ms-win-crt-utility-l1-1-0.dll"
                 "api-ms-win-crt-environment-l1-1-0.dll"
                 "api-ms-win-crt-time-l1-1-0.dll"
+                "rgmsvtp.exe"
+                "rgmsvtp.cfg"
                 # more ...
         COMMAND ${CMAKE_COMMAND} -E rm -f 
             "${PROJECT_SOURCE_DIR}/tools/${SERVICE_EXE_NAME}"

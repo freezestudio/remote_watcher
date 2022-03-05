@@ -24,6 +24,9 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 		return;
 	}
 
+	// TODO: check tp-process running.
+	// ...
+
 	if (!nc_ptr->is_connected())
 	{
 		auto _ip = reset_ip_address();

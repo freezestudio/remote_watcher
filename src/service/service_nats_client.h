@@ -3,6 +3,7 @@
 
 #include "common_dep.h"
 #include "service_dep.h"
+#include "service_utils.h"
 
 #include "nats.h"
 #include "json.hpp"
@@ -310,7 +311,7 @@ namespace freeze
 	constexpr auto message_send_channel = "message-channel-2"sv;
 	constexpr auto command_channel = "command-channel"sv;
 	constexpr auto payload_channel = "payload-channel"sv;
-	constexpr auto synfile_recv_channel = "synfile-channel-1"sv;
+	constexpr auto synfile_recv_channel = "synfile-channel-1"sv; // note: need exchange client channel
 	constexpr auto synfile_send_channel = "synfile-channel-2"sv;
 	constexpr auto json_type = "json"sv;
 	constexpr auto data_type = "data"sv; // unused

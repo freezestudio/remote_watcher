@@ -56,7 +56,7 @@ bool init_service()
     return true;
 }
 
-void run_service()
+void loop_service()
 {
 #ifndef SERVICE_TEST
 	// service running

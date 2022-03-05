@@ -12,7 +12,7 @@
 #include "service_thread_timer.h"
 
 bool init_service();
-void run_service();
+void loop_service();
 void stop_service();
 bool update_status(SERVICE_STATUS_HANDLE, DWORD, DWORD = NO_ERROR);
 DWORD __stdcall handler_proc_ex(DWORD dwControl, DWORD, LPVOID, LPVOID);
