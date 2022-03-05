@@ -11,9 +11,6 @@
 //
 
 /* extern */
-HANDLE g_process_handle = nullptr;
-
-/* extern */
 std::wstring g_wcs_ip{};
 
 int64_t reset_ip_address(std::wstring const& wcs_ip)
@@ -119,9 +116,6 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	DEBUG_STRING(L"@rg ServiceMain: Service Starting ...\n");
 	if (init_service())
 	{
-		g_process_handle = start_process();
-		DEBUG_STRING(L"@rg ServiceMain: Start Transport Handle={}.\n"sv, reinterpret_cast<int>(g_process_handle));
-
 		int64_t remote_ip = 0;
 		if (argc > 1)
 		{
@@ -154,12 +148,6 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 
 			DEBUG_STRING(L"@rg ServiceMain: Sevice will stopping ...\n");
 			stop_threadpool();
-			if(g_process_handle)
-			{
-				stop_process(g_process_handle);
-				g_process_handle = nullptr;
-				DEBUG_STRING(L"@rg ServiceMain: Transport stopped.\n");
-			}
 			stop_service();
 		}
 		else

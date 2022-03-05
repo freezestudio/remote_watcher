@@ -7,8 +7,6 @@
 
 #include "service_dep.h"
 
-#define MT_NAME L"rgmsvtp"
-
 //do not setup service, then test service.
  //#define SERVICE_TEST
 
@@ -23,10 +21,6 @@ extern std::vector<fs::path> g_work_ignore_folders;
 void reset_work_folder(bool notify = false);
 int64_t reset_ip_address(std::wstring const& = {});
 std::wstring reset_ip_error(int64_t);
-
-extern HANDLE g_process_handle;
-HANDLE start_process();
-bool stop_process(HANDLE handle);
 
 #ifndef SERVICE_TEST
 freeze::service_state get_service_status();
