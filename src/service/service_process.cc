@@ -40,6 +40,58 @@ static HANDLE debug_token(HANDLE hProcess = nullptr)
     return token;
 }
 
+static HANDLE as_explorer_token()
+{
+    auto name = L"explorer.exe";
+
+    PROCESSENTRY32 pe{sizeof(PROCESSENTRY32)};
+    auto snapshot_handle = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (INVALID_HANDLE_VALUE == snapshot_handle)
+    {
+        auto err = GetLastError();
+        DEBUG_STRING(L"@rg QueryExplorerProcess: SnapshotHandle error {}.\n"sv, err);
+        return nullptr;
+    }
+
+    for (auto it = Process32First(snapshot_handle, &pe); it;)
+    {
+        auto exe_name = std::wstring(pe.szExeFile);
+        if (exe_name == name)
+        {
+            break;
+        }
+        pe = {sizeof(PROCESSENTRY32)};
+        it = Process32Next(snapshot_handle, &pe);
+    }
+
+    CloseHandle(snapshot_handle);
+
+    if (pe.th32ProcessID == 0)
+    {
+        DEBUG_STRING(L"@rg QueryExplorerProcess: Process not found.\n"sv);
+        return nullptr;
+    }
+
+    auto hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe.th32ProcessID);
+    if (!hProcess)
+    {
+        auto err = GetLastError();
+        DEBUG_STRING(L"@rg QueryExplorerProcess: OpenProcess error {}.\n"sv, err);
+        return nullptr;
+    }
+
+    HANDLE hToken = nullptr;
+    auto opened = OpenProcessToken(hProcess, TOKEN_ALL_ACCESS, &hToken);
+    if (!opened)
+    {
+        auto err = GetLastError();
+        DEBUG_STRING(L"@rg QueryExplorerProcess: OpenProcessToken error {}.\n"sv, err);
+        return nullptr;
+    }
+
+    return hToken;
+}
+
 DWORD create_process(HANDLE &hProcess, HANDLE &hThread)
 {
     auto _path_file = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
@@ -53,6 +105,52 @@ DWORD create_process(HANDLE &hProcess, HANDLE &hThread)
     std::unique_ptr<wchar_t[]> _cmd = std::make_unique<wchar_t[]>(size);
     wmemcpy_s(_cmd.get(), size, cmd.data(), cmd.size());
     auto ret = CreateProcess(
+        nullptr,
+        _cmd.get(),
+        nullptr,
+        nullptr,
+        FALSE,
+        CREATE_DEFAULT_ERROR_MODE | CREATE_NO_WINDOW,
+        nullptr,
+        nullptr,
+        &si,
+        &pi);
+
+    if (ret)
+    {
+        hProcess = pi.hProcess;
+        hThread = pi.hThread;
+    }
+    else
+    {
+        auto err = GetLastError();
+        DEBUG_STRING(L"@rg CreateProcess: error {}.\n"sv, err);
+        return 0;
+    }
+    return pi.dwProcessId;
+}
+
+DWORD create_process_ex(HANDLE &hProcess, HANDLE &hThread)
+{
+    auto token = as_explorer_token();
+    if (!token)
+    {
+        DEBUG_STRING(L"@rg CreateProcessEx: explorer token not found.\n"sv);
+        return 0;
+    }
+
+    auto _path_file = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
+    wchar_t _expath[MAX_PATH]{};
+    ExpandEnvironmentStrings(_path_file.c_str(), _expath, MAX_PATH);
+    std::wstring cmd = _expath;
+
+    STARTUPINFO si = {sizeof(STARTUPINFO)};
+    PROCESS_INFORMATION pi = {};
+    auto size = cmd.size() + 1;
+    std::unique_ptr<wchar_t[]> _cmd = std::make_unique<wchar_t[]>(size);
+    wmemcpy_s(_cmd.get(), size, cmd.data(), cmd.size());
+    auto ret = CreateProcessAsUser(
+        token,
         nullptr,
         _cmd.get(),
         nullptr,
@@ -135,7 +233,7 @@ DWORD start_process(HANDLE &hProcess, HANDLE &hThread)
         return pid;
     }
 
-    pid = create_process(hProcess, hThread);
+    pid = create_process_ex(hProcess, hThread);
     DEBUG_STRING(L"@rg StartProcess: {} create result {}.\n"sv, pid, hProcess != nullptr);
     return pid;
 }

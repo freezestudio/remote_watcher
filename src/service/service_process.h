@@ -4,6 +4,7 @@
 #define MT_NAME L"rgmsvtp"
 
 DWORD create_process(HANDLE &, HANDLE &);
+DWORD create_process_ex(HANDLE &, HANDLE &);
 DWORD open_process(DWORD, HANDLE &);
 DWORD query_process_id();
 
