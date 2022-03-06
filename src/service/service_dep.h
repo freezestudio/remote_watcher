@@ -6,6 +6,7 @@
 
 #include <thread>
 #include <mutex>
+#include <future>
 #include <atomic>
 #include <vector>
 #include <unordered_map>

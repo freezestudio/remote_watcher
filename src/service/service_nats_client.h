@@ -300,9 +300,7 @@ namespace freeze::detail
 	}
 }
 
-// wait for command response value
-// extern freeze::atomic_sync g_cmd_response_signal;
-// command response value
+// extern command response value
 extern std::string g_cmd_response;
 
 namespace freeze
@@ -334,7 +332,7 @@ namespace freeze
 		void notify_message();
 		void notify_command();
 		void notify_payload(fs::path const &);
-		void notify_files();
+		void notify_synfiles();
 
 	public:
 		void send_payload();

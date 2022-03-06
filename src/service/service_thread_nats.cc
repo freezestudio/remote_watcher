@@ -5,50 +5,58 @@ namespace freeze
 {
 	void maybe_send_message(nats_client &nc)
 	{
-		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() ...\n");
-		nc.notify_message();
+		auto fut = std::async(std::launch::async, [&]() {
+			if (!nc.is_connected())
+			{
+				DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() nc not connected.\n");
+				return;
+			}
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() run ...\n");
+			nc.notify_message();
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_message() done.\n"); 
+		});
 	}
 
 	void maybe_send_payload(nats_client &nc, fs::path const &root)
 	{
-		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() ...\n");
-		nc.notify_payload(root);
+		auto fut = std::async(std::launch::async, [&]() {
+			if (!nc.is_connected())
+			{
+				DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() nc not connected.\n");
+				return;
+			}
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() run ...\n");
+			nc.notify_payload(root);
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_payload() done.\n");
+		});
 	}
 
-	void maybe_send_synfile(nats_client& nc)
+	void maybe_send_synfile(nats_client &nc)
 	{
-		nc.notify_files();
+		auto fut = std::async(std::launch::async, [&]() {
+			if (!nc.is_connected())
+			{
+				DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_synfile() nc not connected.\n");
+				return;
+			}
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_synfile() run ...\n");
+			nc.notify_synfiles();
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_send_synfile() done.\n");
+		});
 	}
 
 	void maybe_response_command(nats_client &nc)
 	{
-		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): ...\n");
-
-		g_cmd_response = {};
-		nc.notify_command();
-
-		// error: want wait, but failure.
-		// g_cmd_response_signal.wait();
-
-		// test only
-		// char msg[256] = {};
-		// sprintf_s(msg, "@rg Service-Thread-nats: maybe_response_command(): g_cmd_response_signal wait ready, response=%s, or null\n", g_cmd_response.c_str());
-		// OutputDebugStringA(msg);
-
-		// if (g_cmd_response == CMD_FOLDER)
-		// {
-		// 	DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): try reset work folder...\n");
-		// 	reset_work_folder(true);
-		// }
-		// else if (g_cmd_response == CMD_IGNORE)
-		// {
-		// }
-		// else
-		// {
-		// 	// empty.
-		// }
-
-		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command(): done.\n");
+		auto fut = std::async(std::launch::async, [&]() {
+			if (!nc.is_connected())
+			{
+				DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() nc not connected.\n");
+				return;
+			}
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() run ...\n");
+			nc.notify_command();
+			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() done.\n");
+		});
 	}
 }
 

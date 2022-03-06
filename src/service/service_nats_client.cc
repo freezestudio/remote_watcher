@@ -23,8 +23,6 @@ freeze::detail::nats_cmd g_current_command;
 std::string g_current_message;
 
 // extern
-// freeze::atomic_sync g_cmd_response_signal{};
-// extern
 std::string g_cmd_response = std::string{};
 
 namespace freeze::detail
@@ -1316,9 +1314,8 @@ namespace freeze
 	{
 		// notify message-thread resume.
 		_message_signal.notify();
-		// _message_signal.reset();
-
 		DEBUG_STRING(L"nats_client::notify_message(): message-thread notified!\n");
+		
 		// should, next call nats_client::message_response().
 		// should, SleepThread wait.
 	}
@@ -1327,29 +1324,27 @@ namespace freeze
 	{
 		// notify command-thread resume.
 		_command_signal.notify();
-		// _command_signal.reset();
 		DEBUG_STRING(L"nats_client::notify_command(): command-thread notified!\n");
 
-		// DEBUG_STRING(L"nats_client::notify_command(): _cmd_response_signal waiting...\n");
-		// _cmd_response_signal.wait();
-		// DEBUG_STRING(L"nats_client::notify_command(): _cmd_response_signal wait ready.\n");
+		// should, next call nats_client::command_handle_result().
+		// should, SleepThread wait.
 	}
 
 	void nats_client::notify_payload(fs::path const &root)
 	{
-		_watch_path = root;
 		// notify payload-thread resume.
+		_watch_path = root;
 		_payload_signal.notify();
-		// _payload_signal.reset();
-
 		DEBUG_STRING(L"nats_client::notify_payload(): payload-thread notified!\n");
+
 		// should, next call nats_client::send_payload().
 		// should, SleepThread wait.
 	}
 
-	void nats_client::notify_files()
+	void nats_client::notify_synfiles()
 	{
 		_synfile_signal.notify();
+		DEBUG_STRING(L"nats_client::notify_synfiles(): synfile-thread notified!\n");
 
 		// should, next call nats_client::sync_files().
 		// should, SleepThread wait.
@@ -1519,10 +1514,6 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::command_handle_result(): command is empty!\n");
 			g_cmd_response = {};
 
-			// g_cmd_response_signal.notify();
-			// g_cmd_response_signal.reset();
-			// DEBUG_STRING(L"nats_client::command_handle_result(): response empty, g_cmd_response_signal notified.\n");
-
 			global_reason_signal.notify_reason(sync_reason_cmd__empty);
 			DEBUG_STRING(L"nats_client::command_handle_result(): response empty, global_reason_signal notified.\n");
 			return;
@@ -1578,10 +1569,6 @@ namespace freeze
 
 		g_cmd_response = cmd_name;
 		DEBUG_STRING(L"nats_client::command_handle_result(): response command is: {}!\n"sv, detail::to_utf16(g_cmd_response));
-
-		// g_cmd_response_signal.notify();
-		// g_cmd_response_signal.reset();
-		// DEBUG_STRING(L"nats_client::command_handle_result(): g_cmd_response_signal notified.\n");
 
 		global_reason_signal.notify_reason(sync_reason);
 		DEBUG_STRING(L"nats_client::command_handle_result(): global_reason_signal notified {}.\n"sv, sync_reason);

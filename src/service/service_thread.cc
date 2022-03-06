@@ -260,6 +260,11 @@ DWORD __stdcall _SleepThread(LPVOID)
 		// wait until some reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: Wakeup Reason: {}.\n"sv, reason_string(reason));
+		if (reason == sync_reason_exit__thread)
+		{
+			break;
+		}
+
 #ifndef SERVICE_TEST
 		if (!is_service_running())
 		{
@@ -417,37 +422,54 @@ bool init_threadpool()
 
 void stop_threadpool()
 {
-	bb_worker_thread_exit = true;
-	auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+	DWORD ret = 0;
+
+	// stop sleep-thread
+	bb_sleep_thread_exit = true;
+	ret = QueueUserAPC([](ULONG_PTR)
+					   { global_reason_signal.notify_reason(sync_reason_exit__thread); },
+					   hh_timer_thread, 0);
 	if (ret == 0)
 	{
 		auto err = GetLastError();
-		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop failure: {}.\n", err);
+		DEBUG_STRING(L"@rg stop_threadpool(): notify SleepThread stop failure: {}.\n", err);
+		TerminateThread(hh_sleep_thread, 0);
 	}
 	else
 	{
-		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop.\n");
+		DEBUG_STRING(L"@rg stop_threadpool(): notify SleepThread stop.\n");
 	}
 
+	// stop timer-thread
 	bb_timer_thread_exit = true;
 	ret = QueueUserAPC([](ULONG_PTR) {}, hh_timer_thread, 0);
 	if (ret == 0)
 	{
 		auto err = GetLastError();
 		DEBUG_STRING(L"@rg stop_threadpool(): notify TimerThread stop failure: {}.\n", err);
+		TerminateThread(hh_timer_thread, 0);
 	}
 	else
 	{
 		DEBUG_STRING(L"@rg stop_threadpool(): notify TimerThread stop.\n");
 	}
 
-	bb_sleep_thread_exit = true;
-	// notify SleepThread run.
-	global_reason_signal.notify_reason(sync_reason_exit__thread);
-	DEBUG_STRING(L"@rg stop_threadpool(): notify SleepThread stop.\n");
+	// stop worker-thread
+	bb_worker_thread_exit = true;
+	ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+	if (ret == 0)
+	{
+		auto err = GetLastError();
+		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop failure: {}.\n", err);
+		TerminateThread(hh_worker_thread, 0);
+	}
+	else
+	{
+		DEBUG_STRING(L"@rg stop_threadpool(): notify WorkThread stop.\n");
+	}
 
-	Sleep(3000);
-	DEBUG_STRING(L"@rg stop_threadpool(): wait 3s done.\n");
+	// Sleep(3000);
+	// DEBUG_STRING(L"@rg stop_threadpool(): wait 3s done.\n");
 
 	if (hh_worker_thread)
 	{
