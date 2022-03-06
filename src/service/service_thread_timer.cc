@@ -8,6 +8,45 @@
 #include "service_process.h"
 
 DWORD _g_latest_time = 0;
+static std::wstring heartbeat(freeze::nats_client * nc_ptr, DWORD dwTimerLowValue)
+{
+	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
+	auto _timeout = static_cast<DWORD>((dwTimerLowValue - _g_latest_time) * 1e-7);
+	_g_latest_time = dwTimerLowValue;
+	DEBUG_STRING(L"@rg TimerCallback: ping duration: {}\n"sv, _timeout);
+
+	// check other threads
+	// 1. SleepThread
+	// global_reason_signal.notify_reason(sync_reason_cmd__empty);
+	test_sleep_thread();
+	// 2. WorkerThread
+	test_worker_thread();
+	
+	auto status = nc_ptr->maybe_heartbeat();
+	auto status_msg = L"ok"s;
+	if (status != 0)
+	{
+		if (status == NATS_TIMEOUT)
+		{
+			status_msg = L"timeout"s;
+		}
+		else if (status == NATS_NO_RESPONDERS)
+		{
+			status_msg = L"no responsers"s;
+		}
+		else
+		{
+			status_msg = std::to_wstring(status);
+		}
+	}
+	else
+	{
+		// empty
+	}
+
+	return status_msg;
+}
+
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
 {
 #ifndef SERVICE_TEST
@@ -65,33 +104,8 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 		}
 	}
 
-	// auto _timout = LARGE_INTEGER{ dwTimerLowValue, (LONG)dwTimerHighValue }.QuadPart;
-	auto _timeout = static_cast<DWORD>((dwTimerLowValue - _g_latest_time) * 1e-7);
-	_g_latest_time = dwTimerLowValue;
-	DEBUG_STRING(L"@rg TimerCallback: ping duration: {}\n"sv, _timeout);
-
-	auto status = nc_ptr->maybe_heartbeat();
-	auto status_msg = L"ok"s;
-	if (status != 0)
-	{
-		if (status == NATS_TIMEOUT)
-		{
-			status_msg = L"timeout"s;
-		}
-		else if (status == NATS_NO_RESPONDERS)
-		{
-			status_msg = L"no responsers"s;
-		}
-		else
-		{
-			status_msg = std::to_wstring(status);
-		}
-	}
-	else
-	{
-		// empty
-	}
-	DEBUG_STRING(L"@rg TimerCallback: service pong: {}\n"sv, status_msg);
+	auto status_msg = heartbeat(nc_ptr, dwTimerLowValue);
+	DEBUG_STRING(L"@rg TimerCallback: client pong: {}\n"sv, status_msg);
 }
 
 namespace freeze

@@ -29,10 +29,23 @@ std::vector<fs::path> g_work_ignore_folders;
 static freeze::nats_client g_nats_client{};
 
 // global signal for communicate-with-nats with reason.
+/* extern */
 freeze::atomic_sync_reason global_reason_signal{};
-
+/* extern */
+long global_reason_worker{0L};
 /*extern*/
 fs::path g_work_folder;
+
+void test_sleep_thread()
+{
+
+}
+
+void test_worker_thread()
+{
+
+}
+
 void reset_work_folder(bool notify /* = false */)
 {
 	// TODO: maybe need lock
@@ -119,6 +132,12 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
+		if (global_reason_worker == work_reason_act__empty)
+		{
+			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, maybe heartbeat reason.\n");
+			continue;
+		}
+
 		// task: change watch folder
 		if (freeze::detail::check_exists(g_work_folder))
 		{
@@ -141,6 +160,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 	return 0;
 }
 
+// timer thread.
 DWORD __stdcall _TimerThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg TimerThread: Starting ...\n");
@@ -224,6 +244,7 @@ DWORD __stdcall _TimerThread(LPVOID)
 	return 0;
 }
 
+// sleep thread.
 DWORD __stdcall _SleepThread(LPVOID)
 {
 	DEBUG_STRING(L"@rg SleepThread: Starting ...\n");

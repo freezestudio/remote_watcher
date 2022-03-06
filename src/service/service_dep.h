@@ -131,6 +131,10 @@ constexpr auto sync_reason_cmd__empty = 10L;
 constexpr auto sync_reason_cmd_folder = 11L;
 constexpr auto sync_reason_cmd_igonre = 12L;
 
+constexpr auto work_reason_act__empty = 20L;
+constexpr auto work_reason_act_folder = 21L;
+constexpr auto work_reason_act_igonre = 22L;
+
 constexpr std::wstring reason_string(long reason)
 {
 	switch (reason)
@@ -312,6 +316,10 @@ namespace freeze
 }
 
 // TODO: maybe need refactoring.
+// wake up sleep thread reason.
 extern freeze::atomic_sync_reason global_reason_signal;
+
+// wake up worker thread reason.
+extern long global_reason_worker;
 
 #endif
