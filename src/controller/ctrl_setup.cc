@@ -11,7 +11,7 @@
 namespace fs = std::filesystem;
 using namespace std::literals;
 
-static bool read_resource(void** data, int* len)
+static bool read_resource(void **data, int *len)
 {
 	auto _resource = WTL::CResource();
 	auto _loaded = _resource.Load(MAKEINTRESOURCE(IDR_BLOB), MAKEINTRESOURCE(IDR_MAINFRAME));
@@ -38,10 +38,10 @@ static bool set_description(SC_HANDLE sc)
 	return ok;
 }
 
-static bool query_status(SC_HANDLE sc, SERVICE_STATUS& service_status)
+static bool query_status(SC_HANDLE sc, SERVICE_STATUS &service_status)
 {
 	BOOL ret = FALSE;
-	uint8_t* buffer = nullptr;
+	uint8_t *buffer = nullptr;
 	DWORD buffer_size = 0;
 	DWORD bytes_needed = 0;
 	do
@@ -94,14 +94,29 @@ std::wstring _service_state(DWORD state)
 	std::wstring ret;
 	switch (state)
 	{
-	default: break;
-	case SERVICE_STOPPED: ret = L"stopped"; break;
-	case SERVICE_START_PENDING: ret = L"start pending"; break;
-	case SERVICE_STOP_PENDING: ret = L"stop pending"; break;
-	case SERVICE_RUNNING: ret = L"running"; break;
-	case SERVICE_CONTINUE_PENDING: ret = L"continue pending"; break;
-	case SERVICE_PAUSE_PENDING: ret = L"pause pending"; break;
-	case SERVICE_PAUSED: ret = L"paused"; break;
+	default:
+		break;
+	case SERVICE_STOPPED:
+		ret = L"stopped";
+		break;
+	case SERVICE_START_PENDING:
+		ret = L"start pending";
+		break;
+	case SERVICE_STOP_PENDING:
+		ret = L"stop pending";
+		break;
+	case SERVICE_RUNNING:
+		ret = L"running";
+		break;
+	case SERVICE_CONTINUE_PENDING:
+		ret = L"continue pending";
+		break;
+	case SERVICE_PAUSE_PENDING:
+		ret = L"pause pending";
+		break;
+	case SERVICE_PAUSED:
+		ret = L"paused";
+		break;
 	}
 	return ret;
 }
@@ -137,7 +152,7 @@ bool install_service(bool auto_start /*= true*/)
 
 	// decompress blob
 	auto _resource = WTL::CResource();
-	void* _data = nullptr;
+	void *_data = nullptr;
 	int _len = 0;
 	if (!read_resource(&_data, &_len))
 	{
@@ -163,8 +178,8 @@ bool install_service(bool auto_start /*= true*/)
 
 	// create service: for dll, use manual, for exe, use SCM
 
-	//wchar_t _display_name[255]{};
-	//LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
+	// wchar_t _display_name[255]{};
+	// LoadString(nullptr, IDS_DISPLAY, _display_name, 255);
 
 #ifdef SERVICE_PATH
 	wchar_t _binary_path[MAX_PATH]{};
@@ -184,21 +199,20 @@ bool install_service(bool auto_start /*= true*/)
 	auto hsc = CreateService(
 		hscm,
 		SERVICE_NAME,
-		_display_name,        // dll, manual regkey
+		_display_name, // dll, manual regkey
 		SERVICE_ALL_ACCESS,
 		_service_type,
 		_start_type, // SERVICE_AUTO_START, SERVICE_DEMAND_START
 		SERVICE_ERROR_NORMAL,
 		_binary_path,
-		nullptr, nullptr, nullptr, nullptr, nullptr
-	);
+		nullptr, nullptr, nullptr, nullptr, nullptr);
 	if (!hsc)
 	{
-		//ERROR_INVALID_PARAMETER; // 87
-		//ERROR_SERVICE_MARKED_FOR_DELETE; // 1072
+		// ERROR_INVALID_PARAMETER; // 87
+		// ERROR_SERVICE_MARKED_FOR_DELETE; // 1072
 		auto _err = GetLastError();
 		DEBUG_STRING(L"@rg Install Service: CreateService Failure: {}. name[{}], bin[{}]\n"sv,
-			_err, SERVICE_NAME, _binary_path);
+					 _err, SERVICE_NAME, _binary_path);
 		if (_err == ERROR_SERVICE_MARKED_FOR_DELETE)
 		{
 			MessageBox(nullptr, L"need reboot computer!", L"service", MB_ICONERROR | MB_OK);
@@ -281,7 +295,7 @@ bool uninstall_service()
 	// HKEY_CURRENT_USER\Software\Classes\Local Settings\MuiCache\f7\AAF68885
 	// or:
 	// HKEY_CLASSES_ROOT\Local Settings\MuiCache\f7\AAF68885
-	// @%SystemRoot%\System32\rgmsvc.dll,-102 REG_SZ ...	
+	// @%SystemRoot%\System32\rgmsvc.dll,-102 REG_SZ ...
 	// HKEY_USERS\.DEFAULT\Software\Classes\Local Settings\MuiCache\fd\AAF68885
 	// @%ProgramFiles%\xMonit\rgmsvc.exe,-101
 	// @%ProgramFiles%\xMonit\rgmsvc.exe,-102@%ProgramFiles%\xMonit\rgmsvc.exe,-101@%ProgramFiles%\xMonit\rgmsvc.exe,-101
@@ -291,7 +305,7 @@ bool uninstall_service()
 	auto _path = L"%ProgramFiles%\\" SERVICE_PATH;
 	wchar_t _path_buf[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path, _path_buf, MAX_PATH);
-	auto _uninstall_path = fs::path{ _path_buf };
+	auto _uninstall_path = fs::path{_path_buf};
 	if (fs::exists(_uninstall_path))
 	{
 		std::error_code ec;
@@ -342,14 +356,14 @@ bool start_service(LPCWSTR ip)
 {
 	HANDLE hprocess = nullptr;
 	HANDLE hthread = nullptr;
-	auto pid = start_process();
-	DEBUG_STRING(L"@rg Start Service: OpenOrCreateProcess id={}, handle={}\n", 
-		pid, reinterpret_cast<int>(hprocess));
-	if(hprocess)
+	auto pid = start_process(hprocess, hthread);
+	DEBUG_STRING(L"@rg Start Service: OpenOrCreateProcess id={}, handle={}\n",
+				 pid, reinterpret_cast<int>(hprocess));
+	if (hprocess)
 	{
 		CloseHandle(hprocess);
 	}
-	if(hthread)
+	if (hthread)
 	{
 		CloseHandle(hthread);
 	}
@@ -369,7 +383,7 @@ bool start_service(LPCWSTR ip)
 	auto hsc = ::OpenService(hscm, SERVICE_NAME, SERVICE_ALL_ACCESS);
 	if (!hsc)
 	{
-		//ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
+		// ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
 		DEBUG_STRING(L"@rg Start Service: OpenService failed {}\n", GetLastError());
 		::CloseServiceHandle(hscm);
 		return false;
@@ -437,7 +451,7 @@ bool start_service(LPCWSTR ip)
 	//    b. dwControlsAccepted = 0
 	//    c. dwCheckPoint = 0
 	//    d. dwWaitHint = 2s;
-	wchar_t const* args[] = {
+	wchar_t const *args[] = {
 		ip,
 	};
 	if (!::StartService(hsc, 1, args))
@@ -540,14 +554,14 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 	if (pid)
 	{
 		pid = open_process(pid, hprocess);
-		DEBUG_STRING(L"@rg Stop Service: {} QueryProcess id={}.\n"sv, 
-			pid, reinterpret_cast<int>(hprocess));
-		if(hprocess)
+		DEBUG_STRING(L"@rg Stop Service: {} QueryProcess id={}.\n"sv,
+					 pid, reinterpret_cast<int>(hprocess));
+		if (hprocess)
 		{
 			auto ret = stop_process(hprocess);
 		}
 	}
-	
+
 	bool is_outer = !!scmanager && !!service;
 	if (!scmanager)
 	{
@@ -662,15 +676,15 @@ bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullp
 			::CloseServiceHandle(service);
 			::CloseServiceHandle(scmanager);
 		}
-		//ERROR_ACCESS_DENIED; // 5L
-		//ERROR_INVALID_HANDLE; // 6L
-		//ERROR_INVALID_PARAMETER; // 87L
-		//ERROR_DEPENDENT_SERVICES_RUNNING; // 1051L
-		//ERROR_INVALID_SERVICE_CONTROL; // 1052L
-		//ERROR_SERVICE_REQUEST_TIMEOUT; // 1053L
-		//ERROR_SERVICE_CANNOT_ACCEPT_CTRL; // 1061L
-		//ERROR_SERVICE_NOT_ACTIVE; // 1062L
-		//ERROR_SHUTDOWN_IN_PROGRESS; // 1115L
+		// ERROR_ACCESS_DENIED; // 5L
+		// ERROR_INVALID_HANDLE; // 6L
+		// ERROR_INVALID_PARAMETER; // 87L
+		// ERROR_DEPENDENT_SERVICES_RUNNING; // 1051L
+		// ERROR_INVALID_SERVICE_CONTROL; // 1052L
+		// ERROR_SERVICE_REQUEST_TIMEOUT; // 1053L
+		// ERROR_SERVICE_CANNOT_ACCEPT_CTRL; // 1061L
+		// ERROR_SERVICE_NOT_ACTIVE; // 1062L
+		// ERROR_SHUTDOWN_IN_PROGRESS; // 1115L
 		DEBUG_STRING(L"@rg Stop Service: send [SERVICE_CONTROL_STOP] control code failure: {}.\n"sv, err);
 		return false;
 	}
@@ -745,14 +759,14 @@ bool is_service_installed(LPDWORD state)
 #endif
 	wchar_t _expath[MAX_PATH]{};
 	ExpandEnvironmentStrings(_path_file.c_str(), _expath, MAX_PATH);
-	auto _path = fs::path{ _expath };
+	auto _path = fs::path{_expath};
 	if (!fs::exists(_path))
 	{
 		DEBUG_STRING(L"@rg Check Service: Not Exists.\n");
 		return false;
 	}
 
-	//ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
+	// ERROR_SERVICE_DOES_NOT_EXIST; // 1060L
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
 	if (!hscm)
 	{

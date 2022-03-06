@@ -1,6 +1,8 @@
 #include "common_dep.h"
 #include "ctrl_process.h"
 
+using namespace std::literals;
+
 DWORD create_process(HANDLE &hProcess, HANDLE &hThread)
 {
     auto _path_file = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
@@ -91,13 +93,13 @@ DWORD start_process(HANDLE& hProcess, HANDLE& hThread)
 	auto pid = query_process_id();
 	if (pid)
 	{
-		pid = open_process(pid, handle);
-		DEBUG_STRING(L"@rg StartProcess: {} open result {}.\n"sv, pid, handle != nullptr);
+		pid = open_process(pid, hProcess);
+		DEBUG_STRING(L"@rg StartProcess: {} open result {}.\n"sv, pid, hProcess != nullptr);
 		return pid;
 	}
 
 	pid = create_process(hProcess, hThread);
-	DEBUG_STRING(L"@rg StartProcess: {} create result {}.\n"sv, pid, handle != nullptr);
+	DEBUG_STRING(L"@rg StartProcess: {} create result {}.\n"sv, pid, hProcess != nullptr);
 	return pid;
 }
 
