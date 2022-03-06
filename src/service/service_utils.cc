@@ -419,6 +419,7 @@ namespace freeze::detail
 		{
 			auto wcs = std::wstring(name);
 			auto drive_type = GetDriveType(wcs.c_str());
+			// filter: only fixed-drive
 			if (drive_type == DRIVE_FIXED)
 			{
 				auto mbs = to_utf8(wcs.substr(0, 1));

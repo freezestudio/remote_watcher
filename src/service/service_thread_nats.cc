@@ -54,6 +54,7 @@ namespace freeze
 				return;
 			}
 			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() run ...\n");
+			g_cmd_response = {};
 			nc.notify_command();
 			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() done.\n");
 		});
