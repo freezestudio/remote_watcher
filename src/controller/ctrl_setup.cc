@@ -3,7 +3,7 @@
 
 #include "ctrl_win32_dep.h"
 #include "ctrl_utils.h"
-#include "ctrl_process.h"
+// #include "ctrl_process.h"
 #include "ctrl_setup.h"
 
 #include <cassert>
@@ -354,19 +354,19 @@ bool uninstall_service()
  */
 bool start_service(LPCWSTR ip)
 {
-	HANDLE hprocess = nullptr;
-	HANDLE hthread = nullptr;
-	auto pid = start_process(hprocess, hthread);
-	DEBUG_STRING(L"@rg Start Service: OpenOrCreateProcess id={}, handle={}\n",
-				 pid, reinterpret_cast<int>(hprocess));
-	if (hprocess)
-	{
-		CloseHandle(hprocess);
-	}
-	if (hthread)
-	{
-		CloseHandle(hthread);
-	}
+	// HANDLE hprocess = nullptr;
+	// HANDLE hthread = nullptr;
+	// auto pid = start_process(hprocess, hthread);
+	// DEBUG_STRING(L"@rg Start Service: OpenOrCreateProcess id={}, handle={}\n",
+	// 			 pid, reinterpret_cast<int>(hprocess));
+	// if (hprocess)
+	// {
+	// 	CloseHandle(hprocess);
+	// }
+	// if (hthread)
+	// {
+	// 	CloseHandle(hthread);
+	// }
 
 	// open service control manager
 	auto hscm = OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
@@ -549,18 +549,18 @@ bool start_service(LPCWSTR ip)
 
 bool stop_service(SC_HANDLE scmanager /*= nullptr*/, SC_HANDLE service /*= nullptr*/)
 {
-	HANDLE hprocess = nullptr;
-	auto pid = query_process_id();
-	if (pid)
-	{
-		pid = open_process(pid, hprocess);
-		DEBUG_STRING(L"@rg Stop Service: {} QueryProcess id={}.\n"sv,
-					 pid, reinterpret_cast<int>(hprocess));
-		if (hprocess)
-		{
-			auto ret = stop_process(hprocess);
-		}
-	}
+	// HANDLE hprocess = nullptr;
+	// auto pid = query_process_id();
+	// if (pid)
+	// {
+	// 	pid = open_process(pid, hprocess);
+	// 	DEBUG_STRING(L"@rg Stop Service: {} QueryProcess id={}.\n"sv,
+	// 				 pid, reinterpret_cast<int>(hprocess));
+	// 	if (hprocess)
+	// 	{
+	// 		auto ret = stop_process(hprocess);
+	// 	}
+	// }
 
 	bool is_outer = !!scmanager && !!service;
 	if (!scmanager)

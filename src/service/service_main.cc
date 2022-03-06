@@ -4,6 +4,7 @@
 
 #include "service.h"
 #include "service_extern.h"
+#include "service_process.h"
 
 //
 // TODO: #include <netlistmgr.h>
@@ -13,7 +14,7 @@
 /* extern */
 std::wstring g_wcs_ip{};
 
-int64_t reset_ip_address(std::wstring const& wcs_ip)
+int64_t reset_ip_address(std::wstring const &wcs_ip)
 {
 	if (!g_wcs_ip.empty())
 	{
@@ -49,8 +50,8 @@ int64_t reset_ip_address(std::wstring const& wcs_ip)
 	if (!freeze::detail::check_ip_address(ip))
 	{
 		// 4,294,967,295
-		//constexpr auto _max = (std::numeric_limits<uint32_t>::max)();
-		//constexpr auto _max = static_cast<uint32_t>(-1);
+		// constexpr auto _max = (std::numeric_limits<uint32_t>::max)();
+		// constexpr auto _max = static_cast<uint32_t>(-1);
 		return 0; // str->num convert error!
 	}
 
@@ -108,7 +109,7 @@ std::wstring reset_ip_error(int64_t code)
  * @param argc 参数个数
  * @param argv 参数列表
  */
-void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
+void __stdcall ServiceMain(DWORD argc, LPWSTR *argv)
 {
 	// 初始化所有全局变量
 	// 如果初始化时间不超过 1s, 可以直接设置服务状态为 SERVICE_RUNNING
@@ -116,6 +117,22 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	DEBUG_STRING(L"@rg ServiceMain: Service Starting ...\n");
 	if (init_service())
 	{
+		// start process
+		HANDLE hprocess = nullptr;
+		HANDLE hthread = nullptr;
+		auto pid = start_process(hprocess, hthread);
+		DEBUG_STRING(L"@rg ServiceMain: OpenOrCreateProcess id={}, handle={}\n",
+					 pid, reinterpret_cast<int>(hprocess));
+		// if (hprocess)
+		// {
+		// 	CloseHandle(hprocess);
+		// }
+		// if (hthread)
+		// {
+		// 	CloseHandle(hthread);
+		// }
+
+		// set remote address
 		int64_t remote_ip = 0;
 		if (argc > 1)
 		{
@@ -138,16 +155,38 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 			goto theend;
 		}
 
+		// set watch folder
 		reset_work_folder();
 
+		// start threads
 		if (init_threadpool())
 		{
 			// block waitable-event
 			loop_service();
 
-
-			DEBUG_STRING(L"@rg ServiceMain: Sevice will stopping ...\n");
+			// stop threads
+			DEBUG_STRING(L"@rg ServiceMain: Threads will stopping ...\n");
 			stop_threadpool();
+
+			// stop process
+			DEBUG_STRING(L"@rg ServiceMain: Process will stopping ...\n");
+			// HANDLE hprocess = nullptr;
+			if (!hprocess)
+			{
+				auto pid = query_process_id();
+				if (pid)
+				{
+					pid = open_process(pid, hprocess);
+					DEBUG_STRING(L"@rg ServiceMain: QueryProcess id={} handle={} .\n"sv,
+								 pid, reinterpret_cast<int>(hprocess));
+				}
+			}
+			if (hprocess)
+			{
+				auto ret = stop_process(hprocess);
+			}
+
+			DEBUG_STRING(L"@rg ServiceMain: Service will stopping ...\n");
 			stop_service();
 		}
 		else
@@ -159,7 +198,6 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR* argv)
 	{
 		DEBUG_STRING(L"@rg ServiceMain: Init Service Failure.\n");
 	}
-
 
 theend:
 	DEBUG_STRING(L"@rg ServiceMain: Service Stopped.\n");

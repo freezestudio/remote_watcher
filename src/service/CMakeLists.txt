@@ -12,6 +12,7 @@ if(SERVICE_BUILD_TYPE)
     add_executable(${SERVICE_EXE}
         ./service_utils_ex.cc
         ./service_utils.cc
+        ./service_process.cc
         ./service_watch_tree.cc
         ./service_watch_ex.cc
         ./service_watch.cc
@@ -86,6 +87,7 @@ else()
     add_library(${SERVICE_DLL} SHARED
         ./service_utils_ex.cc
         ./service_utils.cc
+        ./service_process.cc
         ./service_watch_tree.cc
         ./service_watch_ex.cc
         ./service_watch.cc
