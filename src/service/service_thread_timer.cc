@@ -5,6 +5,7 @@
 #include "service_thread_timer.h"
 #include "service_nats_client.h"
 #include "service_extern.h"
+#include "service_process.h"
 
 DWORD _g_latest_time = 0;
 void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue)
@@ -17,7 +18,7 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	}
 #endif
 
-	auto nc_ptr = reinterpret_cast<freeze::nats_client*>(lpArgToCompletionRoutine);
+	auto nc_ptr = reinterpret_cast<freeze::nats_client *>(lpArgToCompletionRoutine);
 	if (!nc_ptr)
 	{
 		DEBUG_STRING(L"@rg TimerCallback: args is null.\n");
@@ -25,7 +26,27 @@ void _TimerCallback(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWOR
 	}
 
 	// TODO: check tp-process running.
-	// ...
+	HANDLE hprocess = nullptr;
+	HANDLE hthread = nullptr;
+	auto pid = query_process_id();
+	if (!pid)
+	{
+		DEBUG_STRING(L"@rg TimerCallback: pid is null, try re-open process.\n");
+		pid = create_process_ex(hprocess, hthread);
+	}
+
+	if (pid)
+	{
+		DEBUG_STRING(L"@rg TimerCallback: process id={}, handle={}\n", pid, reinterpret_cast<int>(hprocess));
+	}
+	if (hprocess)
+	{
+		CloseHandle(hprocess);
+	}
+	if (hthread)
+	{
+		CloseHandle(hthread);
+	}
 
 	if (!nc_ptr->is_connected())
 	{
@@ -78,32 +99,26 @@ namespace freeze
 	rgm_timer::rgm_timer()
 		: _signal{}
 	{
-
 	}
 
 	rgm_timer::~rgm_timer()
 	{
-
 	}
 
 	void rgm_timer::start()
 	{
-
 	}
 
 	void rgm_timer::stop()
 	{
-
 	}
 
 	void rgm_timer::pause()
 	{
-
 	}
 
 	void rgm_timer::resume()
 	{
-
 	}
 }
 
@@ -111,11 +126,9 @@ namespace freeze
 {
 	void rgm_timer::on_network_connect()
 	{
-
 	}
 
 	void rgm_timer::on_network_disconnect()
 	{
-
 	}
 }
