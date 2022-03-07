@@ -36,16 +36,6 @@ long global_reason_worker{0L};
 /*extern*/
 fs::path g_work_folder;
 
-void test_sleep_thread()
-{
-
-}
-
-void test_worker_thread()
-{
-
-}
-
 void reset_work_folder(bool notify /* = false */)
 {
 	// TODO: maybe need lock
@@ -374,28 +364,55 @@ DWORD __stdcall _SleepThread(LPVOID)
 	return 0;
 }
 
-bool init_threadpool()
+static bool _create_worker_thread(bool can_create = false)
 {
 	bb_worker_thread_exit = false;
-	if (!hh_worker_thread)
+	if (!hh_worker_thread && can_create)
 	{
 		hh_worker_thread = ::CreateThread(nullptr, 0, _WorkerThread, nullptr, 0, nullptr);
 		if (!hh_worker_thread)
 		{
-			DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread failure.\n");
+			DEBUG_STRING(L"@rg Create WorkerThread failure.\n");
 			bb_worker_thread_exit = true;
 			return false;
 		}
 		if (hh_worker_thread == INVALID_HANDLE_VALUE)
 		{
-			DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread Error: INVALID_HANDLE_VALUE.\n");
+			DEBUG_STRING(L"@rg Create WorkerThread Error: INVALID_HANDLE_VALUE.\n");
 			hh_worker_thread = nullptr;
 			bb_worker_thread_exit = true;
 			return false;
 		}
 	}
-	DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread Successfully.\n");
 
+	return !!hh_worker_thread;
+}
+
+static bool _create_sleep_thread(bool can_create = false)
+{
+	bb_sleep_thread_exit = false;
+	if (!hh_sleep_thread && can_create)
+	{
+		hh_sleep_thread = ::CreateThread(nullptr, 0, _SleepThread, nullptr, 0, nullptr);
+		if (!hh_sleep_thread)
+		{
+			bb_sleep_thread_exit = true;
+			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Failure.\n");
+			return false;
+		}
+		if (hh_sleep_thread == INVALID_HANDLE_VALUE)
+		{
+			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Error: INVALID_HANDLE_VALUE.\n");
+			hh_sleep_thread = nullptr;
+			bb_sleep_thread_exit = true;
+			return false;
+		}
+	}
+	return !!hh_sleep_thread;
+}
+
+static bool _create_timer_thread()
+{
 	bb_timer_thread_exit = false;
 	if (!hh_timer_thread)
 	{
@@ -414,31 +431,32 @@ bool init_threadpool()
 			return false;
 		}
 	}
+	return !!hh_timer_thread;
+}
+
+bool init_threadpool(bool can_create /* = false */)
+{
+	if (!_create_timer_thread())
+	{
+		DEBUG_STRING(L"@rg init_threadpool(): Create TimerThread Failure, stop.\n");
+	}
 	DEBUG_STRING(L"@rg init_threadpool(): Create TimerThread Successfully.\n");
 
-	bb_sleep_thread_exit = false;
-	if (!hh_sleep_thread)
-	{
-		hh_sleep_thread = ::CreateThread(nullptr, 0, _SleepThread, nullptr, 0, nullptr);
-		if (!hh_sleep_thread)
-		{
-			bb_sleep_thread_exit = true;
-			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Failure.\n");
-			return false;
-		}
-		if (hh_sleep_thread == INVALID_HANDLE_VALUE)
-		{
-			DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Error: INVALID_HANDLE_VALUE.\n");
-			hh_sleep_thread = nullptr;
-			bb_sleep_thread_exit = true;
-			return false;
-		}
-	}
+	_create_sleep_thread(can_create);
 	DEBUG_STRING(L"@rg init_threadpool(): Create SleepThread Successfully.\n");
 
-	auto success = hh_worker_thread && hh_timer_thread && hh_sleep_thread;
+	_create_worker_thread(can_create);
+	DEBUG_STRING(L"@rg init_threadpool(): Create WorkerThread Successfully.\n");
+
+	bool success = hh_worker_thread && hh_timer_thread && hh_sleep_thread;
 	auto running = !bb_worker_thread_exit && !bb_timer_thread_exit && !bb_sleep_thread_exit;
-	return success && running;
+	auto all_true = success && running;
+	if (!all_true)
+	{
+		DEBUG_STRING(L"@rg init_threadpool(): Not All Successed.\n");
+	}
+
+	return hh_timer_thread && !bb_timer_thread_exit;
 }
 
 void stop_threadpool()
@@ -511,6 +529,53 @@ void stop_threadpool()
 	}
 
 	DEBUG_STRING(L"@rg stop_threadpool(): Threadpool Stopped.\n");
+}
+
+bool test_sleep_thread()
+{
+	if (!hh_sleep_thread)
+	{
+		return _create_sleep_thread(true);
+	}
+
+	auto ret = QueueUserAPC([](ULONG_PTR)
+							{ global_reason_signal.notify_reason(sync_reason_cmd__empty); },
+							hh_timer_thread, 0);
+	if (!ret)
+	{
+		auto err = GetLastError();
+		DEBUG_STRING(L"@rg test_sleep_thread(): notify SleepThread stop failure: {}.\n", err);
+		TerminateThread(hh_sleep_thread, 0);
+		hh_sleep_thread = nullptr;
+		return _create_sleep_thread(true);
+	}
+	else
+	{
+		return true;
+	}
+}
+
+bool test_worker_thread()
+{
+	if (!hh_worker_thread)
+	{
+		return _create_worker_thread(true);
+	}
+	auto ret = QueueUserAPC([](ULONG_PTR)
+							{ global_reason_worker=work_reason_act__empty; },
+							hh_timer_thread, 0);
+	if (!ret)
+	{
+		auto err = GetLastError();
+		DEBUG_STRING(L"@rg bool test_worker_thread(): notify WorkerThread failure: {}.\n", err);
+		TerminateThread(hh_worker_thread, 0);
+		hh_worker_thread = nullptr;
+		return _create_worker_thread(true);
+	}
+	else
+	{
+		return true;
+	}
 }
 
 namespace freeze

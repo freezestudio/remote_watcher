@@ -18,8 +18,8 @@ extern std::wstring g_wcs_ip;
 extern fs::path g_work_folder;
 extern std::vector<fs::path> g_work_ignore_folders;
 
-void test_sleep_thread();
-void test_worker_thread();
+bool test_sleep_thread();
+bool test_worker_thread();
 void reset_work_folder(bool notify = false);
 int64_t reset_ip_address(std::wstring const& = {});
 std::wstring reset_ip_error(int64_t);

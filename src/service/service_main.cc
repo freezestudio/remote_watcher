@@ -159,7 +159,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR *argv)
 		reset_work_folder();
 
 		// start threads
-		if (init_threadpool())
+		if (init_threadpool(pid > 0))
 		{
 			// block waitable-event
 			loop_service();

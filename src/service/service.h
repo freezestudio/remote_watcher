@@ -17,7 +17,7 @@ void stop_service();
 bool update_status(SERVICE_STATUS_HANDLE, DWORD, DWORD = NO_ERROR);
 DWORD __stdcall handler_proc_ex(DWORD dwControl, DWORD, LPVOID, LPVOID);
 
-bool init_threadpool();
+bool init_threadpool(bool = false);
 void stop_threadpool();
 
 // worker thread function
@@ -63,15 +63,15 @@ namespace freeze
 
 namespace freeze
 {
-	template<typename T>
+	template <typename T>
 	inline std::shared_ptr<T> g_service_object;
 
-	template<typename T, typename ...Args>
-	std::shared_ptr<T> service_object_instance(Args&& ...args)
+	template <typename T, typename... Args>
+	std::shared_ptr<T> service_object_instance(Args &&...args)
 	{
 		if (!g_service_object<T>)
 		{
-			g_service_object<T> = std::make_shared<T>(static_cast<Args&&>(args)...);
+			g_service_object<T> = std::make_shared<T>(static_cast<Args &&>(args)...);
 		}
 		return g_service_object<T>;
 	}

@@ -17,7 +17,6 @@ static std::wstring heartbeat(freeze::nats_client * nc_ptr, DWORD dwTimerLowValu
 
 	// check other threads
 	// 1. SleepThread
-	// global_reason_signal.notify_reason(sync_reason_cmd__empty);
 	test_sleep_thread();
 	// 2. WorkerThread
 	test_worker_thread();
