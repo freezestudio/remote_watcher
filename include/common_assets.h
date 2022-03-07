@@ -18,6 +18,7 @@
 #define IDC_SYSLINK_START               1000
 #define IDC_SYSLINK_STOP                1001
 #define IDC_CHECK_AUTO_START            1002
+#define IDC_SYSLINK_RESTART             1003
 
 // custom resource data type
 #define IDR_BLOB          257

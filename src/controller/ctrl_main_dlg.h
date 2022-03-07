@@ -69,21 +69,21 @@ public:
 		mEnableUninstall = is_installed ? TRUE : FALSE;
 		if (!is_installed)
 		{
-			SetDlgItemText(IDC_STATUS, L"not installed!");
+			SetDlgItemText(IDC_STATUS, L"未安装!");
 		}
 		else
 		{
 			if (state == SERVICE_RUNNING)
 			{
-				SetDlgItemText(IDC_STATUS, L"installed, running!");
+				SetDlgItemText(IDC_STATUS, L"已安装, 服务已启动!");
 			}
 			else if (state == SERVICE_STOPPED)
 			{
-				SetDlgItemText(IDC_STATUS, L"installed, stopped!");
+				SetDlgItemText(IDC_STATUS, L"已安装, 服务已停止!");
 			}
 			else
 			{
-				SetDlgItemText(IDC_STATUS, L"installed!");
+				SetDlgItemText(IDC_STATUS, L"已安装!");
 			}
 		}
 
@@ -117,7 +117,7 @@ public:
 		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
 		if (addr == 0)
 		{
-			auto ret = MessageBox(L"ip address is empty,\nthis will use the local ip address.", L"monitor", MB_ICONWARNING | MB_YESNO);
+			auto ret = MessageBox(L"未填写 IP 地址,\n是否自动使用本机 IP 地址?", L"监控服务", MB_ICONWARNING | MB_YESNO);
 			if (ret == IDNO)
 			{
 				return;
@@ -137,20 +137,20 @@ public:
 				{
 					mEnableInstall = FALSE;
 					mEnableUninstall = TRUE;
-					SetDlgItemText(IDC_STATUS, L"installed, running!");
+					SetDlgItemText(IDC_STATUS, L"已安装, 服务已启动!");
 				}
 				else
 				{
 					mEnableInstall = TRUE;
 					mEnableUninstall = FALSE;
-					SetDlgItemText(IDC_STATUS, L"installed, start failure!");
+					SetDlgItemText(IDC_STATUS, L"已安装, 服务启动失败!");
 				}
 			}
 			else
 			{
 				mEnableInstall = FALSE;
 				mEnableUninstall = TRUE;
-				SetDlgItemText(IDC_STATUS, L"installed, stopped!");
+				SetDlgItemText(IDC_STATUS, L"已安装, 服务已停止!");
 			}
 			_SetButtonEnabled();
 			_CheckLinkEnable(true);
@@ -158,7 +158,7 @@ public:
 		else
 		{
 			DEBUG_STRING(L"Install Service Failure.\n");
-			SetDlgItemText(IDC_STATUS, L"install failure!");
+			SetDlgItemText(IDC_STATUS, L"安装失败!");
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
 			_SetButtonEnabled();
@@ -169,14 +169,14 @@ public:
 	{
 		if (stop_service())
 		{
-			SetDlgItemText(IDC_STATUS, L"stopped!");
+			SetDlgItemText(IDC_STATUS, L"服务已停止!");
 			auto uninstalled = uninstall_service();
 			DEBUG_STRING(L"Uninstall Service Result: {}\n"sv, uninstalled);
 			if (uninstalled)
 			{
 				mEnableInstall = TRUE;
 				mEnableUninstall = FALSE;
-				SetDlgItemText(IDC_STATUS, L"uninstalled!");
+				SetDlgItemText(IDC_STATUS, L"已卸载!");
 				// TODO: remove HKEY_CURRENT_USER\Software\richgolden\rgmsvc
 				// TODO: remove HKEY_USERS\.DEFAULT\Software\richgolden\rgmsvc
 			}
@@ -184,14 +184,14 @@ public:
 			{
 				mEnableInstall = FALSE;
 				mEnableUninstall = TRUE;
-				SetDlgItemText(IDC_STATUS, L"stopped, uninstall failure!");
+				SetDlgItemText(IDC_STATUS, L"服务已停止, 卸载失败!");
 			}
 			_SetButtonEnabled();
 			_CheckLinkEnable(false);
 		}
 		else
 		{
-			SetDlgItemText(IDC_STATUS, L"stop failure!");
+			SetDlgItemText(IDC_STATUS, L"停止服务失败!");
 			OutputDebugString(L"Stop Service Failure.\n");
 			mEnableInstall = TRUE;
 			mEnableUninstall = FALSE;
@@ -221,6 +221,13 @@ public:
 			return OnStopService(pnmh);
 		}
 
+		if (idCtrl == IDC_SYSLINK_RESTART)
+		{
+			OnStopService(pnmh);
+			OnStartService(pnmh);
+			return TRUE;
+		}
+
 		return FALSE;
 	}
 
@@ -230,7 +237,7 @@ public:
 		DWORD addr = _IpAddress(ip, IP_ADDRESS_LEN);
 		if (addr == 0)
 		{
-			auto ret = MessageBox(L"ip address is empty,\nthis will use the local ip address.", L"monitor", MB_ICONWARNING | MB_YESNO);
+			auto ret = MessageBox(L"未填写 IP 地址,\n是否自动使用本机 IP 地址?", L"监控服务", MB_ICONWARNING | MB_YESNO);
 			if (ret == IDNO)
 			{
 				return FALSE;
@@ -244,7 +251,7 @@ public:
 		}
 		if (ok)
 		{
-			SetDlgItemText(IDC_STATUS, L"running!");
+			SetDlgItemText(IDC_STATUS, L"服务已启动!");
 		}
 
 		return TRUE;
@@ -255,7 +262,7 @@ public:
 		auto stopped = stop_service();
 		if (stopped)
 		{
-			SetDlgItemText(IDC_STATUS, L"stopped!");
+			SetDlgItemText(IDC_STATUS, L"服务已停止!");
 		}
 		return TRUE;
 	}

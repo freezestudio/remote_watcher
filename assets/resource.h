@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Visual C++
-// monitor.rc
+// Microsoft Visual C++ ���ɵİ����ļ���
+// �� monitor.rc ʹ��
 //
 #define ID_SEPARATOR                    0
 #define ID_DEFAULT_PANE                 0
@@ -17,10 +17,9 @@
 #define IDR_BMP_UNINSTALL               134
 #define IDR_BLOB                        257
 #define IDC_SYSLINK_START               1000
-#define IDC_SYSLINK2                    1001
 #define IDC_SYSLINK_STOP                1001
-#define IDC_CHECK1                      1002
 #define IDC_CHECK_AUTO_START            1002
+#define IDC_SYSLINK_RESTART             1003
 #define ATL_IDC_TAB_CONTROL             0x3020
 #define ID_APPLY_NOW                    0x3021
 #define ID_WIZBACK                      0x3023

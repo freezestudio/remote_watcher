@@ -1578,7 +1578,9 @@ namespace freeze
 	{
 		try
 		{
+			DEBUG_STRING(L"nats_client::sync_files(): sync-path={}"sv, _sync_path.c_str());
 			auto dir_informations = freeze::detail::get_dirtree_info(_sync_path, _sync_igonres);
+			DEBUG_STRING(L"nats_client::sync_files(): get_dirtree_info size={}"sv, dir_informations.size());
 			for (auto info : dir_informations)
 			{
 				pimpl->publish_file(info.file_path, info.file_name);
