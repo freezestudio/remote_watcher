@@ -94,7 +94,7 @@ static HANDLE as_explorer_token()
 
 DWORD create_process(HANDLE &hProcess, HANDLE &hThread)
 {
-    auto _path_file = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
+    auto _path_file = std::format(L"\"%ProgramFiles%\\xMonit\\{0}.exe\" --config \"%ProgramFiles%\\xMonit\\{0}.cfg\""sv, MT_NAME);
     wchar_t _expath[MAX_PATH]{};
     ExpandEnvironmentStrings(_path_file.c_str(), _expath, MAX_PATH);
     std::wstring cmd = _expath;
@@ -139,7 +139,7 @@ DWORD create_process_ex(HANDLE &hProcess, HANDLE &hThread)
         return 0;
     }
 
-    auto _path_file = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
+    auto _path_file = std::format(L"\"%ProgramFiles%\\xMonit\\{0}.exe\" --config \"%ProgramFiles%\\xMonit\\{0}.cfg\""sv, MT_NAME);
     wchar_t _expath[MAX_PATH]{};
     ExpandEnvironmentStrings(_path_file.c_str(), _expath, MAX_PATH);
     std::wstring cmd = _expath;

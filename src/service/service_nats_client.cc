@@ -415,22 +415,31 @@ namespace freeze::detail
 			auto full_path_file = (folder / file).lexically_normal();
 			if (!fs::exists(full_path_file))
 			{
+				DEBUG_STRING(L"_nats_msg::set_blob() error: file {}, not exists.\n"sv, full_path_file.c_str());
 				return 0;
 			}
 			if (nullptr == len)
 			{
+				DEBUG_STRING(L"_nats_msg::set_blob() error: file {}, len-ptr is nullptr.\n"sv, full_path_file.c_str());
 				return 0;
 			}
 			if (*len == 0)
 			{
 				auto file_count = fs::file_size(full_path_file);
 				*len = file_count;
+				DEBUG_STRING(L"_nats_msg::set_blob() get file {}, file-size={}.\n"sv, full_path_file.c_str(), file_count);
 				return file_count;
 			}
 
 			std::ifstream ifs;
 			do
 			{
+				if (!fs::exists(full_path_file))
+				{
+					DEBUG_STRING(L"_nats_msg::set_blob() open file error: file {}, not exists.\n"sv, full_path_file.c_str());
+					goto fail;
+				}
+
 				ifs.clear();
 				ifs.open(full_path_file, std::ios::binary | std::ios::in);
 				if (ifs.is_open())
@@ -441,15 +450,15 @@ namespace freeze::detail
 					if (!ok)
 					{
 						ifs.close();
-						DEBUG_STRING(L"_nats_msg::set_blob() error: open file {}.\n", full_path_file.c_str());
-						goto fail;
+						DEBUG_STRING(L"_nats_msg::set_blob() open file error: code={}.\n"sv, full_path_file.c_str());
+						continue;
 					}
 					assert(*len == read_count);
 					if ((*len) != read_count)
 					{
 						ifs.close();
-						DEBUG_STRING(L"_nats_msg::set_blob() error: read file {} size.\n", full_path_file.c_str());
-						goto fail;
+						DEBUG_STRING(L"_nats_msg::set_blob() error: read file {} size.\n"sv, full_path_file.c_str());
+						continue;
 					}
 					ifs.close();
 
@@ -457,7 +466,7 @@ namespace freeze::detail
 					ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char *>(data), *len) == NATS_OK;
 					if (!ok)
 					{
-						DEBUG_STRING(L"_nats_msg::set_blob() error: create file {} message.\n", full_path_file.c_str());
+						DEBUG_STRING(L"_nats_msg::set_blob() error: create file {} message.\n"sv, full_path_file.c_str());
 						goto fail;
 					}
 					ok = _clear_headers();
@@ -497,19 +506,19 @@ namespace freeze::detail
 					{
 						goto fail;
 					}
-					DEBUG_STRING(L"_nats_msg::set_blob(): file={}, count={}, success.\n", full_path_file.c_str(), read_count);
+					DEBUG_STRING(L"_nats_msg::set_blob(): file={}, count={}, success.\n"sv, full_path_file.c_str(), read_count);
 					return read_count;
 				}
 				else
 				{
-					// goodbit=0, eofbit=1, failbit=2, badbit=4
-					DEBUG_STRING(L"_nats_msg::set_blob() error: open file {} failure, {}.\n", full_path_file.c_str(), ifs.rdstate());
+					// goodbit=0x0, eofbit=0x1, failbit=0x2, badbit=0x4
+					DEBUG_STRING(L"_nats_msg::set_blob() error: open file {} failure, rdstate={}.\n"sv, full_path_file.c_str(), ifs.rdstate());
 				}
 				Sleep(300);
 			} while (!ifs.good());
 
 		fail:
-			DEBUG_STRING(L"_nats_msg::set_blob() error: maybe set file {} headers failure.\n", full_path_file.c_str());
+			DEBUG_STRING(L"_nats_msg::set_blob() error: maybe set file {} headers failure.\n"sv, full_path_file.c_str());
 			return 0;
 		}
 
@@ -825,7 +834,8 @@ namespace freeze::detail
 			auto ok = status == NATS_OK;
 			if (!ok)
 			{
-				DEBUG_STRING(L"_nats_connect::publish_payload() error: request-msg failure {}.\n"sv, (DWORD)status);
+				// NATS_MAX_PAYLOAD = 21
+				DEBUG_STRING(L"_nats_connect::publish_payload() request-msg error: status={}.\n"sv, (DWORD)status);
 				delete[] buffer;
 				return ok;
 			}
