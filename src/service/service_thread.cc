@@ -563,7 +563,7 @@ bool test_worker_thread()
 	}
 	auto ret = QueueUserAPC([](ULONG_PTR)
 							{ global_reason_worker=work_reason_act__empty; },
-							hh_timer_thread, 0);
+							hh_worker_thread, 0);
 	if (!ret)
 	{
 		auto err = GetLastError();
