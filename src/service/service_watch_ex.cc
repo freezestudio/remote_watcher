@@ -108,14 +108,22 @@ namespace freeze
 		DEBUG_STRING(L"folder_watchor_base::unwatch() ...\n");
 		if (folder_handle)
 		{
-			CancelIo(folder_handle);
-			CloseHandle(folder_handle);
+			auto canceled = CancelIo(folder_handle);
+			auto closed = CloseHandle(folder_handle);
 			folder_handle = nullptr;
+			DEBUG_STRING(L"folder_watchor_base::unwatch(): result={}, done.\n"sv, canceled && closed);
+		}
+		else
+		{
+			DEBUG_STRING(L"folder_watchor_base::unwatch(): folder handle is null, done.\n");
 		}
 	}
 
 	void folder_watchor_base::notify_information_handle(DWORD dwNumberOfBytesTransfered)
 	{
+		// lock in completion_routine()
+		std::lock_guard<std::mutex> lock(mutex);
+
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > read_buffer.size())
 		{
 			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): maybe need more buffer.\n");
@@ -392,6 +400,11 @@ namespace freeze
 				DEBUG_STRING(L"folder_watchor_apc::completion_routine(): ERROR_NOTIFY_ENUM_DIR.\n");
 				self->watch();
 			}
+			else
+			{
+				// other ...
+			}
+
 			//ERROR_ACCESS_DENIED
 			DEBUG_STRING(L"folder_watchor_apc::completion_routine Error: code != ERROR_SUCCESS.\n");
 			return;

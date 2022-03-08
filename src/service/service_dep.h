@@ -142,29 +142,29 @@ constexpr std::wstring reason_string(long reason)
 	default:
 		break;
 	case sync_reason_exit__thread:
-		return L"ExitThread"s;
+		return L"Exit Thread"s;
 	case sync_reason_none__reason:
 		return L"None"s;
 	case sync_reason_recv_command:
-		return L"RecvCommand"s;
+		return L"Recv Command"s;
 	case sync_reason_recv_message:
-		return L"RecvMessage"s;
+		return L"Recv Message"s;
 	case sync_reason_send_command:
-		return L"SendCommand"s;
+		return L"Send Command"s;
 	case sync_reason_send_message:
-		return L"SendMessage"s;
+		return L"Send Message"s;
 	case sync_reason_send_payload:
-		return L"SendPayload"s;
+		return L"Send Payload"s;
 	case sync_reason_send_synfile:
-		return L"SendSyncFile"s;
+		return L"Send SyncFile"s;
 	case sync_reason_cmd__error:
-		return L"CommandError"s;
+		return L"Command Error"s;
 	case sync_reason_cmd__empty:
-		return L"CommandEmpty"s;
+		return L"Command Empty"s;
 	case sync_reason_cmd_folder:
-		return L"CommandFolder"s;
+		return L"Command Folder"s;
 	case sync_reason_cmd_igonre:
-		return L"CommandIgnore"s;
+		return L"Command Ignore"s;
 	}
 	return {};
 }

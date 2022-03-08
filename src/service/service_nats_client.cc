@@ -880,7 +880,8 @@ namespace freeze::detail
 		bool publish_payload(fs::path const& folder, fs::path const& file)
 		{
 			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}, {}\n"sv, folder.c_str(), file.c_str());
-			// std::lock_guard<std::mutex> lock(_mutex);
+			std::lock_guard<std::mutex> lock(_mutex);
+			
 			_nats_msg data_msg{ payload_channel.data() };
 			uint8_t* buffer = nullptr;
 			uintmax_t buffer_size = 0;
@@ -955,7 +956,7 @@ namespace freeze::detail
 		bool publish_file(fs::path const& file_path, fs::path const& file_name)
 		{
 			DEBUG_STRING(L"_nats_connect::publish_file(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
-			// std::lock_guard<std::mutex> lock(_mutex);
+			std::lock_guard<std::mutex> lock(_mutex);
 
 			_nats_msg data_msg{ synfile_send_channel.data() };
 
@@ -1315,7 +1316,7 @@ namespace freeze::detail
 		}
 
 	private:
-		// std::mutex _mutex;
+		std::mutex _mutex{};
 
 	private:
 		natsConnection* _nc = nullptr;
@@ -1563,7 +1564,7 @@ namespace freeze
 			auto root_str = this->_watch_path.c_str();
 			for (auto file : files)
 			{
-				DEBUG_STRING(L"nats_client::send_payload() publish: {}\n"sv, file.c_str());
+				DEBUG_STRING(L"nats_client::send_payload() will publish: {}\n"sv, file.c_str());
 				pimpl->publish_payload(root_str, file);
 			}
 		}

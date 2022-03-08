@@ -85,6 +85,7 @@ namespace freeze
 
 	protected:
 		std::thread thread;
+		std::mutex mutex{};
 	};
 
 	class folder_watchor_apc : public folder_watchor_base
