@@ -58,17 +58,23 @@ namespace freeze
 
 	void maybe_response_command(nats_client &nc)
 	{
-		auto fut = std::async(std::launch::async, [&]()
-							  {
-			if (!nc.is_connected())
-			{
-				DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() nc not connected.\n");
-				return;
-			}
-			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() run ...\n");
-			g_cmd_response = {};
-			nc.notify_command();
-			DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() done.\n"); });
+		// auto fut = std::async(std::launch::async, [&]()
+		// 					  {
+		// 	if (!nc.is_connected())
+		// 	{
+		// 		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() nc not connected.\n");
+		// 		return;
+		// 	}
+		// 	DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() run ...\n");
+		// 	g_cmd_response = {};
+		// 	nc.notify_command();
+		// 	DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() done.\n"); });
+
+		// sync-send
+		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() run ...\n");
+		g_cmd_response = {};
+		nc.notify_command();
+		DEBUG_STRING(L"@rg Service-Thread-nats: maybe_response_command() done.\n");
 	}
 }
 

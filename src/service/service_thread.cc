@@ -12,6 +12,8 @@ constexpr auto timer_period = 2 * 60 * 1000L;
 HANDLE hh_worker_thread = nullptr;
 // work thread status.
 bool bb_worker_thread_exit = false;
+// TODO: need lock?
+bool bb_worker_is_working = false;
 
 // timer thread handle.
 HANDLE hh_timer_thread = nullptr;
@@ -131,10 +133,12 @@ DWORD __stdcall _WorkerThread(LPVOID)
 		// task: change watch folder
 		if (freeze::detail::check_exists(g_work_folder))
 		{
+			bb_worker_is_working = true;
 			watcher.stop();
 			watcher.set_watch_folder(g_work_folder);
 			watcher.set_ignore_folders(g_work_ignore_folders);
 			watcher.start();
+			bb_worker_is_working = false;
 			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch-folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
 		}
 		else
@@ -561,6 +565,12 @@ bool test_worker_thread()
 	{
 		return _create_worker_thread(true);
 	}
+
+	if (bb_worker_is_working)
+	{
+		return true;
+	}
+	
 	auto ret = QueueUserAPC([](ULONG_PTR)
 							{ global_reason_worker=work_reason_act__empty; },
 							hh_worker_thread, 0);
@@ -568,14 +578,11 @@ bool test_worker_thread()
 	{
 		auto err = GetLastError();
 		DEBUG_STRING(L"@rg bool test_worker_thread(): notify WorkerThread failure: {}.\n", err);
-		TerminateThread(hh_worker_thread, 0);
+		auto terminated = TerminateThread(hh_worker_thread, 0);
 		hh_worker_thread = nullptr;
 		return _create_worker_thread(true);
 	}
-	else
-	{
-		return true;
-	}
+	return true;
 }
 
 namespace freeze
