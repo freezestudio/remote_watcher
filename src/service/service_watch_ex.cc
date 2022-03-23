@@ -727,6 +727,7 @@ namespace freeze
 	void watcher_win32::set_watch_folder(fs::path const& folder)
 	{
 		this->folder = folder;
+		DEBUG_STRING(L"watcher_win32::set_watch_folder(): {}\n"sv, this->folder.c_str());
 	}
 
 	void watcher_win32::set_ignore_folders(std::vector<fs::path> const& ignores)

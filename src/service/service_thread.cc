@@ -72,7 +72,7 @@ void reset_work_folder(bool notify /* = false */)
 	if (notify)
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): Will Wakeup _WorkThread ...\n");
-		auto ret = QueueUserAPC([](ULONG_PTR) {}, hh_worker_thread, 0);
+		auto ret = QueueUserAPC([](ULONG_PTR) { global_reason_worker=work_reason_act_folder; }, hh_worker_thread, 0);
 		if (ret)
 		{
 			DEBUG_STRING(L"@rg reset_work_folder(): Wakeup _WorkThread done.\n");
@@ -124,15 +124,19 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
+		
+		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, reason={}.\n"sv, global_reason_worker);
 		if (global_reason_worker == work_reason_act__empty)
 		{
-			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, maybe heartbeat reason.\n");
+			DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, reason maybe is [heartbeat].\n");
 			continue;
 		}
 
+		DEBUG_STRING(L"@rg WorkerThread: when Wakeup, check work folder ...\n");
 		// task: change watch folder
 		if (freeze::detail::check_exists(g_work_folder))
 		{
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, will run reset work folder: {} ...\n"sv, g_work_folder.c_str());
 			bb_worker_is_working = true;
 			watcher.stop();
 			watcher.set_watch_folder(g_work_folder);

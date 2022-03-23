@@ -121,7 +121,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR *argv)
 		HANDLE hprocess = nullptr;
 		HANDLE hthread = nullptr;
 		auto pid = start_process(hprocess, hthread);
-		DEBUG_STRING(L"@rg ServiceMain: OpenOrCreateProcess id={}, handle={}\n",
+		DEBUG_STRING(L"@rg ServiceMain: OpenOrCreateProcess[transport] id={}, handle={}\n",
 					 pid, reinterpret_cast<int>(hprocess));
 		// if (hprocess)
 		// {
@@ -150,7 +150,7 @@ void __stdcall ServiceMain(DWORD argc, LPWSTR *argv)
 
 		if (remote_ip < 0 || !freeze::detail::check_ip_address(static_cast<uint32_t>(remote_ip)))
 		{
-			DEBUG_STRING(L"@rg ServiceMain: remote ip not set, {}!\n"sv, reset_ip_error(remote_ip));
+			DEBUG_STRING(L"@rg ServiceMain: remote ip not set, {}, will stop!\n"sv, reset_ip_error(remote_ip));
 			stop_service();
 			goto theend;
 		}

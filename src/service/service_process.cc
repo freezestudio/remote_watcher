@@ -82,6 +82,7 @@ static HANDLE as_explorer_token()
 
     HANDLE hToken = nullptr;
     auto opened = OpenProcessToken(hProcess, TOKEN_ALL_ACCESS, &hToken);
+    CloseHandle(hProcess);
     if (!opened)
     {
         auto err = GetLastError();
@@ -139,10 +140,23 @@ DWORD create_process_ex(HANDLE &hProcess, HANDLE &hThread)
         return 0;
     }
 
-    auto _path_file = std::format(L"\"%ProgramFiles%\\xMonit\\{0}.exe\" --config \"%ProgramFiles%\\xMonit\\{0}.cfg\""sv, MT_NAME);
-    wchar_t _expath[MAX_PATH]{};
-    ExpandEnvironmentStrings(_path_file.c_str(), _expath, MAX_PATH);
-    std::wstring cmd = _expath;
+    wchar_t _tp_path_str[MAX_PATH]{};
+    auto _tp_path = std::format(L"%ProgramFiles%\\xMonit\\{}.exe"sv, MT_NAME);
+    ExpandEnvironmentStrings(_tp_path.c_str(), _tp_path_str, MAX_PATH);
+    DEBUG_STRING(L"@rg CreateProcessEx: transport={}.\n"sv, _tp_path_str);
+    if(!fs::exists(fs::path(_tp_path_str)))
+    {
+        DEBUG_STRING(L"@rg CreateProcessEx: transport not found.\n"sv);
+        return 0;
+    }
+
+    wchar_t _tp_cfg_str[MAX_PATH]{};
+    auto _tp_cfg = std::format(L"%ProgramFiles%\\xMonit\\{}.cfg"sv, MT_NAME);
+    ExpandEnvironmentStrings(_tp_cfg.c_str(), _tp_cfg_str, MAX_PATH);
+    DEBUG_STRING(L"@rg CreateProcessEx: transport config={}.\n"sv, _tp_cfg_str);
+
+    std::wstring cmd = std::format(L"\"{}\" --config \"{}\""sv, _tp_path_str, _tp_cfg_str);
+    DEBUG_STRING(L"@rg CreateProcessEx: command={}.\n"sv, cmd);
 
     STARTUPINFO si = {sizeof(STARTUPINFO)};
     PROCESS_INFORMATION pi = {};
@@ -161,7 +175,7 @@ DWORD create_process_ex(HANDLE &hProcess, HANDLE &hThread)
         nullptr,
         &si,
         &pi);
-
+    CloseHandle(token);
     if (ret)
     {
         hProcess = pi.hProcess;
