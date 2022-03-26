@@ -72,7 +72,9 @@ void reset_work_folder(bool notify /* = false */)
 	if (notify)
 	{
 		DEBUG_STRING(L"@rg reset_work_folder(): Will Wakeup _WorkThread ...\n");
-		auto ret = QueueUserAPC([](ULONG_PTR) { global_reason_worker=work_reason_act_folder; }, hh_worker_thread, 0);
+		auto ret = QueueUserAPC([](ULONG_PTR)
+								{ global_reason_worker = work_reason_act_folder; },
+								hh_worker_thread, 0);
 		if (ret)
 		{
 			DEBUG_STRING(L"@rg reset_work_folder(): Wakeup _WorkThread done.\n");
@@ -124,7 +126,7 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 #endif
-		
+
 		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, reason={}.\n"sv, global_reason_worker);
 		if (global_reason_worker == work_reason_act__empty)
 		{
@@ -132,23 +134,27 @@ DWORD __stdcall _WorkerThread(LPVOID)
 			continue;
 		}
 
-		DEBUG_STRING(L"@rg WorkerThread: when Wakeup, check work folder ...\n");
-		// task: change watch folder
-		if (freeze::detail::check_exists(g_work_folder))
+		if (global_reason_worker == work_reason_act_folder || global_reason_worker == work_reason_act_igonre)
 		{
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, will run reset work folder: {} ...\n"sv, g_work_folder.c_str());
-			bb_worker_is_working = true;
-			watcher.stop();
-			watcher.set_watch_folder(g_work_folder);
-			watcher.set_ignore_folders(g_work_ignore_folders);
-			watcher.start();
-			bb_worker_is_working = false;
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch-folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
+			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, check work folder ...\n");
+			// task: change watch folder
+			if (freeze::detail::check_exists(g_work_folder))
+			{
+				DEBUG_STRING(L"@rg WorkerThread: when Wakeup, will run reset work folder: {} ...\n"sv, g_work_folder.c_str());
+				bb_worker_is_working = true;
+				watcher.stop();
+				watcher.set_watch_folder(g_work_folder);
+				watcher.set_ignore_folders(g_work_ignore_folders);
+				watcher.start();
+				bb_worker_is_working = false;
+				DEBUG_STRING(L"@rg WorkerThread: when Wakeup, set watch-folder={}, Watcher re-started.\n"sv, g_work_folder.c_str());
+			}
+			else
+			{
+				DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the watch-folder={}, maybe is null.\n"sv, g_work_folder.c_str());
+			}
 		}
-		else
-		{
-			DEBUG_STRING(L"@rg WorkerThread: when Wakeup, the watch-folder={}, maybe is null.\n"sv, g_work_folder.c_str());
-		}
+
 		DEBUG_STRING(L"@rg WorkerThread: Alerable Wakeup, Done.\n");
 	}
 
@@ -574,9 +580,9 @@ bool test_worker_thread()
 	{
 		return true;
 	}
-	
+
 	auto ret = QueueUserAPC([](ULONG_PTR)
-							{ global_reason_worker=work_reason_act__empty; },
+							{ global_reason_worker = work_reason_act__empty; },
 							hh_worker_thread, 0);
 	if (!ret)
 	{

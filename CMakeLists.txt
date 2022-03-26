@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20.0)
 
 # project name
-project(remote_win32)
+project(remote_win32 VERSION 0.9.0)
 
 # if Release set THIS_DISABLE_DEBUG_TEST to OFF, else set ON.
 option(THIS_DISABLE_DEBUG_TEST "if config is not `Debug`, then disable build tests." OFF)
