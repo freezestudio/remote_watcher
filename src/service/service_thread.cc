@@ -280,13 +280,14 @@ DWORD __stdcall _SleepThread(LPVOID)
 	// thread sleep ...
 	while (!bb_sleep_thread_exit)
 	{
-		DEBUG_STRING(L"@rg SleepThread: Waiting Wakeup ...\n");
+		DEBUG_STRING(L"@rg SleepThread: Sleep, Waiting Wakeup ...\n");
 
 		// wait until some reason changed.
 		auto reason = global_reason_signal.wait_reason();
 		DEBUG_STRING(L"@rg SleepThread: Wakeup Reason: {}.\n"sv, reason_string(reason));
 		if (reason == sync_reason_exit__thread)
 		{
+			DEBUG_STRING(L"@rg SleepThread: Wakeup Reason: sync_reason_exit__thread.\n");
 			break;
 		}
 

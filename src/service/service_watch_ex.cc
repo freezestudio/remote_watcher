@@ -119,7 +119,7 @@ namespace freeze
 		}
 	}
 
-	void folder_watchor_base::notify_information_handle(DWORD dwNumberOfBytesTransfered)
+	bool folder_watchor_base::notify_information_handle(DWORD dwNumberOfBytesTransfered)
 	{
 		// lock in completion_routine()
 		std::lock_guard<std::mutex> lock(mutex);
@@ -127,21 +127,22 @@ namespace freeze
 		if (dwNumberOfBytesTransfered == 0 || dwNumberOfBytesTransfered > read_buffer.size())
 		{
 			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): maybe need more buffer.\n");
-			return;
+			return false;
 		}
 
 		if (!watch_tree_ptr)
 		{
 			DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): watch tree pointer is null.\n");
-			return;
+			return false;
 		}
 
 		auto data = read_buffer.data();
 		auto processed_number = 0;
+		bool need_notify = false;
 		while (true)
 		{
 			auto info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(data);
-			parse_notify_information(info);
+			need_notify = parse_notify_information(info) || need_notify;
 			processed_number += info->NextEntryOffset;
 			if (info->NextEntryOffset == 0 || processed_number > dwNumberOfBytesTransfered)
 			{
@@ -150,15 +151,16 @@ namespace freeze
 			}
 			data += info->NextEntryOffset;
 		}
-		DEBUG_STRING(L"notify information handle done.\n");
+		DEBUG_STRING(L"folder_watchor_base::notify_information_handle(): notify information handle done.\n");
+		return need_notify;
 	}
 
-	void folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
+	bool folder_watchor_base::parse_notify_information(PFILE_NOTIFY_INFORMATION info)
 	{
 		if (info->Action < FILE_ACTION_ADDED || info->Action > FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() failure: action{}.\n", detail::to_str(info->Action));
-			return;
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() failure: action={}.\n", detail::to_str(info->Action));
+			return false;
 		}
 
 		auto s_filename = detail::to_utf8(info->FileName, info->FileNameLength / sizeof(wchar_t));
@@ -168,36 +170,39 @@ namespace freeze
 
 		if (info->Action == FILE_ACTION_REMOVED || info->Action == FILE_ACTION_RENAMED_OLD_NAME)
 		{
-			DEBUG_STRING(L"Ignore: parse notify {}, name={}\n"sv, info->Action, filename);
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() Ignore: parse notify={}, name={}\n"sv, info->Action, filename);
 
 			auto file_path = fs::path{ filename }.lexically_normal();
 			watch_tree_ptr->remove(file_path);
-			return;
+			return false;
 		}
 
 		if (!fs::exists(full_filename))
 		{
-			DEBUG_STRING(L"Ignore: parse notify {}, name={}, not exists.\n"sv, detail::to_str(info->Action), filename);
-			return;
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() Ignore: parse notify={}, name={}, not exists.\n"sv, detail::to_str(info->Action), filename);
+			return false;
 		}
 
 		if (info->Action == FILE_ACTION_MODIFIED)
 		{
-			DEBUG_STRING(L"Ignore: parse notify FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
-			return;
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() Ignore: parse notify=FILE_ACTION_MODIFIED, name={}.\n"sv, filename);
+			return false;
 		}
 
+		bool need_notify = false;
 		if (info->Action == FILE_ACTION_ADDED || info->Action == FILE_ACTION_RENAMED_NEW_NAME)
 		{
-			DEBUG_STRING(L"Update: parse notify {}, name={}\n"sv, detail::to_str(info->Action), filename.c_str());
+			DEBUG_STRING(L"folder_watchor_base::parse_notify_information() Update: parse notify={}, name={}\n"sv, detail::to_str(info->Action), filename.c_str());
 
 			if (fs::is_regular_file(full_filename))
 			{
 				auto file_path = fs::path{ filename }.lexically_normal();
 				watch_tree_ptr->add(file_path);
-				DEBUG_STRING(L"Update: watch-tree added: {}\n"sv, file_path.c_str());
+				need_notify = true;
+				DEBUG_STRING(L"folder_watchor_base::parse_notify_information() Update: watch-tree added: {}\n"sv, file_path.c_str());
 			}
 		}
+		return need_notify;
 	}
 
 	bool folder_watchor_base::folder_exists() const
@@ -412,11 +417,11 @@ namespace freeze
 
 		self->write_buffer.swap(self->read_buffer);
 		self->watch();
-		self->notify_information_handle(num);
+		bool need_notify = self->notify_information_handle(num);
 
 		// TODO: need refact?
 		auto count = self->watch_tree_ptr->current_count();
-		if (count > 0)
+		if (count > 0 && need_notify)
 		{
 			DEBUG_STRING(L"folder_watchor_apc::completion_routine(): parse {} files, notify!\n"sv, count);
 			self->watch_tree_ptr->notify();
@@ -464,6 +469,7 @@ namespace freeze
 			&overlapped,
 			nullptr) != FALSE;
 		// block until completion ...
+		bool need_notify = false;
 		if (result)
 		{
 			if (!io_port_handle)
@@ -487,7 +493,7 @@ namespace freeze
 			if (result)
 			{
 				write_buffer.swap(read_buffer);
-				this->notify_information_handle(bytes_transfer);
+				need_notify = this->notify_information_handle(bytes_transfer);
 			}
 			else
 			{
@@ -506,7 +512,7 @@ namespace freeze
 		if (result)
 		{
 			auto count = watch_tree_ptr->current_count();
-			if (count > 0)
+			if (count > 0 && need_notify)
 			{
 				DEBUG_STRING(L"folder_watchor_status::watch(): parse {} files, notify!\n"sv, count);
 				watch_tree_ptr->notify();
@@ -598,6 +604,7 @@ namespace freeze
 		}
 
 		// block waiting ...
+		bool need_notify = false;
 		if (result)
 		{
 			DWORD bytes_transfer = 0;
@@ -614,7 +621,7 @@ namespace freeze
 				{
 					ResetEvent(overlapped.hEvent);
 					write_buffer.swap(read_buffer);
-					this->notify_information_handle(bytes_transfer);
+					need_notify = this->notify_information_handle(bytes_transfer);
 				}
 				else
 				{
@@ -647,7 +654,7 @@ namespace freeze
 		if (result)
 		{
 			auto count = watch_tree_ptr->current_count();
-			if (count > 0)
+			if (count > 0 && need_notify)
 			{
 				DEBUG_STRING(L"folder_watchor_result::watch(): parse {} files, notify!\n"sv, count);
 				watch_tree_ptr->notify();

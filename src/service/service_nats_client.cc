@@ -621,6 +621,93 @@ namespace freeze::detail
 			return 0;
 		}
 
+		uintmax_t set_blob_ex(uint8_t *data, uintmax_t *len, fs::path const &folder, fs::path const &file)
+		{
+			auto full_path_file = (folder / file).lexically_normal();
+			*len = fs::file_size(full_path_file);
+			if (nullptr == data)
+			{
+				return _set_blob_count(len, full_path_file);
+			}
+
+			// std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(*len);
+			// auto success = freeze::detail::read_file(full_path_file, *len, buffer.get());
+			auto success = freeze::detail::read_file(full_path_file, *len, data);
+			if (success)
+			{
+				return _set_blob_msg(data, *len, file);
+			}
+		}
+
+	private:
+		uintmax_t _set_blob_count(uintmax_t *len, fs::path const &full_path_file)
+		{
+			if (!fs::exists(full_path_file))
+			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_count() error: file {}, not exists.\n"sv, full_path_file.c_str());
+				return 0;
+			}
+			if (nullptr == len)
+			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_count() error: file {}, len-ptr is nullptr.\n"sv, full_path_file.c_str());
+				return 0;
+			}
+			if (*len == 0)
+			{
+				*len = fs::file_size(full_path_file);
+			}
+			DEBUG_STRING(L"_nats_msg::_set_blob_count() get file {}, file-size={}.\n"sv, full_path_file.c_str(), *len);
+			return *len;
+		}
+
+		uintmax_t _set_blob_msg(uint8_t *data, uintmax_t len, fs::path const &file)
+		{
+			_destroy();
+			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char *>(data), len) == NATS_OK;
+			if (!ok)
+			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg() error.\n");
+				return 0;
+			}
+			ok = _clear_headers();
+			if (!ok)
+			{
+				return 0;
+			}
+			ok = _add_header("type", "data");
+			if (!ok)
+			{
+				return 0;
+			}
+			std::wstring filename = file.c_str();
+			ok = _add_header("name", detail::to_utf8(filename.c_str(), filename.size()));
+			if (!ok)
+			{
+				return 0;
+			}
+			ok = _add_header("size", std::to_string(len));
+			if (!ok)
+			{
+				return 0;
+			}
+			auto prefix = "mime/"s;
+			auto suffix = file.extension();
+			auto str_suf = suffix.string();
+			if (str_suf.starts_with("."))
+			{
+				prefix += str_suf.substr(1);
+			}
+			else
+			{
+				prefix += str_suf;
+			}
+			ok = _add_header("mime", prefix);
+			if (!ok)
+			{
+				return 0;
+			}
+		}
+
 	private:
 		bool _auto_ack()
 		{
@@ -922,7 +1009,7 @@ namespace freeze::detail
 			_nats_msg data_msg{payload_channel.data()};
 			uint8_t *buffer = nullptr;
 			uintmax_t buffer_size = 0;
-			auto ret_count = data_msg.set_blob(buffer, &buffer_size, folder, file);
+			auto ret_count = data_msg.set_blob_ex(buffer, &buffer_size, folder, file);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: zero data.\n");
@@ -931,7 +1018,7 @@ namespace freeze::detail
 
 			// TODO: refact unique_ptr
 			buffer = new uint8_t[ret_count]{};
-			ret_count = data_msg.set_blob(buffer, &buffer_size, folder, file);
+			ret_count = data_msg.set_blob_ex(buffer, &buffer_size, folder, file);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: data is null.\n");
@@ -1010,7 +1097,7 @@ namespace freeze::detail
 
 			uint8_t *buffer = nullptr;
 			uintmax_t buffer_size = 0;
-			auto ret_count = data_msg.set_blob(buffer, &buffer_size, file_path, file_name);
+			auto ret_count = data_msg.set_blob_ex(buffer, &buffer_size, file_path, file_name);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: zero data.\n");
@@ -1019,7 +1106,7 @@ namespace freeze::detail
 
 			// TODO: refact use unique_ptr
 			buffer = new uint8_t[ret_count]{};
-			ret_count = data_msg.set_blob(buffer, &buffer_size, file_path, file_name);
+			ret_count = data_msg.set_blob_ex(buffer, &buffer_size, file_path, file_name);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: data is null.\n");
@@ -1037,7 +1124,7 @@ namespace freeze::detail
 			// try test reply message
 			// response = {name, size, result: true}
 
-			if(buffer)
+			if (buffer)
 			{
 				delete[] buffer;
 				buffer = nullptr;

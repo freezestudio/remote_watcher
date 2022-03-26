@@ -69,8 +69,8 @@ namespace freeze
 	public:
 		bool folder_exists() const;
 		void reset_buffer(uint32_t = large_buffer_size);
-		void notify_information_handle(DWORD);
-		void parse_notify_information(PFILE_NOTIFY_INFORMATION);
+		bool notify_information_handle(DWORD);
+		bool parse_notify_information(PFILE_NOTIFY_INFORMATION);
 
 	protected:
 		OVERLAPPED overlapped;

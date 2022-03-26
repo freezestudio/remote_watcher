@@ -102,4 +102,9 @@ namespace freeze::detail
 	std::vector<tree_information> get_dirtree_info(fs::path const&, std::vector<fs::path> const&);
 }
 
+namespace freeze::detail
+{
+	bool read_file(fs::path const&, uintmax_t, uint8_t*);
+}
+
 #endif
