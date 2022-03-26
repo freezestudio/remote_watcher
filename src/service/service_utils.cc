@@ -605,6 +605,34 @@ namespace freeze::detail
 {
 	bool read_file(fs::path const &file, uintmax_t size, uint8_t *data)
 	{
+		std::ifstream ifs;
+		if (!fs::exists(file))
+		{
+			DEBUG_STRING(L"read_file() open file error: file {}, not exists.\n"sv, file.c_str());
+			return false;
+		}
+
+		ifs.clear();
+		ifs.open(file, std::ios::binary | std::ios::in);
+		if (ifs.is_open())
+		{
+			auto &_self = ifs.read(reinterpret_cast<char *>(data), size);
+			auto read_count = ifs.gcount();
+			auto ok = !!_self;
+			if (!ok)
+			{
+				ifs.close();
+				DEBUG_STRING(L"read_file() open file error: code={}.\n"sv, ifs.rdstate());
+				return false;
+			}
+			return true;
+		}
+		DEBUG_STRING(L"read_file() open file error: not opened, code={}.\n"sv, ifs.rdstate());
+		return false;
+	}
+
+	bool read_file_ex(fs::path const &file, uintmax_t size, uint8_t *data)
+	{
 		auto file_handle = CreateFile(
 			file.c_str(),
 			GENERIC_READ,
@@ -615,11 +643,16 @@ namespace freeze::detail
 			nullptr);
 		if (INVALID_HANDLE_VALUE == file_handle)
 		{
-			// TODO: error
+			auto err = GetLastError();
+			DEBUG_STRING(L"read_file: {}, CreateFile error={}\n"sv, file.c_str(), err);
 			return false;
 		}
 		auto success = ReadFile(file_handle, data, size, nullptr, nullptr);
-		// TODO: !success
+		if (!success)
+		{
+			auto err = GetLastError();
+			DEBUG_STRING(L"read_file: {}, ReadFile error={}\n"sv, file.c_str(), err);
+		}
 		CloseHandle(file_handle);
 		return !!success;
 	}

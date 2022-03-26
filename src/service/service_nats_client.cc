@@ -621,73 +621,51 @@ namespace freeze::detail
 			return 0;
 		}
 
-		uintmax_t set_blob_ex(uint8_t *data, uintmax_t *len, fs::path const &folder, fs::path const &file)
+		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &folder, fs::path const &file)
 		{
-			auto full_path_file = (folder / file).lexically_normal();
-			*len = fs::file_size(full_path_file);
-			if (nullptr == data)
-			{
-				return _set_blob_count(len, full_path_file);
-			}
-
-			// std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(*len);
-			// auto success = freeze::detail::read_file(full_path_file, *len, buffer.get());
-			auto success = freeze::detail::read_file(full_path_file, *len, data);
+			Sleep(300);
+			auto success = freeze::detail::read_file(folder / file, len, data);
 			if (success)
 			{
-				return _set_blob_msg(data, *len, file);
+				return _set_blob_msg(data, len, file);
 			}
+			DEBUG_STRING(L"_nats_msg::set_blob_ex() error: make message failure.\n");
+			return 0;
 		}
 
 	private:
-		uintmax_t _set_blob_count(uintmax_t *len, fs::path const &full_path_file)
-		{
-			if (!fs::exists(full_path_file))
-			{
-				DEBUG_STRING(L"_nats_msg::_set_blob_count() error: file {}, not exists.\n"sv, full_path_file.c_str());
-				return 0;
-			}
-			if (nullptr == len)
-			{
-				DEBUG_STRING(L"_nats_msg::_set_blob_count() error: file {}, len-ptr is nullptr.\n"sv, full_path_file.c_str());
-				return 0;
-			}
-			if (*len == 0)
-			{
-				*len = fs::file_size(full_path_file);
-			}
-			DEBUG_STRING(L"_nats_msg::_set_blob_count() get file {}, file-size={}.\n"sv, full_path_file.c_str(), *len);
-			return *len;
-		}
-
 		uintmax_t _set_blob_msg(uint8_t *data, uintmax_t len, fs::path const &file)
 		{
 			_destroy();
 			auto ok = natsMsg_Create(&_msg, _sub.c_str(), nullptr, reinterpret_cast<char *>(data), len) == NATS_OK;
 			if (!ok)
 			{
-				DEBUG_STRING(L"_nats_msg::_set_blob_msg() error.\n");
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): create message error.\n");
 				return 0;
 			}
 			ok = _clear_headers();
 			if (!ok)
 			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): clear header error.\n");
 				return 0;
 			}
 			ok = _add_header("type", "data");
 			if (!ok)
 			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): add header[type] error.\n");
 				return 0;
 			}
 			std::wstring filename = file.c_str();
 			ok = _add_header("name", detail::to_utf8(filename.c_str(), filename.size()));
 			if (!ok)
 			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): add header[name] error.\n");
 				return 0;
 			}
 			ok = _add_header("size", std::to_string(len));
 			if (!ok)
 			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): add header[size] error.\n");
 				return 0;
 			}
 			auto prefix = "mime/"s;
@@ -704,8 +682,10 @@ namespace freeze::detail
 			ok = _add_header("mime", prefix);
 			if (!ok)
 			{
+				DEBUG_STRING(L"_nats_msg::_set_blob_msg(): add header[mime] error.\n");
 				return 0;
 			}
+			return len;
 		}
 
 	private:
@@ -1001,24 +981,20 @@ namespace freeze::detail
 			return status == NATS_OK;
 		}
 
-		bool publish_payload(fs::path const &folder, fs::path const &file)
+		bool publish_payload(fs::path const &file_path, fs::path const &file_name)
 		{
-			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}, {}\n"sv, folder.c_str(), file.c_str());
+			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
 			std::lock_guard<std::mutex> lock(_mutex);
 
 			_nats_msg data_msg{payload_channel.data()};
-			uint8_t *buffer = nullptr;
-			uintmax_t buffer_size = 0;
-			auto ret_count = data_msg.set_blob_ex(buffer, &buffer_size, folder, file);
-			if (ret_count == 0)
+			auto file_size = fs::file_size(file_path / file_name);
+			if (file_size == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: zero data.\n");
 				return false;
 			}
-
-			// TODO: refact unique_ptr
-			buffer = new uint8_t[ret_count]{};
-			ret_count = data_msg.set_blob_ex(buffer, &buffer_size, folder, file);
+			std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(file_size);
+			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, file_path, file_name);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: data is null.\n");
@@ -1032,11 +1008,6 @@ namespace freeze::detail
 			{
 				// NATS_MAX_PAYLOAD = 21
 				DEBUG_STRING(L"_nats_connect::publish_payload() request-msg error: status={}.\n"sv, nats_status(status));
-				if (buffer)
-				{
-					delete[] buffer;
-					buffer = nullptr;
-				}
 				return ok;
 			}
 
@@ -1052,7 +1023,7 @@ namespace freeze::detail
 
 					// test only
 					auto _wcs_name = detail::to_utf16(_mbs_name);
-					ok = fs::path{_wcs_name} == file;
+					ok = fs::path{_wcs_name} == file_name;
 					DEBUG_STRING(L"_nats_connect::publish_payload() reply message: {}, result={}.\n"sv, _wcs_name, ok);
 				}
 				else
@@ -1063,7 +1034,7 @@ namespace freeze::detail
 
 				if (ok)
 				{
-					DEBUG_STRING(L"_nats_connect::publish_payload() response file: {}, success.\n"sv, file.c_str());
+					DEBUG_STRING(L"_nats_connect::publish_payload() response file: {}, success.\n"sv, file_name.c_str());
 				}
 				else
 				{
@@ -1075,14 +1046,6 @@ namespace freeze::detail
 				// OutputDebugStringA(e.what());
 				auto wcs = detail::to_utf16(std::string(e.what()));
 				DEBUG_STRING(wcs.c_str());
-				goto theend;
-			}
-
-		theend:
-			if (buffer)
-			{
-				delete[] buffer;
-				buffer = nullptr;
 			}
 
 			return ok;
@@ -1094,19 +1057,14 @@ namespace freeze::detail
 			std::lock_guard<std::mutex> lock(_mutex);
 
 			_nats_msg data_msg{synfile_send_channel.data()};
-
-			uint8_t *buffer = nullptr;
-			uintmax_t buffer_size = 0;
-			auto ret_count = data_msg.set_blob_ex(buffer, &buffer_size, file_path, file_name);
-			if (ret_count == 0)
+			auto file_size = fs::file_size(file_path / file_name);
+			if (file_size == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: zero data.\n");
 				return false;
 			}
-
-			// TODO: refact use unique_ptr
-			buffer = new uint8_t[ret_count]{};
-			ret_count = data_msg.set_blob_ex(buffer, &buffer_size, file_path, file_name);
+			std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(file_size);
+			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, file_path, file_name);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: data is null.\n");
@@ -1124,11 +1082,6 @@ namespace freeze::detail
 			// try test reply message
 			// response = {name, size, result: true}
 
-			if (buffer)
-			{
-				delete[] buffer;
-				buffer = nullptr;
-			}
 			return ok;
 		}
 

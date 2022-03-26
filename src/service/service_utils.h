@@ -9,6 +9,7 @@
 #include <memory>
 #include <utility>
 #include <filesystem>
+#include <fstream>
 #include <tuple>
 #include <regex>
 
@@ -105,6 +106,7 @@ namespace freeze::detail
 namespace freeze::detail
 {
 	bool read_file(fs::path const&, uintmax_t, uint8_t*);
+	bool read_file_ex(fs::path const&, uintmax_t, uint8_t*);
 }
 
 #endif
