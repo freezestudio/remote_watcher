@@ -623,14 +623,14 @@ namespace freeze::detail
 
 		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &folder, fs::path const &file = {})
 		{
-			Sleep(300);
 			auto _path_file = folder;
 			if (!fs::is_empty(file))
 			{
 				_path_file /= file;
 			}
 			// TODO: use read_file_ex inteed.
-			auto success = freeze::detail::read_file(_path_file);
+			Sleep(300);
+			auto success = freeze::detail::read_file(_path_file, len, data);
 			if (success)
 			{
 				return _set_blob_msg(data, len, file);
