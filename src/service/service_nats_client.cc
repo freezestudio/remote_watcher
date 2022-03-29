@@ -621,19 +621,14 @@ namespace freeze::detail
 			return 0;
 		}
 
-		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &folder, fs::path const &file = {})
+		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &path_file)
 		{
-			auto _path_file = folder;
-			if (!fs::is_empty(file))
-			{
-				_path_file /= file;
-			}
 			// TODO: use read_file_ex inteed.
 			Sleep(300);
-			auto success = freeze::detail::read_file(_path_file, len, data);
+			auto success = freeze::detail::read_file(path_file, len, data);
 			if (success)
 			{
-				return _set_blob_msg(data, len, file);
+				return _set_blob_msg(data, len, path_file.filename());
 			}
 			DEBUG_STRING(L"_nats_msg::set_blob_ex() error: make message failure.\n");
 			return 0;
@@ -989,18 +984,19 @@ namespace freeze::detail
 
 		bool publish_payload(fs::path const &file_path, fs::path const &file_name)
 		{
-			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
+			auto _path_file = file_path / file_name;
+			DEBUG_STRING(L"_nats_connect::publish_payload(): send {}\n"sv, _path_file.c_str());
 			std::lock_guard<std::mutex> lock(_mutex);
 
 			_nats_msg data_msg{payload_channel.data()};
-			auto file_size = fs::file_size(file_path / file_name);
+			auto file_size = fs::file_size(_path_file);
 			if (file_size == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: zero data.\n");
 				return false;
 			}
 			std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(file_size);
-			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, file_path, file_name);
+			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, _path_file);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_payload() error: data is null.\n");
@@ -1592,7 +1588,7 @@ namespace freeze
 		else if (_recv_msg.name == std::string(MSG_FOLDER))
 		{
 			auto wcs_folder = detail::read_latest_folder();
-			DEBUG_STRING(L"nats_client::message_response(): notify-message[watch-folder]: current watch folder: {}\n"sv, wcs_folder);
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[watch-folder]: current watch folder: {}.\n"sv, wcs_folder);
 
 			std::vector<std::string> _one;
 			if (!wcs_folder.empty())
@@ -1600,6 +1596,7 @@ namespace freeze
 				// TODO: erase \u0000
 				auto mbs_folder = detail::to_utf8(wcs_folder);
 				_one.emplace_back(mbs_folder);
+				_watch_path = fs::path(detail::to_utf16(mbs_folder));
 			}
 			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
 		}
@@ -1617,8 +1614,12 @@ namespace freeze
 					ignores.emplace_back(detail::to_utf16(item));
 				}
 			}
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[tree-info]: path={}, ignores size={}.\n"sv,
+						 _sync_path.c_str(), _sync_igonres.size());
 			// TODO: refact _sync_path,ignore to _tree_info?
 			auto tree_info = detail::get_dirtree_info(root, ignores);
+			DEBUG_STRING(L"nats_client::message_response(): notify-message[tree-info]: call get_dirtree_info(path, ignores), size={}.\n"sv,
+						 tree_info.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, tree_info);
 		}
 		else
@@ -1678,6 +1679,10 @@ namespace freeze
 	{
 		try
 		{
+			if (_sync_path.empty())
+			{
+				_sync_path = _watch_path;
+			}
 			DEBUG_STRING(L"nats_client::sync_files(): sync-path={}"sv, _sync_path.c_str());
 			auto tree_paths = freeze::detail::get_dirtree_paths(_sync_path, _sync_igonres);
 			DEBUG_STRING(L"nats_client::sync_files(): get_dirtree_paths size={}"sv, tree_paths.size());
