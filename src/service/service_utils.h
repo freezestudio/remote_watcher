@@ -101,6 +101,7 @@ namespace freeze::detail
 	std::vector<std::string> get_directories_without_subdir(fs::path const&);
 	std::vector<std::string> get_files_without_subdir(fs::path const&);
 	std::vector<tree_information> get_dirtree_info(fs::path const&, std::vector<fs::path> const&);
+	std::vector<fs::path> get_dirtree_paths(fs::path const&, std::vector<fs::path> const&);
 }
 
 namespace freeze::detail

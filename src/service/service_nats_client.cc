@@ -621,10 +621,16 @@ namespace freeze::detail
 			return 0;
 		}
 
-		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &folder, fs::path const &file)
+		uintmax_t set_blob_ex(uint8_t *data, uintmax_t len, fs::path const &folder, fs::path const &file = {})
 		{
 			Sleep(300);
-			auto success = freeze::detail::read_file(folder / file, len, data);
+			auto _path_file = folder;
+			if (!fs::is_empty(file))
+			{
+				_path_file /= file;
+			}
+			// TODO: use read_file_ex inteed.
+			auto success = freeze::detail::read_file(_path_file);
 			if (success)
 			{
 				return _set_blob_msg(data, len, file);
@@ -1051,20 +1057,20 @@ namespace freeze::detail
 			return ok;
 		}
 
-		bool publish_file(fs::path const &file_path, fs::path const &file_name)
+		bool publish_file(fs::path const &file_path)
 		{
-			DEBUG_STRING(L"_nats_connect::publish_file(): send {}, {}\n"sv, file_path.c_str(), file_name.c_str());
+			DEBUG_STRING(L"_nats_connect::publish_file(): send={}\n"sv, file_path.c_str());
 			std::lock_guard<std::mutex> lock(_mutex);
 
 			_nats_msg data_msg{synfile_send_channel.data()};
-			auto file_size = fs::file_size(file_path / file_name);
+			auto file_size = fs::file_size(file_path);
 			if (file_size == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: zero data.\n");
 				return false;
 			}
 			std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(file_size);
-			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, file_path, file_name);
+			auto ret_count = data_msg.set_blob_ex(buffer.get(), file_size, file_path);
 			if (ret_count == 0)
 			{
 				DEBUG_STRING(L"_nats_connect::publish_file() error: data is null.\n");
@@ -1673,11 +1679,11 @@ namespace freeze
 		try
 		{
 			DEBUG_STRING(L"nats_client::sync_files(): sync-path={}"sv, _sync_path.c_str());
-			auto dir_informations = freeze::detail::get_dirtree_info(_sync_path, _sync_igonres);
-			DEBUG_STRING(L"nats_client::sync_files(): get_dirtree_info size={}"sv, dir_informations.size());
-			for (auto info : dir_informations)
+			auto tree_paths = freeze::detail::get_dirtree_paths(_sync_path, _sync_igonres);
+			DEBUG_STRING(L"nats_client::sync_files(): get_dirtree_paths size={}"sv, tree_paths.size());
+			for (auto _path : tree_paths)
 			{
-				pimpl->publish_file(info.file_path, info.file_name);
+				pimpl->publish_file(_path);
 			}
 		}
 		catch (const std::exception &e)

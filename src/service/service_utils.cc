@@ -576,11 +576,12 @@ namespace freeze::detail
 		fs::recursive_directory_iterator iter{root};
 		for (auto const &it : iter)
 		{
-			if (is_include(ignores, it.path()))
+			auto _path = it.path();
+			if (is_include(ignores, _path))
 			{
 				iter.disable_recursion_pending();
+				continue;
 			}
-			auto _path = it.path();
 
 			auto mbs_path = to_utf8(_path.c_str());
 			// std::cout << iter.depth() << ": path=" << mbs_path << std::endl;
@@ -595,6 +596,48 @@ namespace freeze::detail
 					auto info = tree_information{path_name, file_name, file_size};
 					tree.emplace_back(info);
 				}
+			}
+		}
+		return tree;
+	}
+
+	std::vector<fs::path> get_dirtree_paths(fs::path const &root, std::vector<fs::path> const &ignores)
+	{
+		std::vector<fs::path> tree;
+		if (root.empty() || !fs::exists(root))
+		{
+			return tree;
+		}
+
+		auto is_include = [](auto vec, auto p)
+		{
+			for (auto i : vec)
+			{
+				if (i == p)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+		auto equals = [](auto path_like)
+		{
+			std::regex suf("\\.(tif{1,2}|dcm)$", std::regex::ECMAScript | std::regex::icase);
+			return std::regex_search(path_like, suf);
+		};
+
+		fs::recursive_directory_iterator iter{root};
+		for (auto const &it : iter)
+		{
+			auto _path = it.path();
+			if (is_include(ignores, _path))
+			{
+				iter.disable_recursion_pending();
+			}
+			else
+			{
+				tree.emplace_back(_path);
 			}
 		}
 		return tree;
@@ -633,25 +676,28 @@ namespace freeze::detail
 
 	bool read_file_ex(fs::path const &file, uintmax_t size, uint8_t *data)
 	{
+		// TODO: use asynchronous I/O
 		auto file_handle = CreateFile(
 			file.c_str(),
 			GENERIC_READ,
 			FILE_SHARE_READ,
 			nullptr,
 			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
+			FILE_ATTRIBUTE_NORMAL, // FILE_FLAG_OVERLAPPED
 			nullptr);
 		if (INVALID_HANDLE_VALUE == file_handle)
 		{
 			auto err = GetLastError();
-			DEBUG_STRING(L"read_file: {}, CreateFile error={}\n"sv, file.c_str(), err);
+			DEBUG_STRING(L"read_file_ex: {}, CreateFile error={}\n"sv, file.c_str(), err);
 			return false;
 		}
-		auto success = ReadFile(file_handle, data, size, nullptr, nullptr);
+		// TODO: use OVERLAPPED, or ReadFileEx
+		DWORD number_of_bytes_read = 0;
+		auto success = ReadFile(file_handle, data, size, &number_of_bytes_read, nullptr);
 		if (!success)
 		{
 			auto err = GetLastError();
-			DEBUG_STRING(L"read_file: {}, ReadFile error={}\n"sv, file.c_str(), err);
+			DEBUG_STRING(L"read_file_ex: {}, ReadFile error={}\n"sv, file.c_str(), err);
 		}
 		CloseHandle(file_handle);
 		return !!success;
