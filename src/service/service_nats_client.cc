@@ -1679,7 +1679,10 @@ namespace freeze
 	{
 		try
 		{
-			_sync_path = _watch_path;
+			Sleep(50);
+			auto latest_folder = freeze::detail::read_latest_folder();
+			Sleep(50);
+			_sync_path = fs::path(detail::to_utf16(detail::to_utf8(latest_folder)));
 			DEBUG_STRING(L"nats_client::sync_files(): sync-path={}"sv, _sync_path.c_str());
 			auto tree_paths = freeze::detail::get_dirtree_paths(_sync_path, _sync_igonres);
 			DEBUG_STRING(L"nats_client::sync_files(): get_dirtree_paths size={}"sv, tree_paths.size());
