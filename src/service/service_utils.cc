@@ -241,11 +241,13 @@ namespace freeze::detail
 			return false;
 		}
 		status = regkey.SetStringValue(L"latest", folder.c_str());
+		Sleep(50);
 		return regkey_status(status, L"save_latest_folder");
 	}
 
 	std::wstring read_latest_folder()
 	{
+		// TODO: how to lock threads.
 		freeze::reg_key regkey;
 		auto status = regkey.Open(HKEY_CURRENT_USER, L"Software\\richgolden\\rgmsvc");
 		if (!regkey_status(status, L"read_latest_folder"))

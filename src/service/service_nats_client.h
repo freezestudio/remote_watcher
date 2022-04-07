@@ -370,8 +370,8 @@ namespace freeze
 
 	private:
 		mutable std::mutex _mutex;
-		fs::path _watch_path;
-		fs::path _sync_path;
+		fs::path _watch_path{};
+		fs::path _sync_path{};
 		std::vector<fs::path> _sync_igonres;
 	};
 }
