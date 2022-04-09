@@ -1,6 +1,6 @@
 #include "common_dep.h"
 #include "service_utils.h"
-#include "service_utils_ex.h"
+// #include "service_utils_ex.h"
 
 namespace freeze::detail
 {
@@ -28,7 +28,7 @@ namespace freeze::detail
 		auto len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, nullptr, 0);
 		auto pwstr = std::make_unique<wchar_t[]>(len);
 		len = MultiByteToWideChar(CP_UTF8, 0, mbs.c_str(), -1, pwstr.get(), len);
-		std::wstring wcs(pwstr.get(), len - 1); // erase null-terminated
+		std::wstring wcs(pwstr.get(), len - 1); // want erase null-terminated
 		return wcs;
 	}
 }
@@ -703,5 +703,95 @@ namespace freeze::detail
 		}
 		CloseHandle(file_handle);
 		return !!success;
+	}
+}
+
+namespace freeze
+{
+	regkey_semaphore::regkey_semaphore()
+	{
+	}
+
+	void regkey_semaphore::wait()
+	{
+		reset();
+	}
+
+	void regkey_semaphore::notify()
+	{
+		_singal.release();
+	}
+
+	void regkey_semaphore::reset()
+	{
+		_singal.acquire();
+	}
+}
+
+namespace freeze
+{
+	locked_regkey::locked_regkey()
+	{
+	}
+
+	locked_regkey::~locked_regkey()
+	{
+		_running = false;
+		_semaphore.notify();
+	}
+
+	// locked_regkey &locked_regkey::instance()
+	// {
+	// 	static locked_regkey _regkey{};
+	// 	return _regkey;
+	// }
+
+	void locked_regkey::save_latest_folder(std::wstring const &folder)
+	{
+		this->_folder = folder;
+		_semaphore.notify();
+		Sleep(50);
+		_semaphore.wait();
+	}
+
+	std::wstring locked_regkey::read_latest_folder()
+	{
+		_semaphore.notify();
+		Sleep(50);
+		_semaphore.wait();
+		return this->_folder;
+	}
+
+	void locked_regkey::thread_work()
+	{
+		while (true)
+		{
+			_semaphore.wait();
+			if (!_running)
+			{
+				break;
+			}
+
+			if (_save)
+			{
+				detail::save_latest_folder(_folder);
+			}
+			else
+			{
+				_folder = detail::read_latest_folder();
+			}
+			_semaphore.notify();
+		}
+	}
+
+	void locked_regkey::thread_loop()
+	{
+		_thread = std::jthread([this]
+							   {
+			if(this)
+			{
+				this->_running = true;
+				this->thread_work();
+			} });
 	}
 }

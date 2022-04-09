@@ -1679,7 +1679,6 @@ namespace freeze
 	{
 		try
 		{
-			Sleep(50);
 			auto latest_folder = freeze::detail::read_latest_folder();
 			Sleep(50);
 			_sync_path = fs::path(detail::to_utf16(detail::to_utf8(latest_folder)));
