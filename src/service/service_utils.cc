@@ -750,14 +750,14 @@ namespace freeze
 	{
 		this->_folder = folder;
 		_semaphore.notify();
-		Sleep(50);
+		std::this_thread::sleep_for(50ms);
 		_semaphore.wait();
 	}
 
 	std::wstring locked_regkey::read_latest_folder()
 	{
 		_semaphore.notify();
-		Sleep(50);
+		std::this_thread::sleep_for(50ms);
 		_semaphore.wait();
 		return this->_folder;
 	}

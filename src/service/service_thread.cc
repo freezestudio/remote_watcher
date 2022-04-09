@@ -42,6 +42,7 @@ void reset_work_folder(bool notify /* = false */)
 {
 	// TODO: maybe need lock
 	auto wcs_folder = freeze::detail::read_latest_folder();
+	std::this_thread::sleep_for(50ms);
 	DEBUG_STRING(L"@rg reset_work_folder(): read latest={}, notify-to-WorkThread={}.\n"sv, wcs_folder, notify);
 
 	if (wcs_folder.empty())

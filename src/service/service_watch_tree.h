@@ -57,7 +57,7 @@ namespace freeze
 		std::mutex mutex;
 	};
 
-	std::shared_ptr<watch_tree> watch_tree_instace(
+	std::shared_ptr<watch_tree> watch_tree_instance(
 		fs::path const& folder, std::vector<fs::path>const& ignores = {}, bool reset = false);
 }
 

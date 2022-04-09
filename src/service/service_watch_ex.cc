@@ -77,7 +77,7 @@ namespace freeze
 			force_reset = true;
 		}
 
-		watch_tree_ptr = watch_tree_instace(this->folder, ignores, force_reset);
+		watch_tree_ptr = watch_tree_instance(this->folder, ignores, force_reset);
 
 		running = true;
 		DEBUG_STRING(

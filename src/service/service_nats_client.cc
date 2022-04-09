@@ -1558,14 +1558,14 @@ namespace freeze
 		DEBUG_STRING(L"nats_client::message_response(): {} handling ...\n"sv, detail::to_utf16(_recv_msg.name));
 
 		std::string _send_msg;
-		if (_recv_msg.name == std::string(MSG_LIST_DISK))
+		if (_recv_msg.name == std::string(MSG_LIST_DISK)) // list disk
 		{
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: call get_harddisks_ex() ...\n");
 			auto disk_names = detail::get_harddisks_ex();
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[list-disk]: disk count={}\n"sv, disk_names.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, disk_names);
 		}
-		else if (_recv_msg.name == std::string(MSG_LIST_DIR))
+		else if (_recv_msg.name == std::string(MSG_LIST_DIR)) // select directory
 		{
 			auto dir = detail::to_utf16(_recv_msg.folder);
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-directory]: dir={}\n"sv, dir);
@@ -1575,7 +1575,7 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-directory]: folders-count={}\n"sv, folders.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, folders);
 		}
-		else if (_recv_msg.name == std::string(MSG_LIST_FILE)) // unused.
+		else if (_recv_msg.name == std::string(MSG_LIST_FILE)) // select-files unused.
 		{
 			auto dir = detail::to_utf16(_recv_msg.folder);
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: dir={}\n"sv, dir);
@@ -1585,9 +1585,10 @@ namespace freeze
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[select-files]: files-count={}\n"sv, files.size());
 			_send_msg = detail::make_send_message_string(_recv_msg.name, files);
 		}
-		else if (_recv_msg.name == std::string(MSG_FOLDER))
+		else if (_recv_msg.name == std::string(MSG_FOLDER)) // watch folder
 		{
 			auto wcs_folder = detail::read_latest_folder();
+			std::this_thread::sleep_for(50ms);
 			DEBUG_STRING(L"nats_client::message_response(): notify-message[watch-folder]: current watch folder: {}.\n"sv, wcs_folder);
 
 			std::vector<std::string> _one;
@@ -1600,7 +1601,7 @@ namespace freeze
 			}
 			_send_msg = detail::make_send_message_string(_recv_msg.name, _one);
 		}
-		else if (_recv_msg.name == std::string(MSG_TREE_INFO))
+		else if (_recv_msg.name == std::string(MSG_TREE_INFO)) // tree info
 		{
 			_sync_path = fs::path{_recv_msg.folder};
 			std::vector<fs::path>{}.swap(_sync_igonres);
@@ -1645,7 +1646,7 @@ namespace freeze
 		{
 			DEBUG_STRING(L"nats_client::send_payload(): from root path: {}.\n"sv, this->_watch_path.c_str());
 			// std::unique_lock<std::mutex> lock(_mutex);
-			auto watch_tree_ptr = watch_tree_instace(this->_watch_path);
+			auto watch_tree_ptr = watch_tree_instance(this->_watch_path);
 			if (!watch_tree_ptr)
 			{
 				DEBUG_STRING(L"nats_client::send_payload(): watch-tree is null, payload not send.\n");
@@ -1680,7 +1681,7 @@ namespace freeze
 		try
 		{
 			auto latest_folder = freeze::detail::read_latest_folder();
-			Sleep(50);
+			std::this_thread::sleep_for(50ms);
 			_sync_path = fs::path(detail::to_utf16(detail::to_utf8(latest_folder)));
 			DEBUG_STRING(L"nats_client::sync_files(): sync-path={}"sv, _sync_path.c_str());
 			auto tree_paths = freeze::detail::get_dirtree_paths(_sync_path, _sync_igonres);

@@ -94,7 +94,7 @@ namespace freeze
 		path_watch_trees;
 	static std::shared_ptr<watch_tree> _g_watch_tree_instance = nullptr;
 	static std::mutex _g_mutex;
-	std::shared_ptr<watch_tree> watch_tree_instace(fs::path const& folder, std::vector<fs::path> const& ignores /*= {}*/, bool reset /*= false*/)
+	std::shared_ptr<watch_tree> watch_tree_instance(fs::path const& folder, std::vector<fs::path> const& ignores /*= {}*/, bool reset /*= false*/)
 	{
 		std::lock_guard<std::mutex> lock(_g_mutex);
 		if (!_g_watch_tree_instance || reset)
